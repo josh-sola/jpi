@@ -1,0 +1,130 @@
+// jpi.kdl — config for all jpi plugins.
+// Sections are added by each plugin on first load.
+
+guardian {
+  // model that runs the reviews; unset defaults to anthropic/claude-sonnet-5
+  // model "provider/model-id"
+  // set to #false to disable reviews
+  enabled #true
+  // per-review timeout in milliseconds
+  timeout-ms 10000
+  allow {
+    // tool names that skip review (repeat: tool "name")
+    tool "read"
+    tool "find"
+    tool "grep"
+    tool "ls"
+    tool "ask_user_question"
+    tool "bg_delegate"
+    tool "bg_result"
+    tool "bg_run_pi_attested"
+    tool "bg_status"
+    tool "bg_logs"
+    tool "bg_kill"
+    tool "Agent"
+    tool "get_subagent_result"
+    tool "steer_subagent"
+    tool "TaskCreate"
+    tool "TaskList"
+    tool "TaskGet"
+    tool "TaskUpdate"
+    tool "TaskOutput"
+    tool "TaskStop"
+    tool "TaskExecute"
+    tool "schedule_prompt"
+    // regexes; a full command match skips review
+    bash "^git.*$"
+    bash "^gh.*$"
+    bash "^gt.*$"
+    bash "^uv +run.*(pytest|ruff|ty).*$"
+    bash "^make.*type-check.*$"
+    bash "^ps +aux$"
+    bash "^docker +(inspect|logs).*$"
+    bash #"^aws +sts +get-caller-identity(?: +[A-Za-z0-9_./:=,@%+~^*?{}\[\]-]+)*$"#
+  }
+  // extra review policy lines
+}
+
+status {
+  format {
+    row "@jpi/model" "@jpi/context" "@jpi/repository" "@jpi/branch"
+    row "@jpi/name" "@jpi/directory"
+    row "@jpi/slot"
+  }
+}
+
+background {
+  // bytes of output a task may write before it is capped and killed
+  max-output-bytes 20971520
+  // default per-task timeout in seconds; 0 means tasks run until they exit
+  default-timeout-seconds 0
+  // lifetime in seconds for a non-persistent monitor before it is stopped
+  monitor-timeout-seconds 1800
+  // monitor events allowed per minute before flood suppression kicks in
+  max-monitor-events-per-minute 30
+}
+
+subagents {
+  // max concurrent background agents
+  max-concurrent 10
+  // max concurrent foreground (blocking) agents; 0 = unlimited
+  max-concurrent-foreground 0
+  // default max turns before wrap-up; 0 = unlimited
+  default-max-turns 0
+  // grace turns after wrap-up steer
+  grace-turns 5
+  // default join mode for background agents
+  default-join-mode smart
+  // an Agent call that doesn't say run_in_background runs detached
+  background-by-default #true
+  // master switch for the schedule subagent feature
+  scheduling-enabled #true
+  // validate subagent models against pi's enabledModels
+  scope-models #false
+  // abort extension load on a broken agent file instead of skipping it with a warning
+  strict-agent-files #false
+  // skip registering the built-in default agents (general-purpose, Explore, Plan)
+  disable-default-agents #false
+  // Agent tool description sent to the LLM: full, compact, or custom
+  tool-description-mode full
+  // show the Claude Code-style fleet list below the editor
+  fleet-view #true
+  // route `@handle message` at the prompt to that subagent: model, direct, or off
+  agent-mentions model
+  // persist subagent sessions by default, so @handle can resume one after it finishes
+  remember-agents #true
+  // above-editor agent widget: all, background (hide foreground), or off
+  widget-mode background
+  // write each subagent's .output transcript by default
+  output-transcript #true
+  // allow isolation: worktree to create a git worktree
+  worktree-isolation #true
+  // master switch for scripted workflows; auto yields to another extension's workflow tool
+  workflows-enabled auto
+  // hard cap on nested subagent delegation depth; 0 or 1 disables nesting
+  max-subagent-depth 2
+  // agent type substituted when subagent_type is unknown, disabled, or ambiguous; #false rejects the call instead
+  fallback-subagent general-purpose
+  // add subagent tokens and cost to this session's own totals
+  report-usage #false
+  // show an estimated dollar cost beside subagent token counts
+  show-cost #false
+  // name the model and thinking level on the widget's running rows
+  show-model #false
+  // how much of the conversation viewer's transcript renders as Markdown
+  viewer-markdown all
+}
+
+tasks {
+  // where the task list is stored — memory, session, or project
+  scope "session"
+  // when completed tasks are swept from the list
+  auto-clear-completed "on_list_complete"
+}
+
+scratchpad {
+  // set to #false to disable the scratchpad
+  enabled #true
+  // age in days after which a stale session's scratchpad dir is swept
+  ttl-days 7
+}

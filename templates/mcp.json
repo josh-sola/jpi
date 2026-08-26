@@ -1,0 +1,47 @@
+{
+  "settings": {
+    "mcpFooterStatus": "off"
+  },
+  "mcpServers": {
+    "metabase-prod": {
+      "url": "https://production-metabase-debug.tail67f40b.ts.net/api/metabase-mcp"
+    },
+    "metabase-dev": {
+      "url": "https://development-metabase-debug.tail67f40b.ts.net/api/metabase-mcp"
+    },
+    "datadog-prod": {
+      "url": "https://mcp.datadoghq.com/v1/mcp?toolsets=core,dashboards,alerting,llmobs,error-tracking,software-delivery,profiling",
+      "auth": "oauth"
+    },
+    "datadog-dev": {
+      "url": "https://mcp.datadoghq.com/v1/mcp?toolsets=core,dashboards,alerting,llmobs,error-tracking,software-delivery,profiling",
+      "headers": {
+        "Authorization": "Bearer ${DD_DEV_TOKEN}"
+      }
+    },
+    "sentry": {
+      "url": "https://mcp.sentry.dev/mcp",
+      "auth": "oauth",
+      "protocolVersion": "auto"
+    },
+    "linear": {
+      "url": "https://mcp.linear.app/mcp",
+      "auth": "oauth",
+      "protocolVersion": "auto"
+    },
+    "planhub": {
+      "url": "https://planhub-sola-internal-toy.tail67f40b.ts.net/mcp"
+    },
+    "duckdb-logs-dev": {
+      "url": "https://development-duckdb-logs-mcp-debug.tail67f40b.ts.net/mcp"
+    },
+    "duckdb-logs-prod": {
+      "url": "https://production-duckdb-logs-mcp-debug.tail67f40b.ts.net/mcp"
+    },
+    "notion": {
+      "url": "https://mcp.notion.com/mcp",
+      "auth": "oauth",
+      "protocolVersion": "auto"
+    }
+  }
+}
