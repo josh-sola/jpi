@@ -23,7 +23,7 @@ The script, in order:
 
 1. Checks Node is installed and its major version is at least 24. It exits
    with a clear message if not — see Troubleshooting below.
-2. Installs the `pi` CLI globally if it is not already on `PATH`.
+2. Installs the `pi` CLI globally via pnpm if it is not already on `PATH`.
 3. Installs the 16 packages listed in the table below via `pi install`.
    Re-running this step is safe: `pi install` updates an already-installed
    package rather than failing.
@@ -69,6 +69,8 @@ These steps need a person, not just the agent:
 
 - **Node is older than 24** — `setup.sh` exits with a message saying so.
   Upgrade Node and re-run.
+- **`pnpm add -g` can't find a global bin directory** — run `pnpm setup`,
+  restart the shell, and re-run `setup.sh`.
 - **A config file already existed** — `setup.sh` prints "Left alone" for
   each file it skipped. Diff that file against the matching one in
   `templates/` yourself to see what's different, and decide whether the

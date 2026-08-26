@@ -16,8 +16,17 @@ if [ "$node_major" -lt 24 ]; then
 fi
 
 if ! command -v pi >/dev/null 2>&1; then
+  if ! command -v pnpm >/dev/null 2>&1; then
+    echo "pnpm not found. Install pnpm, then re-run this script." >&2
+    exit 1
+  fi
   echo "Installing @earendil-works/pi-coding-agent..."
-  npm install -g @earendil-works/pi-coding-agent
+  # fails with "Unable to find the global bin directory" until `pnpm setup`
+  # has run once; point the user there instead of leaving a bare pnpm error
+  if ! pnpm add -g @earendil-works/pi-coding-agent; then
+    echo "pnpm add -g failed. If it could not find a global bin directory, run 'pnpm setup', restart your shell, and re-run this script." >&2
+    exit 1
+  fi
 fi
 
 # jpi-prompt must come before other prompt-modifying packages (jpi-memory,
