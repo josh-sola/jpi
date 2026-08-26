@@ -38,10 +38,6 @@ https://raw.githubusercontent.com/josh-sola/jpi/main/ONBOARDING.md
 | `jpi-scratchpad` | A session scratchpad directory, steering the model away from `/tmp`. |
 | `jpi-style` | Claude-Code-style rendering for tool calls and results. |
 
-Left out on purpose: `jpi-planter` (talks to Josh's personal macOS app) and
-`jpi-sidebar` (a personal TUI sidebar). `jpi-base` is a shared library the
-others depend on, not something you install directly.
-
 ## What gets configured
 
 `setup.sh` seeds these files under the Pi agent directory

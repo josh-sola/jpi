@@ -97,7 +97,3 @@ These steps need a person, not just the agent:
 | `git:github.com/josh-sola/jpi-tasks` | A plain todo list: create/list/update tasks, plus a persistent widget. |
 | `git:github.com/josh-sola/jpi-scratchpad` | A session scratchpad directory, steering the model away from `/tmp`. |
 | `git:github.com/josh-sola/jpi-style` | Claude-Code-style rendering for tool calls and results. |
-
-Not installed by this repo: `jpi-planter` (talks to a personal macOS app)
-and `jpi-sidebar` (a personal TUI sidebar). `jpi-base` is a shared library
-the other plugins depend on, not something installed on its own.
