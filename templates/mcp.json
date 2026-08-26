@@ -13,12 +13,6 @@
       "url": "https://mcp.datadoghq.com/v1/mcp?toolsets=core,dashboards,alerting,llmobs,error-tracking,software-delivery,profiling",
       "auth": "oauth"
     },
-    "datadog-dev": {
-      "url": "https://mcp.datadoghq.com/v1/mcp?toolsets=core,dashboards,alerting,llmobs,error-tracking,software-delivery,profiling",
-      "headers": {
-        "Authorization": "Bearer ${DD_DEV_TOKEN}"
-      }
-    },
     "sentry": {
       "url": "https://mcp.sentry.dev/mcp",
       "auth": "oauth",

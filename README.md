@@ -58,7 +58,6 @@ one of these files, `setup.sh` leaves it alone and tells you so.
 2. Pick a default model.
 3. Optionally set the guardian review model in `jpi.kdl` — see the comment
    above the `model` line in the `guardian { }` section.
-4. Export `DD_DEV_TOKEN` if you want the `datadog-dev` MCP server.
 
 ## Re-running is safe
 

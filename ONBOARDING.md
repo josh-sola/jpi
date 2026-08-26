@@ -63,9 +63,6 @@ These steps need a person, not just the agent:
   they run. Reviews default to `anthropic/claude-sonnet-5`; to use a different
   model, set it in the `guardian { }` section of `jpi.kdl` (see the comment
   above the `model` line there).
-- **`DD_DEV_TOKEN`** — export this environment variable if the person wants
-  the `datadog-dev` MCP server (it authenticates with a bearer token from
-  this variable; `datadog-prod` uses OAuth instead and needs no token).
 
 ## Troubleshooting
 

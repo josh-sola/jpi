@@ -80,5 +80,4 @@ Setup complete. Next steps:
   1. Start pi and authenticate: run /login, or export a provider API key.
   2. Pick a default provider and model.
   3. Optionally set the guardian review model in $AGENT_DIR/jpi.kdl.
-  4. Export DD_DEV_TOKEN if you want the datadog-dev MCP server.
 EOF
