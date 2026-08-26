@@ -20,7 +20,11 @@ if ! command -v pi >/dev/null 2>&1; then
   npm install -g @earendil-works/pi-coding-agent
 fi
 
+# jpi-prompt must come before other prompt-modifying packages (jpi-memory,
+# jpi-scratchpad) in settings.json's packages array: it replaces the system
+# prompt outright and would discard sections a package before it appended.
 packages=(
+  "git:github.com/josh-sola/jpi-prompt"
   "npm:pi-mcp-adapter"
   "npm:@juicesharp/rpiv-ask-user-question"
   "npm:pi-schedule-prompt"
@@ -35,6 +39,7 @@ packages=(
   "git:github.com/josh-sola/jpi-tasks"
   "git:github.com/josh-sola/jpi-scratchpad"
   "git:github.com/josh-sola/jpi-style"
+  "git:github.com/josh-sola/jpi-history"
 )
 
 # pi install updates an already-installed source in place rather than failing,
@@ -44,7 +49,7 @@ for pkg in "${packages[@]}"; do
   pi install "$pkg"
 done
 
-mkdir -p "$AGENT_DIR/agents"
+mkdir -p "$AGENT_DIR"
 
 seed_file() {
   local src="$1" dest="$2"
@@ -58,9 +63,7 @@ seed_file() {
 
 seed_file "$SCRIPT_DIR/templates/jpi.kdl" "$AGENT_DIR/jpi.kdl"
 seed_file "$SCRIPT_DIR/templates/mcp.json" "$AGENT_DIR/mcp.json"
-for src in "$SCRIPT_DIR"/templates/agents/*.md; do
-  seed_file "$src" "$AGENT_DIR/agents/$(basename "$src")"
-done
+seed_file "$SCRIPT_DIR/templates/JPI-SYSTEM.md" "$AGENT_DIR/JPI-SYSTEM.md"
 
 node -e '
 const fs = require("fs");

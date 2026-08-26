@@ -41,6 +41,16 @@ guardian {
     bash "^ps +aux$"
     bash "^docker +(inspect|logs).*$"
     bash #"^aws +sts +get-caller-identity(?: +[A-Za-z0-9_./:=,@%+~^*?{}\[\]-]+)*$"#
+    // MCP servers whose tools skip review (repeat: mcp "server")
+    mcp "datadog-prod"
+    mcp "metabase-prod"
+    mcp "metabase-dev"
+    mcp "duckdb-logs-prod"
+    mcp "duckdb-logs-dev"
+    mcp "sentry"
+    mcp "linear"
+    mcp "notion"
+    mcp "planhub"
   }
   // extra review policy lines
 }
@@ -48,8 +58,7 @@ guardian {
 status {
   format {
     row "@jpi/model" "@jpi/context" "@jpi/repository" "@jpi/branch"
-    row "@jpi/name" "@jpi/directory"
-    row "@jpi/slot"
+    row "@jpi-guardian/review-mode" "@jpi-background/tasks" "@jpi-background/monitors" "@jpi/slot"
   }
 }
 
@@ -77,13 +86,11 @@ subagents {
   default-join-mode smart
   // an Agent call that doesn't say run_in_background runs detached
   background-by-default #true
-  // master switch for the schedule subagent feature
-  scheduling-enabled #true
   // validate subagent models against pi's enabledModels
-  scope-models #false
+  scope-models #true
   // abort extension load on a broken agent file instead of skipping it with a warning
   strict-agent-files #false
-  // skip registering the built-in default agents (general-purpose, Explore, Plan)
+  // skip registering the built-in default agents (general-purpose, explore, plan)
   disable-default-agents #false
   // Agent tool description sent to the LLM: full, compact, or custom
   tool-description-mode full
@@ -94,13 +101,11 @@ subagents {
   // persist subagent sessions by default, so @handle can resume one after it finishes
   remember-agents #true
   // above-editor agent widget: all, background (hide foreground), or off
-  widget-mode background
+  widget-mode off
   // write each subagent's .output transcript by default
   output-transcript #true
   // allow isolation: worktree to create a git worktree
   worktree-isolation #true
-  // master switch for scripted workflows; auto yields to another extension's workflow tool
-  workflows-enabled auto
   // hard cap on nested subagent delegation depth; 0 or 1 disables nesting
   max-subagent-depth 2
   // agent type substituted when subagent_type is unknown, disabled, or ambiguous; #false rejects the call instead
@@ -127,4 +132,9 @@ scratchpad {
   enabled #true
   // age in days after which a stale session's scratchpad dir is swept
   ttl-days 7
+}
+
+history {
+  // prompts the log file retains; the oldest are dropped at session start
+  max-size 1000
 }

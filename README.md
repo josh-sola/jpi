@@ -27,6 +27,7 @@ https://raw.githubusercontent.com/josh-sola/jpi/main/ONBOARDING.md
 | `@juicesharp/rpiv-ask-user-question` | Adds an `ask_user_question` tool for mid-task clarification. |
 | `pi-schedule-prompt` | Schedules a prompt to run later. |
 | `pi-rewind` | Rewinds a session to an earlier point. |
+| `jpi-prompt` | The system prompt as a plain markdown file you own (`JPI-SYSTEM.md` in the agent dir), re-read every turn. |
 | `jpi-guardian` | Auto-review gate for tool calls, configured in the `guardian { }` section of `jpi.kdl`. |
 | `jpi-status` | Configurable status footer, configured in the `status { }` section of `jpi.kdl`. |
 | `jpi-memory` | Persistent memory: one markdown file per fact plus an index, under the agent dir. |
@@ -37,6 +38,7 @@ https://raw.githubusercontent.com/josh-sola/jpi/main/ONBOARDING.md
 | `jpi-tasks` | A plain todo list: create/list/update tasks, plus a persistent widget. |
 | `jpi-scratchpad` | A session scratchpad directory, steering the model away from `/tmp`. |
 | `jpi-style` | Claude-Code-style rendering for tool calls and results. |
+| `jpi-history` | Prompt history across sessions: every prompt typed is one up-arrow or `ctrl+r` away. |
 
 ## What gets configured
 
@@ -45,8 +47,8 @@ https://raw.githubusercontent.com/josh-sola/jpi/main/ONBOARDING.md
 
 - `jpi.kdl` — settings for the jpi plugins (from `templates/jpi.kdl`)
 - `mcp.json` — the MCP server registry (from `templates/mcp.json`)
-- `agents/explore.md`, `agents/plan.md`, `agents/general-purpose.md` — custom
-  subagent definitions (from `templates/agents/`)
+- `JPI-SYSTEM.md` — the system prompt template jpi-prompt reads (from
+  `templates/JPI-SYSTEM.md`)
 - `settings.json` — merges in `tuiMode: "fullscreen"` and a `theme` default
 
 It never overwrites a file that already exists there. If you already have

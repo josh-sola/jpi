@@ -24,12 +24,12 @@ The script, in order:
 1. Checks Node is installed and its major version is at least 24. It exits
    with a clear message if not — see Troubleshooting below.
 2. Installs the `pi` CLI globally if it is not already on `PATH`.
-3. Installs the 14 packages listed in the table below via `pi install`.
+3. Installs the 16 packages listed in the table below via `pi install`.
    Re-running this step is safe: `pi install` updates an already-installed
    package rather than failing.
-4. Seeds `jpi.kdl`, `mcp.json`, and the three files under `agents/` into
-   the Pi agent directory (`$PI_CODING_AGENT_DIR`, default `~/.pi/agent`) —
-   but only for files that do not already exist there.
+4. Seeds `jpi.kdl`, `mcp.json`, and `JPI-SYSTEM.md` into the Pi agent
+   directory (`$PI_CODING_AGENT_DIR`, default `~/.pi/agent`) — but only for
+   files that do not already exist there.
 5. Merges `tuiMode` and `theme` defaults into `settings.json`, without
    touching any other key already set there.
 6. Prints next steps for the human (see part 4 below).
@@ -41,13 +41,14 @@ what happened.
 
 After `setup.sh` finishes, confirm:
 
-- `pi list` shows all 14 packages from the table below.
+- `pi list` shows all 16 packages from the table below.
 - `$AGENT_DIR/jpi.kdl` exists.
 - `$AGENT_DIR/mcp.json` exists.
-- `$AGENT_DIR/agents/explore.md`, `agents/plan.md`, and
-  `agents/general-purpose.md` all exist.
-- `$AGENT_DIR/settings.json` has a `packages` array containing the 14
-  package sources.
+- `$AGENT_DIR/JPI-SYSTEM.md` exists.
+- `$AGENT_DIR/settings.json` has a `packages` array containing the 16
+  package sources, with `git:github.com/josh-sola/jpi-prompt` before
+  `jpi-memory` and `jpi-scratchpad` (jpi-prompt replaces the system prompt
+  outright, so packages that append to it must load after it).
 
 (`$AGENT_DIR` is `$PI_CODING_AGENT_DIR`, or `~/.pi/agent` if that variable
 is unset.)
@@ -84,6 +85,7 @@ These steps need a person, not just the agent:
 | `npm:@juicesharp/rpiv-ask-user-question` | Adds an `ask_user_question` tool for mid-task clarification. |
 | `npm:pi-schedule-prompt` | Schedules a prompt to run later. |
 | `npm:pi-rewind` | Rewinds a session to an earlier point. |
+| `git:github.com/josh-sola/jpi-prompt` | The system prompt as a plain markdown file you own (`JPI-SYSTEM.md` in the agent dir), re-read every turn. |
 | `git:github.com/josh-sola/jpi-guardian` | Auto-review gate for tool calls, configured in the `guardian { }` section of `jpi.kdl`. |
 | `git:github.com/josh-sola/jpi-status` | Configurable status footer, configured in the `status { }` section of `jpi.kdl`. |
 | `git:github.com/josh-sola/jpi-memory` | Persistent memory: one markdown file per fact plus an index, under the agent dir. |
@@ -94,3 +96,4 @@ These steps need a person, not just the agent:
 | `git:github.com/josh-sola/jpi-tasks` | A plain todo list: create/list/update tasks, plus a persistent widget. |
 | `git:github.com/josh-sola/jpi-scratchpad` | A session scratchpad directory, steering the model away from `/tmp`. |
 | `git:github.com/josh-sola/jpi-style` | Claude-Code-style rendering for tool calls and results. |
+| `git:github.com/josh-sola/jpi-history` | Prompt history across sessions: every prompt typed is one up-arrow or `ctrl+r` away. |
