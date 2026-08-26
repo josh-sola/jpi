@@ -9,28 +9,15 @@ guardian {
   // per-review timeout in milliseconds
   timeout-ms 10000
   allow {
-    // tool names that skip review (repeat: tool "name")
-    tool "read"
-    tool "find"
-    tool "grep"
-    tool "ls"
-    tool "ask_user_question"
-    tool "bg_delegate"
-    tool "bg_result"
-    tool "bg_run_pi_attested"
-    tool "bg_status"
-    tool "bg_logs"
+    // tool names that skip review (repeat: tool "name").
+    // Read-only tools (read, grep, find, ls, ask_user_question, bg_status,
+    // bg_logs, TaskList, TaskGet, get_subagent_result, web_search, web_fetch)
+    // are built into jpi-guardian by default. List only the extras here.
     tool "bg_kill"
     tool "Agent"
-    tool "get_subagent_result"
     tool "steer_subagent"
     tool "TaskCreate"
-    tool "TaskList"
-    tool "TaskGet"
     tool "TaskUpdate"
-    tool "TaskOutput"
-    tool "TaskStop"
-    tool "TaskExecute"
     tool "schedule_prompt"
     // regexes; a full command match skips review
     bash "^git.*$"
