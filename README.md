@@ -10,7 +10,7 @@ and drops in starter config files.
 git clone git@github.com:josh-sola/jpi.git && cd jpi && ./setup.sh
 ```
 
-## Have your agent do it
+## Have your model do it
 
 Point your coding agent at `ONBOARDING.md` and ask it to follow the
 instructions there. Raw URL:
