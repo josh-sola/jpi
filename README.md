@@ -49,7 +49,8 @@ https://raw.githubusercontent.com/josh-sola/jpi/main/ONBOARDING.md
 - `mcp.json` — the MCP server registry (from `templates/mcp.json`)
 - `JPI-SYSTEM.md` — the system prompt template jpi-prompt reads (from
   `templates/JPI-SYSTEM.md`)
-- `settings.json` — merges in `tuiMode: "fullscreen"` and a `theme` default
+- `settings.json` — merges in UI and behavior defaults from
+  `templates/settings-defaults.json`, only for keys you haven't set
 
 It never overwrites a file that already exists there. If you already have
 one of these files, `setup.sh` leaves it alone and tells you so.

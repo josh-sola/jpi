@@ -76,15 +76,17 @@ seed_file "$SCRIPT_DIR/templates/JPI-SYSTEM.md" "$AGENT_DIR/JPI-SYSTEM.md"
 
 node -e '
 const fs = require("fs");
-const settingsPath = process.argv[1];
+const [settingsPath, defaultsPath] = process.argv.slice(1);
 let settings = {};
 if (fs.existsSync(settingsPath)) {
   settings = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
 }
-if (!("tuiMode" in settings)) settings.tuiMode = "fullscreen";
-if (!("theme" in settings)) settings.theme = "dark";
+const defaults = JSON.parse(fs.readFileSync(defaultsPath, "utf-8"));
+for (const [key, value] of Object.entries(defaults)) {
+  if (!(key in settings)) settings[key] = value;
+}
 fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
-' "$AGENT_DIR/settings.json"
+' "$AGENT_DIR/settings.json" "$SCRIPT_DIR/templates/settings-defaults.json"
 
 cat <<EOF
 

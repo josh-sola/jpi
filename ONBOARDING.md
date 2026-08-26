@@ -30,8 +30,8 @@ The script, in order:
 4. Seeds `jpi.kdl`, `mcp.json`, and `JPI-SYSTEM.md` into the Pi agent
    directory (`$PI_CODING_AGENT_DIR`, default `~/.pi/agent`) — but only for
    files that do not already exist there.
-5. Merges `tuiMode` and `theme` defaults into `settings.json`, without
-   touching any other key already set there.
+5. Merges the UI and behavior defaults from `templates/settings-defaults.json`
+   into `settings.json`, without touching any key already set there.
 6. Prints next steps for the human (see part 4 below).
 
 Do not re-implement these steps yourself — just run the script and report

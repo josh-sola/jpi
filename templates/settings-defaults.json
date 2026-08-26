@@ -1,0 +1,18 @@
+{
+  "theme": "dark",
+  "tuiMode": "fullscreen",
+  "followUpMode": "all",
+  "steeringMode": "all",
+  "doubleEscapeAction": "tree",
+  "treeFilterMode": "default",
+  "editorPaddingX": 1,
+  "fullscreenScrollbar": "auto",
+  "hideThinkingBlock": false,
+  "terminal": {
+    "showTerminalProgress": false
+  },
+  "markdown": {
+    "mermaid": "streaming"
+  },
+  "enableInstallTelemetry": false
+}
