@@ -743,7 +743,7 @@ test("custom commands start immediately, run duplicates concurrently, and use on
 
 test("custom failures hide output and warn once per reason; timeouts stay silent", async () => {
   const scheduler = manualScheduler();
-  const notifications: Array<{ message: string; level: "warning" }> = [];
+  const notifications: Array<{ message: string; level: NotifyLevel }> = [];
   const responses: Array<ExecResult | Error> = [
     ok("visible"),
     { ...ok(), code: 7, stderr: " denied\nnow " },

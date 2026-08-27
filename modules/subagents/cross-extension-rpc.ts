@@ -9,16 +9,13 @@
  *   error   → { success: false, error: string }
  */
 
+import type { EventBus } from "../../src/core/index.ts";
 import { isTopLevelAgent } from "./agent-manager.ts";
 import { type ModelRegistry, resolveModel } from "./model-resolver.ts";
 import { checkModelScope } from "./model-scope.ts";
 import type { AgentRecord } from "./types.ts";
 
-/** Minimal event bus interface needed by the RPC handlers. */
-export interface EventBus {
-  on(event: string, handler: (data: unknown) => void): () => void;
-  emit(event: string, data: unknown): void;
-}
+export type { EventBus };
 
 /** RPC protocol version — bumped when the envelope or method contracts change. */
 export const PROTOCOL_VERSION = 2;

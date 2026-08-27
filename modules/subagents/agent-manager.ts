@@ -19,6 +19,7 @@ import { statSync } from "node:fs";
 import { isAbsolute } from "node:path";
 import type { Model } from "@earendil-works/pi-ai";
 import type { AgentSession, ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { errorMessage } from "../../src/core/index.ts";
 import { abortable } from "./abortable.ts";
 import { resumeAgent, runAgent, type ToolActivity } from "./agent-runner.ts";
 import { assignHandle, handleBase } from "./mention.ts";
@@ -648,7 +649,7 @@ export class AgentManager {
           // session about it — the same failure reported twice.
           if (queuedPool === "foreground") record.resultConsumed = true;
           record.status = "error";
-          record.error = err instanceof Error ? err.message : String(err);
+          record.error = errorMessage(err);
           record.completedAt = Date.now();
           this.onComplete?.(record);
         } else {
@@ -941,7 +942,7 @@ export class AgentManager {
       })
       .catch(async (err) => {
         this.markErrored(record);
-        record.error = err instanceof Error ? err.message : String(err);
+        record.error = errorMessage(err);
         record.completedAt ??= Date.now();
 
         detach();
@@ -1265,7 +1266,7 @@ export class AgentManager {
               // Don't overwrite status if externally stopped via abort() while queued.
               if (record.status !== "stopped") {
                 this.markErrored(record);
-                record.error = err instanceof Error ? err.message : String(err);
+                record.error = errorMessage(err);
               }
               record.completedAt ??= Date.now();
               this.onComplete?.(record);
@@ -1322,7 +1323,7 @@ export class AgentManager {
     } catch (err) {
       if (!this.isStopped(record)) {
         this.markErrored(record);
-        record.error = err instanceof Error ? err.message : String(err);
+        record.error = errorMessage(err);
       }
       record.completedAt ??= Date.now();
     }
@@ -1437,7 +1438,7 @@ export class AgentManager {
       .catch((err) => {
         if (record.status !== "stopped") {
           this.markErrored(record);
-          record.error = err instanceof Error ? err.message : String(err);
+          record.error = errorMessage(err);
         }
         record.completedAt ??= Date.now();
         settle();

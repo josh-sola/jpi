@@ -9,6 +9,8 @@
  */
 
 import { truncateToWidth } from "@earendil-works/pi-tui";
+
+import { errorMessage, type Notifier } from "../../../src/core/index.ts";
 import type { TaskStore } from "../task-store.ts";
 import type { Task } from "../types.ts";
 
@@ -43,7 +45,7 @@ export type UICtx = {
     content: undefined | ((tui: any, theme: Theme) => { render(): string[]; invalidate(): void }),
     options?: { placement?: "aboveEditor" | "belowEditor" },
   ): void;
-  notify(message: string, type?: "info" | "warning" | "error"): void;
+  notify: Notifier;
 };
 
 /** Per-task runtime metrics (elapsed time, token usage). */
@@ -151,7 +153,7 @@ export class TaskWidget {
       if (!this.renderErrorNotified) {
         this.renderErrorNotified = true;
         this.uiCtx?.notify(
-          `Task widget failed to render and will stay blank: ${error instanceof Error ? error.message : String(error)}`,
+          `Task widget failed to render and will stay blank: ${errorMessage(error)}`,
           "warning",
         );
       }

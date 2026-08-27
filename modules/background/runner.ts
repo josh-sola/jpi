@@ -4,6 +4,7 @@ import { existsSync, statSync } from "node:fs";
 import { copyFile, mkdir, writeFile } from "node:fs/promises";
 import { basename, isAbsolute, join, resolve } from "node:path";
 
+import { errorMessage } from "../../src/core/index.ts";
 import type { RunLanguage } from "./registry.ts";
 
 const SCRIPT_EXTENSION: Record<RunLanguage, string> = {
@@ -182,7 +183,7 @@ export async function prepareRun(
     // the stage's pnpm-workspace.yaml allowlists esbuild's (what tsx needs).
     result = await install("pnpm", ["install"], { cwd: stageDir });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = errorMessage(error);
     throw new Error(mapSpawnError(message, "pnpm") ?? message);
   }
   if (result.code !== 0) {

@@ -1,3 +1,5 @@
+import { isRecord } from "../../src/core/index.ts";
+
 const WORKTREE_PALETTE = [
   39, 208, 46, 141, 226, 51, 207, 196, 118, 214, 213, 45, 99, 220, 82, 159,
 ] as const;
@@ -53,10 +55,6 @@ type ParsedOrigin = {
   owner?: string;
   repo?: string;
 };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
-}
 
 export function stringHash(value: string): number {
   let hash = 0;

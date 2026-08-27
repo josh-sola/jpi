@@ -1,17 +1,18 @@
-import { projectSlug, Store } from "../../src/core/index.ts";
+import {
+  projectSlug,
+  Store,
+  type BeforeAgentStartEvent,
+  type Notifier,
+} from "../../src/core/index.ts";
 
 import { capacityStatus, entryCount, INDEX_FILENAME, readMemoryIndex } from "./memory-index.ts";
 import { getMemoryDirectory } from "./paths.ts";
-import { buildMemorySection } from "./prompt.ts";
+import { buildMemorySection, formatKb } from "./prompt.ts";
 
-type NotifyLevel = "info" | "warning" | "error";
+export type { BeforeAgentStartEvent };
 
 export type SessionStartContext = {
   cwd: string;
-};
-
-export type BeforeAgentStartEvent = {
-  systemPrompt: string;
 };
 
 export type BeforeAgentStartContext = {
@@ -21,7 +22,7 @@ export type BeforeAgentStartContext = {
 export type CommandContext = {
   cwd: string;
   ui: {
-    notify(message: string, level?: NotifyLevel): void;
+    notify: Notifier;
   };
 };
 
@@ -38,10 +39,6 @@ export type MemoryExtensionDeps = {
   env?: NodeJS.ProcessEnv;
   homeDirectory?: string;
 };
-
-function formatBytes(byteSize: number): string {
-  return `${(byteSize / 1024).toFixed(1)}KB`;
-}
 
 export function createMemoryExtension(deps: MemoryExtensionDeps = {}): MemoryExtension {
   const env = deps.env ?? process.env;
@@ -80,7 +77,7 @@ export function createMemoryExtension(deps: MemoryExtensionDeps = {}): MemoryExt
       const lines = [
         `Memory directory: ${memoryDir}`,
         `Index (${INDEX_FILENAME}) exists: ${exists ? "yes" : "no"}`,
-        `Index size: ${formatBytes(byteSize)}`,
+        `Index size: ${formatKb(byteSize)}`,
         `Index entries: ${entries}`,
         `Memory files: ${memoryFileCount}`,
         `Capacity status: ${capacity}`,

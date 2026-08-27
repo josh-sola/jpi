@@ -1,5 +1,6 @@
 import { dirname, resolve } from "node:path";
 
+import { errorMessage, type NotifyLevel } from "../../src/core/index.ts";
 import type { ExecCommand, RepositoryMetadata } from "./data.ts";
 import type { StatusLineFormat } from "./layout.ts";
 
@@ -142,7 +143,7 @@ type CustomControllerOptions = {
   configPath: string;
   getPayload(): CustomStatusPayload;
   requestRender(): void;
-  notify(message: string, level: "warning"): void;
+  notify(message: string, level: NotifyLevel): void;
   scheduler: IntervalScheduler;
 };
 
@@ -181,7 +182,7 @@ function resultFailure(result: Awaited<ReturnType<ExecCommand>>): string | undef
 }
 
 function thrownFailure(error: unknown): string {
-  const message = concise(error instanceof Error ? error.message : String(error));
+  const message = concise(errorMessage(error));
   return message ? `could not run: ${message}` : "could not run";
 }
 

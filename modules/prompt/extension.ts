@@ -5,8 +5,8 @@ import { join } from "node:path";
 
 import type { BuildSystemPromptOptions, Skill } from "@earendil-works/pi-coding-agent";
 
+import { errorMessage, seedIfMissing, type Notifier } from "../../src/core/index.ts";
 import { getDefaultTemplatePath, getSystemPromptPath } from "./paths.ts";
-import { seedIfMissing } from "./seed.ts";
 import { appendPiTail } from "./system-prompt-tail.ts";
 import { interpolate } from "./template.ts";
 import {
@@ -17,8 +17,8 @@ import {
   type PiDocsPaths,
 } from "./variables.ts";
 
-type NotifyLevel = "info" | "warning" | "error";
-
+// Carries systemPromptOptions in addition to systemPrompt, unlike the other
+// modules' onBeforeAgentStart event — not the shared core BeforeAgentStartEvent shape.
 export type BeforeAgentStartEvent = {
   systemPrompt: string;
   systemPromptOptions: BuildSystemPromptOptions;
@@ -26,7 +26,7 @@ export type BeforeAgentStartEvent = {
 
 export type BeforeAgentStartContext = {
   ui: {
-    notify(message: string, level?: NotifyLevel): void;
+    notify: Notifier;
   };
 };
 
@@ -77,7 +77,7 @@ export function createPromptExtension(deps: PromptExtensionDeps): PromptExtensio
 
         return { systemPrompt };
       } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
+        const message = errorMessage(err);
         ctx.ui.notify(
           `jpi-prompt: failed to render ${templatePath} (${message}); using the stock system prompt.`,
           "warning",

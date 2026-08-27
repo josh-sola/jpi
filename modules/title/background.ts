@@ -1,3 +1,4 @@
+import { isRecord } from "../../src/core/index.ts";
 import type { EventBus, Scheduler } from "./helpers.ts";
 
 const BACKGROUND_REQUEST_CHANNEL = "pi-background-tasks:request:v1";
@@ -7,12 +8,6 @@ const BACKGROUND_REQUEST_SCHEMA = "pi-background-tasks.extension-request.v1";
 const BACKGROUND_RESPONSE_SCHEMA = "pi-background-tasks.extension-response.v1";
 const BACKGROUND_POLL_INTERVAL_MS = 1_000;
 const BACKGROUND_RESPONSE_TIMEOUT_MS = 3_000;
-
-type RecordValue = Record<string, unknown>;
-
-function isRecord(value: unknown): value is RecordValue {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 function runningStatusResponse(data: unknown, requestId: string): boolean | undefined {
   if (

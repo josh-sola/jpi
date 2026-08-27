@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { test } from "vite-plus/test";
 
 import { getSystemPromptPath } from "../../modules/prompt/paths.ts";
-import { seedIfMissing } from "../../modules/prompt/seed.ts";
+import { seedIfMissing } from "../../src/core/index.ts";
 
 async function tempAgentDir(t: {
   onTestFinished: (fn: () => Promise<void> | void) => void;

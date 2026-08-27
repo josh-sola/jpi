@@ -1,8 +1,9 @@
 import type { AgentToolResult, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import type { Static, TObject, TString } from "typebox";
 
+import { isRecord } from "../../src/core/index.ts";
 import type { KetchRunner } from "./ketch.ts";
-import { boundedText, isRecord } from "./text.ts";
+import { boundedText } from "./text.ts";
 
 const WEB_SEARCH_TIMEOUT_MS = 30_000;
 const MAX_SEARCH_URL_CHARS = 8_192;

@@ -2,6 +2,7 @@ import { homedir } from "node:os";
 
 import type { EventBus } from "@earendil-works/pi-coding-agent";
 
+import type { Notifier } from "../../src/core/index.ts";
 import {
   loadStatusLineConfig,
   toStatusLineConfig,
@@ -62,7 +63,7 @@ type FooterContext = {
     getBranch?(): BranchEntryLike[];
   };
   ui: {
-    notify(message: string, level?: "info" | "warning" | "error"): void;
+    notify: Notifier;
     setFooter(
       factory:
         | ((

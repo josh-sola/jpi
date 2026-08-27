@@ -3,6 +3,8 @@ import { access as fsAccess } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { errorMessage } from "../../src/core/index.ts";
+
 function readKetchVersion(): string {
   const manifestUrl = new URL("../../ketch-release.json", import.meta.url);
   const manifest = JSON.parse(readFileSync(manifestUrl, "utf8"));
@@ -178,11 +180,6 @@ function formatDiagnostics(stderr: string | undefined): string {
   return `\nDiagnostics:\n${diagnostics}`;
 }
 
-function messageFromError(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  return String(error);
-}
-
 function throwIfAborted(signal: AbortSignal | undefined): void {
   if (signal?.aborted) throw new Error("The web request was cancelled.");
 }
@@ -250,7 +247,7 @@ export function createKetchRunner(options: CreateKetchRunnerOptions): KetchRunne
               "Could not run ketch. The resolved executable was not found. Reinstall this package or install ketch on PATH for local development.",
             );
           }
-          throw new Error(`Could not run ketch: ${truncateDiagnostic(messageFromError(error))}`);
+          throw new Error(`Could not run ketch: ${truncateDiagnostic(errorMessage(error))}`);
         }
 
         throwIfAborted(runOptions.signal);

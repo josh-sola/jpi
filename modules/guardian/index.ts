@@ -22,19 +22,18 @@ import { type Component, Text } from "@earendil-works/pi-tui";
 
 import {
   Config,
+  errorMessage,
+  isRecord,
   j,
   scratchpadRoot,
+  seedIfMissing,
   type InferNode,
   type ModuleContext,
+  type NotifyLevel,
   type WithEnabled,
 } from "../../src/core/index.ts";
 import { REVIEW_POLICY } from "./policy.ts";
-import {
-  buildSystemPrompt,
-  getGuardianPromptPath,
-  loadGuardianPromptBase,
-  seedIfMissing,
-} from "./prompt.ts";
+import { buildSystemPrompt, getGuardianPromptPath, loadGuardianPromptBase } from "./prompt.ts";
 import { BUILT_IN_READONLY_TOOLS, isReadOnlyCommand } from "./readonly.ts";
 import { splitCommand } from "./split.ts";
 
@@ -185,7 +184,7 @@ type ReviewContext = {
   signal?: AbortSignal;
   hasUI?: boolean;
   ui?: {
-    notify(message: string, level: "info" | "warning" | "error"): void;
+    notify(message: string, level: NotifyLevel): void;
     setStatus(key: string, value: string | undefined): void;
   };
   sessionManager: {
@@ -204,7 +203,7 @@ type ReviewContext = {
 
 type ReviewCommandContext = ReviewContext & {
   ui: {
-    notify(message: string, level: "info" | "warning" | "error"): void;
+    notify(message: string, level: NotifyLevel): void;
     setStatus(key: string, value: string | undefined): void;
   };
 };
@@ -227,10 +226,6 @@ type DenialRecord = {
   reason: string;
   timestamp: number;
 };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
-}
 
 function truncateInline(value: string, maxChars: number): string {
   if (value.length <= maxChars) return value;
@@ -288,7 +283,7 @@ function mapConfigValue(value: GuardianConfigValue, path: string, issues: string
     try {
       allowBash.push({ source, regex: new RegExp(source) });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = errorMessage(error);
       issues.push(`allow.bash contains an invalid regex (${source}): ${message}`);
     }
   }
@@ -1083,8 +1078,7 @@ export class AutoReviewController {
       if (timeoutSignal.aborted && !ctx.signal?.aborted) {
         return this.recordReviewFailure(`timeout after ${config.timeoutMs}ms`);
       }
-      const message =
-        error instanceof Error ? normalizeReason(error.message) : normalizeReason(String(error));
+      const message = normalizeReason(errorMessage(error));
       return this.recordReviewFailure(message || "reviewer error");
     }
     const durationMs = this.now() - startedAt;

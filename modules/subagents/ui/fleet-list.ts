@@ -27,6 +27,7 @@ import {
   truncateToWidth,
   visibleWidth,
 } from "@earendil-works/pi-tui";
+import type { Notifier } from "../../../src/core/index.ts";
 import { hasAgentBadge, renderAgentName } from "../agent-color.ts";
 import type { AgentManager } from "../agent-manager.ts";
 import type { AgentRecord, ViewerMarkdownMode } from "../types.ts";
@@ -72,7 +73,7 @@ export type FleetUICtx = {
     handler: (data: string) => { consume?: boolean; data?: string } | undefined,
   ): () => void;
   getEditorText(): string;
-  notify(message: string, type?: "info" | "warning" | "error"): void;
+  notify: Notifier;
   custom<T>(
     factory: (
       tui: any,

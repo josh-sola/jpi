@@ -3,13 +3,18 @@ import { dirname, join } from "node:path";
 import { mkdir, readdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 
+import { errorMessage } from "./errors.ts";
 import { getAgentDirectory } from "./agent-dir.ts";
 
 export type StoreReadResult = { value: unknown } | { missing: true } | { problem: string };
 export type StoreTextReadResult = { value: string } | { missing: true } | { problem: string };
 export type StoreRemoveResult = { problem: string } | undefined;
 
-const NAME_PATTERN = /^[A-Za-z0-9._-]+$/;
+// The one character class a Store path segment may contain — NAME_PATTERN
+// validates it, sanitizeStoreSegment() below replaces anything outside it.
+const SEGMENT_CHARS = "A-Za-z0-9._-";
+const NAME_PATTERN = new RegExp(`^[${SEGMENT_CHARS}]+$`);
+const INVALID_SEGMENT_CHARS = new RegExp(`[^${SEGMENT_CHARS}]`, "g");
 
 function assertValidName(kind: "extension" | "file", name: string): void {
   if (name.startsWith(".") || !NAME_PATTERN.test(name)) {
@@ -17,6 +22,11 @@ function assertValidName(kind: "extension" | "file", name: string): void {
       `invalid ${kind} name "${name}": must match ${NAME_PATTERN} and not start with a dot`,
     );
   }
+}
+
+/** Replaces every character outside a Store path segment's allowed class with "-". */
+export function sanitizeStoreSegment(raw: string): string {
+  return raw.replace(INVALID_SEGMENT_CHARS, "-");
 }
 
 function isErrnoException(error: unknown): error is NodeJS.ErrnoException {
@@ -56,14 +66,14 @@ export class Store {
       if (isErrnoException(error) && error.code === "ENOENT") {
         return { missing: true };
       }
-      const message = error instanceof Error ? error.message : String(error);
+      const message = errorMessage(error);
       return { problem: `could not read state: ${message}` };
     }
 
     try {
       return { value: JSON.parse(text) };
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = errorMessage(error);
       return { problem: `invalid JSON: ${message}` };
     }
   }
@@ -80,7 +90,7 @@ export class Store {
       if (isErrnoException(error) && error.code === "ENOENT") {
         return { missing: true };
       }
-      const message = error instanceof Error ? error.message : String(error);
+      const message = errorMessage(error);
       return { problem: `could not read state: ${message}` };
     }
   }
@@ -131,7 +141,7 @@ export class Store {
       if (isErrnoException(error) && error.code === "ENOENT") {
         return undefined;
       }
-      const message = error instanceof Error ? error.message : String(error);
+      const message = errorMessage(error);
       return { problem: `could not remove state: ${message}` };
     }
   }

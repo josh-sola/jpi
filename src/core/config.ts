@@ -12,6 +12,7 @@ import { dirname, join } from "node:path";
 
 import { getAgentDirectory } from "./agent-dir.ts";
 import type { AnyJpiNodeSpec, InferNode } from "./builder.ts";
+import { errorMessage } from "./errors.ts";
 import {
   buildRaw,
   cloneJson,
@@ -40,10 +41,6 @@ const HEADER =
 
 function isErrnoException(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && "code" in error;
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 function formatParseError(error: unknown): string {

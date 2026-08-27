@@ -7,6 +7,7 @@ import {
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
+import { errorMessage } from "../../src/core/index.ts";
 import { abortable } from "./abortable.ts";
 import {
   buildAgentRegistry,
@@ -370,7 +371,7 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
         );
         return textResult(formatRecord(record, "inline"), record.status === "error");
       } catch (err) {
-        return textResult(err instanceof Error ? err.message : String(err), true);
+        return textResult(errorMessage(err), true);
       }
     },
   });
@@ -431,10 +432,7 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
       try {
         await record.session.steer(params.message);
       } catch (err) {
-        return textResult(
-          `Failed to steer nested agent: ${err instanceof Error ? err.message : String(err)}`,
-          true,
-        );
+        return textResult(`Failed to steer nested agent: ${errorMessage(err)}`, true);
       }
       return textResult(`Steering message sent to nested agent ${params.agent_id}.`);
     },

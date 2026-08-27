@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "vite-plus/test";
 
-import { Store } from "../../src/core/store.ts";
+import { sanitizeStoreSegment, Store } from "../../src/core/store.ts";
 
 async function tempEnv(): Promise<NodeJS.ProcessEnv> {
   const directory = await mkdtemp(join(tmpdir(), "jpi-base-store-"));
@@ -169,6 +169,12 @@ test("readText, writeText, ensureDirectory, and list validate segments like path
   await assert.rejects(() => store.list("../escape"), /invalid file name/);
   await assert.rejects(() => store.list(".hidden"), /invalid file name/);
   await assert.rejects(() => store.list(""), /invalid file name/);
+});
+
+test("sanitizeStoreSegment replaces every character outside the valid path segment class with -", () => {
+  assert.equal(sanitizeStoreSegment("sess:2024/06/01@12:00"), "sess-2024-06-01-12-00");
+  assert.equal(sanitizeStoreSegment("abc-123"), "abc-123");
+  assert.equal(sanitizeStoreSegment(""), "");
 });
 
 test("list returns entry names, skips dot-prefixed entries, and returns [] for a missing directory", async () => {

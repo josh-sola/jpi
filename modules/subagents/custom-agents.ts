@@ -7,6 +7,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { getAgentDir, parseFrontmatter } from "@earendil-works/pi-coding-agent";
+import { errorMessage } from "../../src/core/index.ts";
 import { BUILTIN_TOOL_NAMES } from "./agent-types.ts";
 import type { AgentConfig, IsolationMode, ThinkingLevel } from "./types.ts";
 
@@ -179,7 +180,7 @@ function readAgentFile(
   try {
     return parseAgentFrontmatter<Record<string, unknown>>(readFileSync(path, "utf-8"));
   } catch (err) {
-    const reason = err instanceof Error ? err.message : String(err);
+    const reason = errorMessage(err);
     if (strict) throw new Error(`${path}: ${reason}`);
     warnIfNew(`Skipping agent file ${path}: ${reason}`);
     return undefined;

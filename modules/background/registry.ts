@@ -4,7 +4,7 @@ import { createWriteStream, existsSync, type WriteStream } from "node:fs";
 import { open, stat } from "node:fs/promises";
 import { join } from "node:path";
 
-import { projectSlug, type Store } from "../../src/core/index.ts";
+import { errorMessage, projectSlug, type Store } from "../../src/core/index.ts";
 
 import { writeJsonAtomic } from "./durable-write.ts";
 import type { MonitorSnapshot } from "./monitor.ts";
@@ -190,10 +190,6 @@ interface BgTask {
   waiters: Array<() => void>;
   outputListeners: Set<(chunk: string, source: "stdout" | "stderr") => void>;
   metadataWriteChain: Promise<void> | undefined;
-}
-
-function message(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 function appendError(existing: string | undefined, next: string): string {
@@ -466,7 +462,7 @@ export class BackgroundTaskRegistry {
     task.stream = stream;
     stream.on("error", (error) => {
       if (task.status !== "running") return;
-      task.error = appendError(task.error, `output file write failed: ${message(error)}`);
+      task.error = appendError(task.error, `output file write failed: ${errorMessage(error)}`);
       task.killKind = task.killKind ?? "write_error";
       try {
         this.requestKill(task, "SIGTERM");
@@ -493,8 +489,8 @@ export class BackgroundTaskRegistry {
       child.stderr?.on("data", (chunk) => this.handleChildOutput(task, chunk, "stderr"));
 
       child.on("error", (error) => {
-        this.writeNotice(task, `\n[background task spawn error: ${message(error)}]\n`);
-        void this.finalizeTask(task, "failed", null, undefined, message(error));
+        this.writeNotice(task, `\n[background task spawn error: ${errorMessage(error)}]\n`);
+        void this.finalizeTask(task, "failed", null, undefined, errorMessage(error));
       });
 
       child.on("close", (code, signalName) => {
@@ -516,7 +512,7 @@ export class BackgroundTaskRegistry {
               "failed",
               null,
               undefined,
-              `${task.error}; kill failed: ${message(error)}`,
+              `${task.error}; kill failed: ${errorMessage(error)}`,
             );
           }
         }, timeoutSeconds * 1000);
@@ -527,7 +523,7 @@ export class BackgroundTaskRegistry {
       this.emitChange();
       return snapshot(task);
     } catch (error) {
-      const failure = message(error);
+      const failure = errorMessage(error);
       this.writeNotice(task, `\n[background task spawn exception: ${failure}]\n`);
       await this.finalizeTask(task, "failed", null, undefined, failure);
       throw new Error(`Failed to start background task: ${failure}`);
@@ -709,7 +705,7 @@ export class BackgroundTaskRegistry {
     try {
       this.requestKill(task, "SIGTERM");
     } catch (error) {
-      task.error = appendError(task.error, `kill failed: ${message(error)}`);
+      task.error = appendError(task.error, `kill failed: ${errorMessage(error)}`);
       void this.finalizeTask(task, "failed", null, undefined, task.error);
     }
   }
@@ -731,14 +727,14 @@ export class BackgroundTaskRegistry {
       this.killProcessFn(-task.pid, signal);
       killed = true;
     } catch (error) {
-      errors.push(`process group kill failed: ${message(error)}`);
+      errors.push(`process group kill failed: ${errorMessage(error)}`);
     }
     if (!killed) {
       try {
         task.child.kill(signal);
         killed = true;
       } catch (error) {
-        errors.push(`child kill failed: ${message(error)}`);
+        errors.push(`child kill failed: ${errorMessage(error)}`);
       }
     }
     if (!killed) throw new Error(`Could not kill task ${task.id}: ${errors.join("; ")}`);
@@ -755,7 +751,7 @@ export class BackgroundTaskRegistry {
       try {
         this.requestKill(task, "SIGKILL");
       } catch (error) {
-        task.error = appendError(task.error, `SIGKILL failed: ${message(error)}`);
+        task.error = appendError(task.error, `SIGKILL failed: ${errorMessage(error)}`);
       }
     }, this.killGraceMs);
     task.killEscalationTimer.unref?.();
@@ -858,7 +854,10 @@ export class BackgroundTaskRegistry {
         await closeOutputStream(task.stream);
       } catch (closeError) {
         finalStatus = "failed";
-        finalError = appendError(finalError, `output stream close failed: ${message(closeError)}`);
+        finalError = appendError(
+          finalError,
+          `output stream close failed: ${errorMessage(closeError)}`,
+        );
       }
     }
 

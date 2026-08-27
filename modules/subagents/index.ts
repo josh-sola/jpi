@@ -32,6 +32,7 @@ import {
   Text,
 } from "@earendil-works/pi-tui";
 import { Type } from "@sinclair/typebox";
+import { errorMessage } from "../../src/core/index.ts";
 import type { ModuleContext } from "../../src/core/module.ts";
 import { abortable } from "./abortable.ts";
 import { hasAgentBadge, renderAgentName } from "./agent-color.ts";
@@ -1159,10 +1160,7 @@ export default async function setupSubagents(
       } catch (err) {
         // The type is already settled above, so what is left is a spawn-time
         // failure: a strict worktree-isolation error, an unusable cwd.
-        ctx.ui.notify(
-          `Could not resume ${target}: ${err instanceof Error ? err.message : String(err)}`,
-          "warning",
-        );
+        ctx.ui.notify(`Could not resume ${target}: ${errorMessage(err)}`, "warning");
       }
       return { action: "handled" };
     }
@@ -1218,10 +1216,7 @@ export default async function setupSubagents(
           await manager.awaitStartup(id);
           ctx.ui.notify(`Started ${label} directly — ${result.error}`, "warning");
         } catch (err) {
-          ctx.ui.notify(
-            `Could not start ${label}: ${err instanceof Error ? err.message : String(err)}`,
-            "error",
-          );
+          ctx.ui.notify(`Could not start ${label}: ${errorMessage(err)}`, "error");
         }
       });
       return { action: "handled" };
@@ -1243,10 +1238,7 @@ export default async function setupSubagents(
       await manager.awaitStartup(id);
       ctx.ui.notify(`Started @${handleBase(type)}`, "info");
     } catch (err) {
-      ctx.ui.notify(
-        `Could not start @${handleBase(type)}: ${err instanceof Error ? err.message : String(err)}`,
-        "error",
-      );
+      ctx.ui.notify(`Could not start @${handleBase(type)}: ${errorMessage(err)}`, "error");
     }
     return { action: "handled" };
   });
@@ -1744,9 +1736,7 @@ Terse command-style prompts produce shallow, generic work.
       if (text) return renderToolDescriptionTemplate(text);
       console.warn(`[jpi-subagents] ${path} is empty — ignoring`);
     } catch (err) {
-      console.warn(
-        `[jpi-subagents] failed to read ${path}: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      console.warn(`[jpi-subagents] failed to read ${path}: ${errorMessage(err)}`);
     }
     return undefined;
   };
@@ -2683,9 +2673,7 @@ Terse command-style prompts produce shallow, generic work.
               `Current state: ${stateParts.join(" · ")}`,
           );
         } catch (err) {
-          return textResult(
-            `Failed to steer agent: ${err instanceof Error ? err.message : String(err)}`,
-          );
+          return textResult(`Failed to steer agent: ${errorMessage(err)}`);
         }
       },
     }),

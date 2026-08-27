@@ -1,3 +1,4 @@
+import { errorMessage, isRecord, type EventBus } from "../../src/core/index.ts";
 import { type MonitorManager, type MonitorSnapshot, resolveBackgroundItem } from "./monitor.ts";
 import type { BackgroundTaskRegistry, BgTaskSnapshot, TaskRunContext } from "./registry.ts";
 
@@ -14,10 +15,7 @@ export const TASKS_SCHEMA = "jpi-background.tasks.v1";
 const KNOWN_OPS = new Set(["capabilities", "run", "status", "logs", "kill"]);
 type Operation = "capabilities" | "run" | "status" | "logs" | "kill";
 
-export interface EventBus {
-  emit(channel: string, data: unknown): void;
-  on(channel: string, handler: (data: unknown) => void): () => void;
-}
+export type { EventBus };
 
 export interface RequestEnvelope {
   readonly schema: typeof REQUEST_SCHEMA;
@@ -44,14 +42,6 @@ export interface BackgroundBus {
     monitors: MonitorManager,
     getContext: () => TaskRunContext | undefined,
   ): void;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function message(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 export function parseRequest(data: unknown): RequestEnvelope | undefined {
@@ -147,7 +137,7 @@ async function handleRequest(
       request_id: request.request_id,
       operation: request.operation,
       ok: false,
-      error: message(error),
+      error: errorMessage(error),
     });
   }
 }

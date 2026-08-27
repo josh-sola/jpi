@@ -2,7 +2,7 @@ import { join } from "node:path";
 
 import { INDEX_FILENAME, type CapacityStatus, type MemoryIndexResult } from "./memory-index.ts";
 
-function formatKb(byteSize: number): string {
+export function formatKb(byteSize: number): string {
   return `${(byteSize / 1024).toFixed(1)}KB`;
 }
 

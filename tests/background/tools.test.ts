@@ -284,6 +284,14 @@ test("run: prepareArguments requires a known language", () => {
   );
 });
 
+test("run: prepareArguments rejects an array as arguments", () => {
+  const { runTool } = setUpRun();
+  assert.throws(
+    () => runTool.prepareArguments!(["zsh", "echo hi"]),
+    /run arguments must be an object/,
+  );
+});
+
 test("run foreground: returns exit code and output tail", async (t) => {
   const cwd = await withTempCwd(t);
   const { spawn, children } = makeFakeSpawn();

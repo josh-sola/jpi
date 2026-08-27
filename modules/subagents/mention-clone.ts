@@ -69,6 +69,7 @@ import {
   SessionManager,
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
+import { errorMessage } from "../../src/core/index.ts";
 import { runInChildSessionContext } from "./child-context.ts";
 import { agentMentionReminder } from "./mention.ts";
 import type { SubagentType, ThinkingLevel } from "./types.ts";
@@ -190,7 +191,7 @@ export async function runMentionClone(opts: MentionCloneOptions): Promise<Mentio
     // renderer produces, where the reminder trails the message it is about.
     await session.prompt(`${message}\n\n${agentMentionReminder(type)}`);
   } catch (err) {
-    return { spawned, error: err instanceof Error ? err.message : String(err) };
+    return { spawned, error: errorMessage(err) };
   } finally {
     session?.dispose?.();
   }

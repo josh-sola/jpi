@@ -8,10 +8,11 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import type { Static, TObject, TString } from "typebox";
 
+import { errorMessage, isRecord } from "../../src/core/index.ts";
 import type { KetchRunner } from "./ketch.ts";
 import { truncateDiagnostic } from "./ketch.ts";
 import { buildWebFetchUserMessage, WEB_FETCH_SYSTEM_PROMPT } from "./prompt.ts";
-import { boundedText, isRecord } from "./text.ts";
+import { boundedText } from "./text.ts";
 
 const WEB_FETCH_TIMEOUT_MS = 60_000;
 const WEB_FETCH_MAX_TOKENS = 2_048;
@@ -209,7 +210,7 @@ async function answerFromPage(
     );
   } catch (error) {
     if (signal?.aborted) throw new Error("The focused page answer was cancelled.");
-    const message = error instanceof Error ? error.message : String(error);
+    const message = errorMessage(error);
     throw new Error(`The focused page answer failed: ${truncateDiagnostic(message)}`);
   }
 

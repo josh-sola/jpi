@@ -15,6 +15,7 @@ import {
   wrapTextWithAnsi,
 } from "@earendil-works/pi-tui";
 
+import { errorMessage } from "../../src/core/index.ts";
 import { type MonitorManager, type MonitorSnapshot, resolveBackgroundItem } from "./monitor.ts";
 import type { BackgroundTaskRegistry, BgTaskSnapshot } from "./registry.ts";
 
@@ -34,10 +35,6 @@ const TRIM_MARGIN = 2_000;
 const NAME_MAX_CHARS = 52;
 const CHROME_LINES = 8;
 const MIN_VIEWPORT = 3;
-
-function message(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
 
 function truncate(text: string, max: number): string {
   const trimmed = text.trim();
@@ -448,7 +445,7 @@ export function createBgCommand(
         try {
           item = resolveBackgroundItem(registry, monitors, prefix);
         } catch (error) {
-          ctx.ui.notify(message(error), "error");
+          ctx.ui.notify(errorMessage(error), "error");
           return;
         }
         await openLogView(ctx, registry, monitors, item);

@@ -1,6 +1,8 @@
 import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 
+import { isRecord } from "../../src/core/index.ts";
+
 /** The real return type of ModelRegistry.find, derived rather than duplicated. */
 export type PiModel = NonNullable<ReturnType<ModelRegistry["find"]>>;
 
@@ -61,10 +63,6 @@ function truncateMiddle(value: string, maxChars: number): string {
   const headLength = Math.ceil(retained / 2);
   const tailLength = Math.floor(retained / 2);
   return `${value.slice(0, headLength)}${marker}${value.slice(value.length - tailLength)}`;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 // Shared by user and assistant messages: keeping only "text" parts is what

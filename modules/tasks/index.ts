@@ -18,7 +18,12 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 
-import { projectSlug, Store, type ModuleContext } from "../../src/core/index.ts";
+import {
+  projectSlug,
+  sanitizeStoreSegment,
+  Store,
+  type ModuleContext,
+} from "../../src/core/index.ts";
 import { AutoClearManager } from "./auto-clear.ts";
 import { tasksSchema } from "./config.ts";
 import {
@@ -127,12 +132,6 @@ function buildSystemReminder(tasks: Task[]): string {
   ].join("\n");
 }
 
-/** Sanitize a session ID into a valid Store path segment (Store rejects
- *  anything outside `[A-Za-z0-9._-]`, and a leading dot). */
-function sanitizeSessionId(sessionId: string): string {
-  return sessionId.replace(/[^A-Za-z0-9._-]/g, "-");
-}
-
 export function setupTasks(pi: ExtensionAPI, ctx: ModuleContext<typeof tasksSchema>) {
   const jpiStore = new Store("tasks");
 
@@ -151,7 +150,7 @@ export function setupTasks(pi: ExtensionAPI, ctx: ModuleContext<typeof tasksSche
     const slug = projectSlug(cwd);
     if (taskScope === "session") {
       if (!sessionId) return { key: "pending:session" };
-      const storeKey = `${slug}/session-${sanitizeSessionId(sessionId)}.json`;
+      const storeKey = `${slug}/session-${sanitizeStoreSegment(sessionId)}.json`;
       return { key: `path:${storeKey}`, storeKey };
     }
     const storeKey = `${slug}/project.json`;

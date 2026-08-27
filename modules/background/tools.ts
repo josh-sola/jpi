@@ -2,8 +2,9 @@ import type { ExtensionContext, ToolDefinition } from "@earendil-works/pi-coding
 import type { TextContent } from "@earendil-works/pi-ai";
 import { Type, type Static } from "typebox";
 
+import { isRecord } from "../../src/core/index.ts";
 import { abortable, DETACH_MARKER, type DetachRegistry } from "./detach.ts";
-import { type MonitorManager, type MonitorSnapshot, resolveBackgroundItem } from "./monitor.ts";
+import { type MonitorManager, resolveBackgroundItem } from "./monitor.ts";
 import {
   BG_KILL_DESCRIPTION,
   BG_KILL_GUIDELINES,
@@ -28,13 +29,12 @@ import {
   type TaskRunContext,
 } from "./registry.ts";
 import { type InstallRunner, mapSpawnError, type PreparedRun, prepareRun } from "./runner.ts";
+import type { Snapshot } from "./log-view.ts";
 
 export interface BackgroundToolDeps {
   readonly registry: BackgroundTaskRegistry;
   readonly monitors: MonitorManager;
 }
-
-type Snapshot = BgTaskSnapshot | MonitorSnapshot;
 
 function taskRunContext(ctx: ExtensionContext): TaskRunContext {
   return { cwd: ctx.cwd, sessionId: ctx.sessionManager.getSessionId() };
@@ -243,10 +243,6 @@ export interface RunToolDeps {
   readonly defaultTimeoutSeconds: number | undefined;
   readonly makeStageId?: () => string;
   readonly runInstall?: InstallRunner;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
 }
 
 /** Builds the `run` tool. Registered conditionally (config's runEnabled), unlike the always-on bg_* tools. */

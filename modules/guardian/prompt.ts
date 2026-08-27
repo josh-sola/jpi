@@ -1,7 +1,7 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 
-import { getAgentDirectory } from "../../src/core/index.ts";
+import { errorMessage, getAgentDirectory, seedIfMissing } from "../../src/core/index.ts";
 
 import { REVIEW_POLICY } from "./policy.ts";
 
@@ -9,18 +9,6 @@ export const GUARDIAN_PROMPT_FILENAME = "GUARDIAN.md";
 
 export function getGuardianPromptPath(env?: NodeJS.ProcessEnv, homeDirectory?: string): string {
   return join(getAgentDirectory(env, homeDirectory), GUARDIAN_PROMPT_FILENAME);
-}
-
-// The exclusive-create flag makes the missing-file check and the write
-// atomic, so a file that already exists is never touched.
-export async function seedIfMissing(targetPath: string, defaultContent: string): Promise<void> {
-  await mkdir(dirname(targetPath), { recursive: true });
-  try {
-    await writeFile(targetPath, defaultContent, { encoding: "utf8", flag: "wx" });
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === "EEXIST") return;
-    throw err;
-  }
 }
 
 export function buildSystemPrompt(basePrompt: string, policy: string[]): string {
@@ -40,7 +28,7 @@ export async function loadGuardianPromptBase(
     await seedIfMissing(promptPath, REVIEW_POLICY);
     return await readFile(promptPath, "utf8");
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = errorMessage(err);
     notify?.(
       `Guardian: failed to load ${promptPath} (${message}); using the built-in review policy.`,
       "warning",

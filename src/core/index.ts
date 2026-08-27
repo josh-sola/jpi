@@ -1,4 +1,6 @@
 export { getAgentDirectory } from "./agent-dir.ts";
+export { errorMessage } from "./errors.ts";
+export { isRecord } from "./guards.ts";
 export {
   j,
   type AnyJpiNodeSpec,
@@ -11,9 +13,12 @@ export {
 } from "./builder.ts";
 export { Config, type ConfigLoadResult, type ConfigSaveResult } from "./config.ts";
 export { injectEnabled, type JpiModule, type ModuleContext, type WithEnabled } from "./module.ts";
+export type { BeforeAgentStartEvent, EventBus, Notifier, NotifyLevel } from "./pi-types.ts";
 export { projectSlug } from "./project-slug.ts";
 export { scratchpadDir, scratchpadRoot } from "./scratchpad-dir.ts";
+export { seedIfMissing } from "./seed-file.ts";
 export {
+  sanitizeStoreSegment,
   Store,
   type StoreReadResult,
   type StoreRemoveResult,

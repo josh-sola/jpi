@@ -1,13 +1,11 @@
-import { scratchpadDir, scratchpadRoot } from "../../src/core/index.ts";
+import { scratchpadDir, scratchpadRoot, type BeforeAgentStartEvent } from "../../src/core/index.ts";
 
 import { buildScratchpadSection, ensureScratchpadDir, sweepStale } from "./scratchpad.ts";
 
+export type { BeforeAgentStartEvent };
+
 export type SessionStartEvent = {
   reason: "startup" | "reload" | "new" | "resume" | "fork";
-};
-
-export type BeforeAgentStartEvent = {
-  systemPrompt: string;
 };
 
 export type ScratchpadExtensionContext = {

@@ -1,13 +1,12 @@
 import { basename } from "node:path";
 
+import type { EventBus } from "../../src/core/index.ts";
+
 export const IDLE_INDICATOR = "⏹";
 export const ACTIVE_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"] as const;
 export const SPINNER_INTERVAL_MS = 80;
 
-export type EventBus = {
-  emit(channel: string, data: unknown): void;
-  on(channel: string, handler: (data: unknown) => void): () => void;
-};
+export type { EventBus };
 
 export type Scheduler = {
   setInterval(callback: () => void, delay: number): unknown;
