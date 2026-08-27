@@ -6,13 +6,32 @@ import type {
   ExtensionContext,
   ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
+import { Container, Text } from "@earendil-works/pi-tui";
 import type { Static, TObject, TString } from "typebox";
 
-import { errorMessage, isRecord } from "../../src/core/index.ts";
+import {
+  bulletState,
+  createResultLine,
+  createToolHeader,
+  errorMessage,
+  extractResultText,
+  isRecord,
+  truncateEnd,
+} from "../../src/core/index.ts";
 import type { KetchRunner } from "./ketch.ts";
 import { truncateDiagnostic } from "./ketch.ts";
 import { buildWebFetchUserMessage, WEB_FETCH_SYSTEM_PROMPT } from "./prompt.ts";
 import { boundedText } from "./text.ts";
+
+/** First non-empty line of `text`, for a one-line error or fallback summary. */
+function firstNonEmptyLine(text: string): string | undefined {
+  return text.split("\n").find((line) => line.trim() !== "");
+}
+
+/** Byte size of `text` in KB, one decimal place, matching the format used for memory-index sizes. */
+function formatKb(text: string): string {
+  return `${(Buffer.byteLength(text, "utf8") / 1024).toFixed(1)}KB`;
+}
 
 const WEB_FETCH_TIMEOUT_MS = 60_000;
 const WEB_FETCH_MAX_TOKENS = 2_048;
@@ -277,6 +296,33 @@ export function createWebFetchTool(
       ctx: ExtensionContext,
     ) {
       return executeWebFetch(params, ctx, options, signal);
+    },
+    renderShell: "self",
+    renderCall(args, theme, context) {
+      return createToolHeader(
+        bulletState(context),
+        "WebFetch",
+        args.url,
+        theme,
+        context.lastComponent,
+      );
+    },
+    renderResult(result, renderOptions, theme, context) {
+      if (renderOptions.isPartial) return new Container();
+      const text = extractResultText(result.content);
+      const container = new Container();
+      if (context.isError) {
+        const preview = truncateEnd(firstNonEmptyLine(text) ?? "Error", 100);
+        container.addChild(createResultLine(preview, theme, "error"));
+        if (renderOptions.expanded) container.addChild(new Text(theme.fg("error", text), 0, 0));
+        return container;
+      }
+
+      container.addChild(createResultLine(`Fetched ${formatKb(text)}`, theme, "dim"));
+      if (renderOptions.expanded && text) {
+        container.addChild(new Text(theme.fg("toolOutput", text), 0, 0));
+      }
+      return container;
     },
   };
 }

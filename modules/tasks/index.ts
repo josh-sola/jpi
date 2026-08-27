@@ -16,12 +16,20 @@ import type {
   ExtensionCommandContext,
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
+import { Container, Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 
 import {
+  bulletState,
+  countLines,
+  createResultLine,
+  createToolHeader,
+  extractResultText,
+  plural,
   projectSlug,
   sanitizeStoreSegment,
   Store,
+  truncateEnd,
   type ModuleContext,
 } from "../../src/core/index.ts";
 import { AutoClearManager } from "./auto-clear.ts";
@@ -42,6 +50,11 @@ import { TaskWidget, type UICtx } from "./ui/task-widget.ts";
 
 function textResult(msg: string) {
   return { content: [{ type: "text" as const, text: msg }], details: undefined as any };
+}
+
+/** First non-empty line of `text`, for a one-line error or fallback summary. */
+function firstNonEmptyLine(text: string): string | undefined {
+  return text.split("\n").find((line) => line.trim() !== "");
 }
 
 /** Glyphs for the /tasks picker menu — mirrors the widget's fixed defaults. */
@@ -437,6 +450,36 @@ All tasks are created with status \`pending\`.
       widget.update();
       return textResult(`Task #${task.id} created successfully: ${task.subject}`);
     },
+    renderShell: "self",
+    renderCall(args, theme, context) {
+      return createToolHeader(
+        bulletState(context),
+        "TaskCreate",
+        args.subject,
+        theme,
+        context.lastComponent,
+      );
+    },
+    renderResult(result, options, theme, context) {
+      if (options.isPartial) return new Container();
+      const text = extractResultText(result.content);
+      const container = new Container();
+      if (context.isError) {
+        const preview = truncateEnd(firstNonEmptyLine(text) ?? "Error", 100);
+        container.addChild(createResultLine(preview, theme, "error"));
+        if (options.expanded) container.addChild(new Text(theme.fg("error", text), 0, 0));
+        return container;
+      }
+
+      const match = text.match(/^Task #(\S+) created successfully/);
+      const summary = match
+        ? `Created task ${match[1]}`
+        : (firstNonEmptyLine(text) ?? "Created task");
+      container.addChild(createResultLine(summary, theme, "dim"));
+      if (options.expanded && text)
+        container.addChild(new Text(theme.fg("toolOutput", text), 0, 0));
+      return container;
+    },
   });
 
   // ──────────────────────────────────────────────────
@@ -480,6 +523,27 @@ Use TaskGet with a specific task ID to view full details including the descripti
       const lines = sorted.map((task) => `#${task.id} [${task.status}] ${task.subject}`);
 
       return Promise.resolve(textResult(lines.join("\n")));
+    },
+    renderShell: "self",
+    renderCall(_args, theme, context) {
+      return createToolHeader(bulletState(context), "TaskList", "", theme, context.lastComponent);
+    },
+    renderResult(result, options, theme, context) {
+      if (options.isPartial) return new Container();
+      const text = extractResultText(result.content);
+      const container = new Container();
+      if (context.isError) {
+        const preview = truncateEnd(firstNonEmptyLine(text) ?? "Error", 100);
+        container.addChild(createResultLine(preview, theme, "error"));
+        if (options.expanded) container.addChild(new Text(theme.fg("error", text), 0, 0));
+        return container;
+      }
+
+      const n = text === "No tasks found" ? 0 : countLines(text);
+      container.addChild(createResultLine(`${n} ${plural(n, "task")}`, theme, "dim"));
+      if (options.expanded && text)
+        container.addChild(new Text(theme.fg("toolOutput", text), 0, 0));
+      return container;
     },
   });
 
@@ -525,6 +589,34 @@ Returns full task details:
       ];
 
       return Promise.resolve(textResult(lines.join("\n")));
+    },
+    renderShell: "self",
+    renderCall(args, theme, context) {
+      return createToolHeader(
+        bulletState(context),
+        "TaskGet",
+        args.taskId,
+        theme,
+        context.lastComponent,
+      );
+    },
+    renderResult(result, options, theme, context) {
+      if (options.isPartial) return new Container();
+      const text = extractResultText(result.content);
+      const container = new Container();
+      if (context.isError) {
+        const preview = truncateEnd(firstNonEmptyLine(text) ?? "Error", 100);
+        container.addChild(createResultLine(preview, theme, "error"));
+        if (options.expanded) container.addChild(new Text(theme.fg("error", text), 0, 0));
+        return container;
+      }
+
+      const summary =
+        store.get(context.args.taskId)?.subject ?? firstNonEmptyLine(text) ?? "Task not found";
+      container.addChild(createResultLine(summary, theme, "dim"));
+      if (options.expanded && text)
+        container.addChild(new Text(theme.fg("toolOutput", text), 0, 0));
+      return container;
     },
   });
 
@@ -635,6 +727,36 @@ Delete a task:
 
       widget.update();
       return textResult(`Updated task #${taskId} ${changedFields.join(", ")}`);
+    },
+    renderShell: "self",
+    renderCall(args, theme, context) {
+      return createToolHeader(
+        bulletState(context),
+        "TaskUpdate",
+        args.taskId,
+        theme,
+        context.lastComponent,
+      );
+    },
+    renderResult(result, options, theme, context) {
+      if (options.isPartial) return new Container();
+      const text = extractResultText(result.content);
+      const container = new Container();
+      if (context.isError) {
+        const preview = truncateEnd(firstNonEmptyLine(text) ?? "Error", 100);
+        container.addChild(createResultLine(preview, theme, "error"));
+        if (options.expanded) container.addChild(new Text(theme.fg("error", text), 0, 0));
+        return container;
+      }
+
+      const taskId = context.args.taskId;
+      const notFound = text === `Task #${taskId} not found`;
+      const title = notFound ? undefined : store.get(taskId)?.subject;
+      const summary = notFound ? text : title ? `Updated ${title}` : `Updated ${taskId}`;
+      container.addChild(createResultLine(summary, theme, "dim"));
+      if (options.expanded && text)
+        container.addChild(new Text(theme.fg("toolOutput", text), 0, 0));
+      return container;
     },
   });
 

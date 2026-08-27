@@ -1,9 +1,23 @@
 import type { AgentToolResult, ToolDefinition } from "@earendil-works/pi-coding-agent";
+import { Container, Text } from "@earendil-works/pi-tui";
 import type { Static, TObject, TString } from "typebox";
 
-import { isRecord } from "../../src/core/index.ts";
+import {
+  bulletState,
+  createResultLine,
+  createToolHeader,
+  extractResultText,
+  isRecord,
+  plural,
+  truncateEnd,
+} from "../../src/core/index.ts";
 import type { KetchRunner } from "./ketch.ts";
 import { boundedText } from "./text.ts";
+
+/** First non-empty line of `text`, for a one-line error or fallback summary. */
+function firstNonEmptyLine(text: string): string | undefined {
+  return text.split("\n").find((line) => line.trim() !== "");
+}
 
 const WEB_SEARCH_TIMEOUT_MS = 30_000;
 const MAX_SEARCH_URL_CHARS = 8_192;
@@ -124,6 +138,37 @@ export function createWebSearchTool(
     parameters: webSearchParameters,
     async execute(_toolCallId: string, params: WebSearchInput, signal?: AbortSignal) {
       return executeWebSearch(params, runner, signal);
+    },
+    renderShell: "self",
+    renderCall(args, theme, context) {
+      return createToolHeader(
+        bulletState(context),
+        "WebSearch",
+        args.query,
+        theme,
+        context.lastComponent,
+      );
+    },
+    renderResult(result, options, theme, context) {
+      if (options.isPartial) return new Container();
+      const text = extractResultText(result.content);
+      const container = new Container();
+      if (context.isError) {
+        const preview = truncateEnd(firstNonEmptyLine(text) ?? "Error", 100);
+        container.addChild(createResultLine(preview, theme, "error"));
+        if (options.expanded) container.addChild(new Text(theme.fg("error", text), 0, 0));
+        return container;
+      }
+
+      const details = result.details as WebSearchDetails | undefined;
+      const count = details?.results.length ?? 0;
+      container.addChild(
+        createResultLine(`Found ${count} ${plural(count, "result")}`, theme, "dim"),
+      );
+      if (options.expanded && text) {
+        container.addChild(new Text(theme.fg("toolOutput", text), 0, 0));
+      }
+      return container;
     },
   };
 }

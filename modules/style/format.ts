@@ -1,61 +1,15 @@
 /**
- * Pure formatting helpers for the Claude-Code-style tool renderer.
+ * Pure formatting helpers specific to how the built-in read/bash/edit/write/
+ * grep/find/ls tools describe their own results as text.
  *
- * Kept free of pi imports so they can be unit tested without a TUI or
+ * Generic display helpers (path relativizing, pluralizing, line counting,
+ * the header/result-line Components) live in `src/core/render.ts` instead —
+ * this file only holds parsing/summarizing logic tied to one tool's output
+ * format. Kept free of pi imports so it can be unit tested without a TUI or
  * extension host.
  */
 
-import { isAbsolute, relative, resolve, sep } from "node:path";
-
-export type BulletState = "pending" | "running" | "success" | "error";
-
-export function bulletState(ctx: {
-  executionStarted: boolean;
-  isPartial: boolean;
-  isError: boolean;
-}): BulletState {
-  if (!ctx.executionStarted) return "pending";
-  if (ctx.isPartial) return "running";
-  return ctx.isError ? "error" : "success";
-}
-
-/** Narrow an unknown tool-call argument to a string, matching pi's own `str()` convention. */
-export function asString(value: unknown): string {
-  return typeof value === "string" ? value : "";
-}
-
-export function plural(count: number, singular: string, pluralForm = `${singular}s`): string {
-  return count === 1 ? singular : pluralForm;
-}
-
-/**
- * Render a path relative to `cwd` when it is inside `cwd`, otherwise the
- * absolute path. Always posix-separated for display, regardless of platform.
- */
-export function relativizePath(rawPath: string, cwd: string): string {
-  if (!rawPath) return rawPath;
-  const absolute = isAbsolute(rawPath) ? rawPath : resolve(cwd, rawPath);
-  const rel = relative(cwd, absolute);
-  const insideCwd = rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
-  const chosen = insideCwd ? rel || "." : absolute;
-  return chosen.split(sep).join("/");
-}
-
-export function truncateSingleLine(text: string, maxLen: number): string {
-  if (text.length <= maxLen) return text;
-  return `${text.slice(0, Math.max(0, maxLen - 1)).trimEnd()}…`;
-}
-
-/** Truncate a shell command to its first line, then to `maxLen` characters. */
-export function truncateCommand(command: string, maxLen = 80): string {
-  const firstLine = command.split("\n")[0] ?? "";
-  return truncateSingleLine(firstLine, maxLen);
-}
-
-/** Number of lines in `text`, treating the empty string as zero lines. */
-export function countLines(text: string): number {
-  return text === "" ? 0 : text.split("\n").length;
-}
+import { countLines, truncateEnd } from "../../src/core/index.ts";
 
 /**
  * Built-in tools append a trailing `\n\n[...]` notice (truncation, limits,
@@ -73,11 +27,10 @@ export function firstNonEmptyLine(text: string): string | undefined {
   return text.split("\n").find((line) => line.trim() !== "");
 }
 
-export function extractResultText(content: ReadonlyArray<{ type: string; text?: string }>): string {
-  return content
-    .filter((block) => block.type === "text")
-    .map((block) => block.text ?? "")
-    .join("\n");
+/** Truncate a shell command to its first line, then to `maxLen` characters. */
+export function truncateCommand(command: string, maxLen = 80): string {
+  const firstLine = command.split("\n")[0] ?? "";
+  return truncateEnd(firstLine, maxLen);
 }
 
 /** Collapsed bash summary: first non-empty output line, or "(no output)". */
@@ -86,7 +39,7 @@ export function summarizeBashOutput(text: string, maxLineLen = 100): string {
   const lines = stripped.split("\n");
   const firstIndex = lines.findIndex((line) => line.trim() !== "");
   if (firstIndex === -1) return "(no output)";
-  const preview = truncateSingleLine(lines[firstIndex] ?? "", maxLineLen);
+  const preview = truncateEnd(lines[firstIndex] ?? "", maxLineLen);
   const remaining = lines.length - firstIndex - 1;
   return remaining > 0 ? `${preview} … +${remaining} lines` : preview;
 }
@@ -135,4 +88,14 @@ export function countLsEntries(text: string): number {
   const trimmed = stripTrailingBracketNotice(text).trim();
   if (!trimmed || trimmed === "(empty directory)") return 0;
   return trimmed.split("\n").filter((line) => line !== "" && !NOTICE_LINE.test(line)).length;
+}
+
+/**
+ * Right-align line numbers starting at `startAt`, indented to sit under a
+ * `  ⎿  summary` result line (Claude Code's write/read preview format).
+ */
+export function numberLines(lines: readonly string[], startAt = 1): string[] {
+  if (lines.length === 0) return [];
+  const width = String(startAt + lines.length - 1).length;
+  return lines.map((line, i) => `    ${String(startAt + i).padStart(width, " ")}  ${line}`);
 }

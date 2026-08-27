@@ -2,111 +2,25 @@ import assert from "node:assert/strict";
 import { test } from "vite-plus/test";
 
 import {
-  asString,
-  bulletState,
   countDiffStats,
   countFindResults,
   countGrepMatches,
-  countLines,
   countLsEntries,
   countReadLines,
-  extractResultText,
   firstNonEmptyLine,
-  plural,
-  relativizePath,
+  numberLines,
   stripTrailingBracketNotice,
   summarizeBashOutput,
   truncateCommand,
-  truncateSingleLine,
 } from "../../modules/style/format.ts";
 
-// --- bulletState ---
-
-test("bulletState is pending before execution starts", () => {
-  assert.equal(
-    bulletState({ executionStarted: false, isPartial: true, isError: false }),
-    "pending",
-  );
-});
-
-test("bulletState is running once started but not yet settled", () => {
-  assert.equal(bulletState({ executionStarted: true, isPartial: true, isError: false }), "running");
-});
-
-test("bulletState is success on a settled non-error result", () => {
-  assert.equal(
-    bulletState({ executionStarted: true, isPartial: false, isError: false }),
-    "success",
-  );
-});
-
-test("bulletState is error on a settled error result", () => {
-  assert.equal(bulletState({ executionStarted: true, isPartial: false, isError: true }), "error");
-});
-
-// --- asString / plural ---
-
-test("asString narrows strings and rejects everything else", () => {
-  assert.equal(asString("foo"), "foo");
-  assert.equal(asString(42), "");
-  assert.equal(asString(undefined), "");
-});
-
-test("plural picks singular or plural by count", () => {
-  assert.equal(plural(1, "line"), "line");
-  assert.equal(plural(0, "line"), "lines");
-  assert.equal(plural(2, "line"), "lines");
-  assert.equal(plural(1, "match", "matches"), "match");
-  assert.equal(plural(3, "match", "matches"), "matches");
-});
-
-// --- relativizePath ---
-
-test("relativizePath makes a path under cwd relative", () => {
-  assert.equal(relativizePath("/repo/src/foo.ts", "/repo"), "src/foo.ts");
-});
-
-test("relativizePath resolves a relative input against cwd first", () => {
-  assert.equal(relativizePath("src/foo.ts", "/repo"), "src/foo.ts");
-});
-
-test("relativizePath keeps cwd itself as a dot", () => {
-  assert.equal(relativizePath("/repo", "/repo"), ".");
-});
-
-test("relativizePath keeps an absolute path when outside cwd", () => {
-  assert.equal(relativizePath("/etc/hosts", "/repo"), "/etc/hosts");
-});
-
-test("relativizePath passes through an empty path", () => {
-  assert.equal(relativizePath("", "/repo"), "");
-});
-
-// --- truncateSingleLine / truncateCommand ---
-
-test("truncateSingleLine leaves short text alone", () => {
-  assert.equal(truncateSingleLine("short", 80), "short");
-});
-
-test("truncateSingleLine truncates with an ellipsis at the limit", () => {
-  const result = truncateSingleLine("a".repeat(90), 80);
-  assert.equal(result.length, 80);
-  assert.ok(result.endsWith("…"));
-});
+// --- truncateCommand ---
 
 test("truncateCommand only keeps the first line before truncating", () => {
   assert.equal(truncateCommand("echo hi\nrm -rf /", 80), "echo hi");
 });
 
-// --- countLines / stripTrailingBracketNotice / countReadLines ---
-
-test("countLines treats the empty string as zero lines", () => {
-  assert.equal(countLines(""), 0);
-});
-
-test("countLines counts newline-separated lines", () => {
-  assert.equal(countLines("a\nb\nc"), 3);
-});
+// --- stripTrailingBracketNotice / countReadLines ---
 
 test("stripTrailingBracketNotice removes a trailing truncation notice", () => {
   const text = "line one\nline two\n\n[Truncated: showing 2 of 100 lines (50KB limit)]";
@@ -197,16 +111,7 @@ test("summarizeBashOutput truncates a long first line", () => {
   assert.ok(result.endsWith("…"));
 });
 
-// --- extractResultText / firstNonEmptyLine ---
-
-test("extractResultText joins only text content blocks", () => {
-  const content = [
-    { type: "text", text: "hello" },
-    { type: "image" },
-    { type: "text", text: "world" },
-  ];
-  assert.equal(extractResultText(content), "hello\nworld");
-});
+// --- firstNonEmptyLine ---
 
 test("firstNonEmptyLine skips blank lines", () => {
   assert.equal(firstNonEmptyLine("\n\nfirst\nsecond"), "first");
@@ -214,4 +119,18 @@ test("firstNonEmptyLine skips blank lines", () => {
 
 test("firstNonEmptyLine returns undefined when everything is blank", () => {
   assert.equal(firstNonEmptyLine("\n\n"), undefined);
+});
+
+// --- numberLines ---
+
+test("numberLines right-aligns the gutter and indents under a result line", () => {
+  assert.deepEqual(numberLines(["a", "b", "c"]), ["    1  a", "    2  b", "    3  c"]);
+});
+
+test("numberLines starts at the given offset and widens the gutter as needed", () => {
+  assert.deepEqual(numberLines(["a", "b"], 9), ["     9  a", "    10  b"]);
+});
+
+test("numberLines returns an empty array for no lines", () => {
+  assert.deepEqual(numberLines([]), []);
 });

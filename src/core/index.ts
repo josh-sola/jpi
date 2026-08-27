@@ -22,9 +22,34 @@ export {
 } from "./bus-contracts.ts";
 export { Config, type ConfigLoadResult, type ConfigSaveResult } from "./config.ts";
 export { type DurationParts, splitDuration, truncateEnd, truncateMiddle } from "./format.ts";
+export { memoriesRoot } from "./memories-dir.ts";
 export { injectEnabled, type JpiModule, type ModuleContext, type WithEnabled } from "./module.ts";
 export type { BeforeAgentStartEvent, EventBus, Notifier, NotifyLevel } from "./pi-types.ts";
 export { projectSlug } from "./project-slug.ts";
+export {
+  asString,
+  bulletState,
+  countLines,
+  createResultLine,
+  createToolHeader,
+  displayPath,
+  extractResultText,
+  isWithinRoot,
+  plural,
+  relativizePath,
+  ToolHeader,
+  ToolResultLine,
+  type BulletState,
+} from "./render.ts";
+export {
+  formatReviewDuration,
+  getReviewAnnotation,
+  hasReviewAnnotationConsumer,
+  markReviewAnnotationConsumer,
+  onReviewAnnotation,
+  recordReviewAnnotation,
+  type ReviewAnnotation,
+} from "./review-annotations.ts";
 export { scratchpadDir, scratchpadRoot } from "./scratchpad-dir.ts";
 export { seedIfMissing } from "./seed-file.ts";
 export {

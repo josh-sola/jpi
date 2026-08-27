@@ -1,8 +1,22 @@
-import type { ExtensionContext, ToolDefinition } from "@earendil-works/pi-coding-agent";
+import type {
+  ExtensionContext,
+  Theme,
+  ToolDefinition,
+  ToolRenderResultOptions,
+} from "@earendil-works/pi-coding-agent";
 import type { TextContent } from "@earendil-works/pi-ai";
+import { Container, Text } from "@earendil-works/pi-tui";
 import { Type, type Static } from "typebox";
 
-import { isRecord } from "../../src/core/index.ts";
+import {
+  bulletState,
+  createResultLine,
+  createToolHeader,
+  extractResultText,
+  isRecord,
+  plural,
+  truncateEnd,
+} from "../../src/core/index.ts";
 import { abortable, DETACH_MARKER, type DetachRegistry } from "./detach.ts";
 import { type MonitorManager, resolveBackgroundItem } from "./monitor.ts";
 import {
@@ -42,6 +56,45 @@ function taskRunContext(ctx: ExtensionContext): TaskRunContext {
 
 function textContent(text: string): TextContent[] {
   return [{ type: "text", text }];
+}
+
+/** Collapsed summary: first non-empty line, or "(no output)". Mirrors a shell tool's result line. */
+function summarizeOutput(text: string): string {
+  const lines = text.split("\n");
+  const firstIndex = lines.findIndex((line) => line.trim() !== "");
+  if (firstIndex === -1) return "(no output)";
+  const preview = truncateEnd(lines[firstIndex] ?? "", 100);
+  const remaining = lines.length - firstIndex - 1;
+  return remaining > 0 ? `${preview} … +${remaining} ${plural(remaining, "line")}` : preview;
+}
+
+/** First non-empty line of `text`, for a one-line error preview. */
+function firstNonEmptyLine(text: string): string | undefined {
+  return text.split("\n").find((line) => line.trim() !== "");
+}
+
+/** Shared renderResult for the bg_* tools: partial/error handling, then a shell-style summary. */
+function renderBackgroundResult(
+  result: { content: ReadonlyArray<{ type: string; text?: string }> },
+  options: ToolRenderResultOptions,
+  theme: Theme,
+  context: { isError: boolean },
+) {
+  if (options.isPartial) return new Container();
+  const text = extractResultText(result.content);
+  const container = new Container();
+  if (context.isError) {
+    const preview = truncateEnd(firstNonEmptyLine(text) ?? "Error", 100);
+    container.addChild(createResultLine(preview, theme, "error"));
+    if (options.expanded) container.addChild(new Text(theme.fg("error", text), 0, 0));
+    return container;
+  }
+
+  container.addChild(createResultLine(summarizeOutput(text), theme, "dim"));
+  if (options.expanded && text) {
+    container.addChild(new Text(theme.fg("toolOutput", text), 0, 0));
+  }
+  return container;
 }
 
 function formatSnapshot(item: Snapshot): string {
@@ -127,6 +180,17 @@ export function createBackgroundTools(deps: BackgroundToolDeps): ToolDefinition[
         details: { items },
       });
     },
+    renderShell: "self",
+    renderCall(_args, theme, context) {
+      return createToolHeader(
+        bulletState(context),
+        "Background",
+        "status",
+        theme,
+        context.lastComponent,
+      );
+    },
+    renderResult: renderBackgroundResult,
   };
 
   const bgLogs: ToolDefinition<typeof BgLogsParams> = {
@@ -143,6 +207,17 @@ export function createBackgroundTools(deps: BackgroundToolDeps): ToolDefinition[
       });
       return { content: textContent(read.text), details: read };
     },
+    renderShell: "self",
+    renderCall(args, theme, context) {
+      return createToolHeader(
+        bulletState(context),
+        "Background",
+        `logs: ${args.taskId}`,
+        theme,
+        context.lastComponent,
+      );
+    },
+    renderResult: renderBackgroundResult,
   };
 
   const bgKill: ToolDefinition<typeof BgKillParams> = {
@@ -159,6 +234,17 @@ export function createBackgroundTools(deps: BackgroundToolDeps): ToolDefinition[
         details: { task },
       };
     },
+    renderShell: "self",
+    renderCall(args, theme, context) {
+      return createToolHeader(
+        bulletState(context),
+        "Background",
+        `kill: ${args.taskId}`,
+        theme,
+        context.lastComponent,
+      );
+    },
+    renderResult: renderBackgroundResult,
   };
 
   const bgMonitor: ToolDefinition<typeof BgMonitorParams> = {
@@ -185,6 +271,19 @@ export function createBackgroundTools(deps: BackgroundToolDeps): ToolDefinition[
         details: { monitor },
       };
     },
+    renderShell: "self",
+    // No monitor id exists until execute() runs, so the header uses the
+    // description — the only identifier available at call-render time.
+    renderCall(args, theme, context) {
+      return createToolHeader(
+        bulletState(context),
+        "Background",
+        `monitor: ${args.description}`,
+        theme,
+        context.lastComponent,
+      );
+    },
+    renderResult: renderBackgroundResult,
   };
 
   return [bgStatus, bgLogs, bgKill, bgMonitor] as ToolDefinition[];
@@ -235,6 +334,12 @@ const RunParams = Type.Object({
   ),
 });
 type RunParamsValue = Static<typeof RunParams>;
+
+/** First line of the script, or the file path, truncated for the header. */
+function runCommandArg(args: RunParamsValue): string {
+  const raw = args.script ? (args.script.split("\n")[0] ?? "") : (args.file ?? "");
+  return truncateEnd(raw, 80);
+}
 
 export interface RunToolDeps {
   readonly registry: BackgroundTaskRegistry;
@@ -389,5 +494,16 @@ export function createRunTool(deps: RunToolDeps): ToolDefinition<typeof RunParam
         if (signal && onAbort) signal.removeEventListener("abort", onAbort);
       }
     },
+    renderShell: "self",
+    renderCall(args, theme, context) {
+      return createToolHeader(
+        bulletState(context),
+        "Run",
+        runCommandArg(args),
+        theme,
+        context.lastComponent,
+      );
+    },
+    renderResult: renderBackgroundResult,
   };
 }

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
-import { isAbsolute, relative, resolve } from "node:path";
+import { isAbsolute, resolve } from "node:path";
 
 import type {
   AssistantMessage,
@@ -23,8 +23,12 @@ import { type Component, Text } from "@earendil-works/pi-tui";
 import {
   Config,
   errorMessage,
+  formatReviewDuration,
+  hasReviewAnnotationConsumer,
   isRecord,
+  isWithinRoot,
   j,
+  recordReviewAnnotation,
   scratchpadRoot,
   seedIfMissing,
   truncateEnd,
@@ -38,6 +42,10 @@ import { REVIEW_POLICY } from "./policy.ts";
 import { buildSystemPrompt, getGuardianPromptPath, loadGuardianPromptBase } from "./prompt.ts";
 import { BUILT_IN_READONLY_TOOLS, isReadOnlyCommand } from "./readonly.ts";
 import { splitCommand } from "./split.ts";
+
+// Re-exported for call sites (and tests) that import these from guardian's
+// own module rather than the shared core barrel.
+export { formatReviewDuration, isWithinRoot } from "../../src/core/index.ts";
 
 // The root barrel exports ToolCallEventResult but omits this sibling type
 // (a gap in pi-coding-agent 0.84.3); mirror it until upstream fixes the export.
@@ -248,15 +256,6 @@ function normalizeReason(value: string): string {
   return truncateEnd(value.replace(/\s+/g, " ").trim(), MAX_REASON_CHARS);
 }
 
-// Sub-10s durations keep one decimal of precision (reviews are fast enough
-// that whole seconds alone would hide most of the variation); 10s and above
-// round to a whole second, since that precision stops being useful.
-export function formatReviewDuration(durationMs: number): string {
-  const seconds = durationMs / 1000;
-  if (seconds < 10) return `${(Math.round(seconds * 10) / 10).toFixed(1)}s`;
-  return `${Math.round(seconds)}s`;
-}
-
 export function parseReviewerModel(value: unknown): ReviewerModelSpec | undefined {
   if (typeof value !== "string") return undefined;
   const raw = value.trim();
@@ -357,14 +356,6 @@ function getPathToolTarget(event: Pick<ToolCallEvent, "toolName" | "input">): st
   if (event.toolName !== "write" && event.toolName !== "edit") return undefined;
   const input: unknown = event.input;
   return isRecord(input) && typeof input.path === "string" ? input.path : undefined;
-}
-
-// Containment must use path.relative, not startsWith: a sibling directory that
-// merely shares the root as a string prefix (e.g. "/tmp/jpi-scratchpad-501x")
-// must not pass, and a resolved "root/../escape" must land outside cleanly.
-export function isWithinRoot(root: string, resolvedTarget: string): boolean {
-  const rel = relative(root, resolvedTarget);
-  return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
 }
 
 export function isScratchpadWrite(
@@ -1189,6 +1180,10 @@ export default function autoReview(
   pi.on("tool_result", async (event) => {
     const durationMs = controller.takeReviewDuration(event.toolCallId);
     if (durationMs === undefined) return undefined;
+    if (hasReviewAnnotationConsumer()) {
+      recordReviewAnnotation(event.toolCallId, { durationMs });
+      return undefined;
+    }
     pi.appendEntry<ReviewedEntryData>(REVIEWED_ENTRY_TYPE, { durationMs });
     return undefined;
   });

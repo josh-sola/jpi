@@ -32,7 +32,14 @@ import {
   Text,
 } from "@earendil-works/pi-tui";
 import { Type } from "@sinclair/typebox";
-import { errorMessage } from "../../src/core/index.ts";
+import {
+  bulletState,
+  createResultLine,
+  createToolHeader,
+  errorMessage,
+  extractResultText,
+  truncateEnd,
+} from "../../src/core/index.ts";
 import type { ModuleContext } from "../../src/core/module.ts";
 import { abortable } from "./abortable.ts";
 import { hasAgentBadge, renderAgentName } from "./agent-color.ts";
@@ -168,6 +175,11 @@ const DEFAULT_BACKGROUND_SHORTCUT = "ctrl+b";
 /** Tool execute return value for a text response. */
 function textResult(msg: string, details?: AgentDetails) {
   return { content: [{ type: "text" as const, text: msg }], details: details as any };
+}
+
+/** First non-empty line of `text`, for a one-line error or fallback summary. */
+function firstNonEmptyLine(text: string): string | undefined {
+  return text.split("\n").find((line) => line.trim() !== "");
 }
 
 export function renderRunningAgentStatus(
@@ -2607,6 +2619,33 @@ Terse command-style prompts produce shallow, generic work.
 
         return textResult(output);
       },
+      renderShell: "self",
+      renderCall(args, theme, context) {
+        return createToolHeader(
+          bulletState(context),
+          "Subagent",
+          `result: ${args.agent_id}`,
+          theme,
+          context.lastComponent,
+        );
+      },
+      renderResult(result, options, theme, context) {
+        if (options.isPartial) return new Container();
+        const text = extractResultText(result.content);
+        const container = new Container();
+        if (context.isError) {
+          const preview = truncateEnd(firstNonEmptyLine(text) ?? "Error", 100);
+          container.addChild(createResultLine(preview, theme, "error"));
+          if (options.expanded) container.addChild(new Text(theme.fg("error", text), 0, 0));
+          return container;
+        }
+
+        const summary = truncateEnd(firstNonEmptyLine(text) ?? "(no output)", 100);
+        container.addChild(createResultLine(summary, theme, "dim"));
+        if (options.expanded && text)
+          container.addChild(new Text(theme.fg("toolOutput", text), 0, 0));
+        return container;
+      },
     }),
   );
 
@@ -2675,6 +2714,33 @@ Terse command-style prompts produce shallow, generic work.
         } catch (err) {
           return textResult(`Failed to steer agent: ${errorMessage(err)}`);
         }
+      },
+      renderShell: "self",
+      renderCall(args, theme, context) {
+        return createToolHeader(
+          bulletState(context),
+          "Subagent",
+          `steer: ${args.agent_id}`,
+          theme,
+          context.lastComponent,
+        );
+      },
+      renderResult(result, options, theme, context) {
+        if (options.isPartial) return new Container();
+        const text = extractResultText(result.content);
+        const container = new Container();
+        if (context.isError) {
+          const preview = truncateEnd(firstNonEmptyLine(text) ?? "Error", 100);
+          container.addChild(createResultLine(preview, theme, "error"));
+          if (options.expanded) container.addChild(new Text(theme.fg("error", text), 0, 0));
+          return container;
+        }
+
+        const summary = truncateEnd(firstNonEmptyLine(text) ?? "(no output)", 100);
+        container.addChild(createResultLine(summary, theme, "dim"));
+        if (options.expanded && text)
+          container.addChild(new Text(theme.fg("toolOutput", text), 0, 0));
+        return container;
       },
     }),
   );
