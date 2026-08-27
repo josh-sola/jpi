@@ -31,6 +31,9 @@ export default defineConfig({
     options: { typeAware: true, typeCheck: true },
   },
   test: {
+    // The merged suite saturates every worker thread; timing-sensitive tests
+    // that pass alone in <1s can exceed vitest's 5s default under that load.
+    testTimeout: 20_000,
     // The print-mode e2e tests register a faux pi-ai provider and need the session
     // to stream through that same pi-ai instance. npm duplicates pi-ai (top-level +
     // nested under pi-coding-agent), yielding two registries and "No API provider

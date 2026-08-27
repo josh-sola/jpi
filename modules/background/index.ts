@@ -3,13 +3,7 @@ import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { isKeyRelease, matchesKey, type KeyId } from "@earendil-works/pi-tui";
 
-import {
-  getAgentDirectory,
-  Store,
-  type Config,
-  type JpiModule,
-  type WithEnabled,
-} from "../../src/core/index.ts";
+import { getAgentDirectory, Store, type Config, type WithEnabled } from "../../src/core/index.ts";
 import { createBackgroundBus } from "./bus.ts";
 import { backgroundSchema } from "./config.ts";
 import { DetachRegistry } from "./detach.ts";
@@ -162,14 +156,4 @@ export function registerBackground(
   return { registry, monitors };
 }
 
-const backgroundModule: JpiModule<typeof backgroundSchema> = {
-  name: "background",
-  section: "background",
-  schema: backgroundSchema,
-  setup(pi, ctx) {
-    registerBackground(pi, ctx.config);
-  },
-};
-
-export default backgroundModule;
 export type { BgTaskSnapshot };

@@ -18,7 +18,7 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 
-import { projectSlug, Store, type JpiModule, type ModuleContext } from "../../src/core/index.ts";
+import { projectSlug, Store, type ModuleContext } from "../../src/core/index.ts";
 import { AutoClearManager } from "./auto-clear.ts";
 import { tasksSchema } from "./config.ts";
 import {
@@ -133,7 +133,7 @@ function sanitizeSessionId(sessionId: string): string {
   return sessionId.replace(/[^A-Za-z0-9._-]/g, "-");
 }
 
-function setup(pi: ExtensionAPI, ctx: ModuleContext<typeof tasksSchema>) {
+export function setupTasks(pi: ExtensionAPI, ctx: ModuleContext<typeof tasksSchema>) {
   const jpiStore = new Store("tasks");
 
   // The loader guarantees the `tasks { }` config is loaded before setup runs, so
@@ -756,12 +756,3 @@ Delete a task:
     },
   });
 }
-
-const tasksModule: JpiModule<typeof tasksSchema> = {
-  name: "tasks",
-  section: "tasks",
-  schema: tasksSchema,
-  setup,
-};
-
-export default tasksModule;

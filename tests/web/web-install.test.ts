@@ -451,7 +451,9 @@ test("runCommandWithSpawn never exceeds maxOutputBytes for multi-byte output", a
   const output = await runCommandWithSpawn(
     process.execPath,
     ["-e", "process.stdout.write(Buffer.from('€'.repeat(10000)))"],
-    { timeoutMs: 5_000, maxOutputBytes: 1_000 },
+    // Generous: node startup alone can take seconds while the full merged
+    // suite saturates the machine, and a timeout kill fails the exit-code check.
+    { timeoutMs: 15_000, maxOutputBytes: 1_000 },
   );
   assert.equal(output.exitCode, 0);
   assert.ok(Buffer.byteLength(output.stdout) <= 1_000);

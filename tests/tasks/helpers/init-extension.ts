@@ -8,7 +8,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 import { Config, injectEnabled } from "../../../src/core/index.ts";
 import { tasksSchema } from "../../../modules/tasks/config.ts";
-import tasksModule from "../../../modules/tasks/index.ts";
+import tasksModule from "../../../modules/tasks/module.ts";
 
 export async function initTasksExtension(pi: ExtensionAPI): Promise<void> {
   const config = new Config("tasks", injectEnabled("tasks", tasksSchema));

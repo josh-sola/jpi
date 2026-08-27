@@ -2,16 +2,38 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 import { Config } from "../../src/core/config.ts";
 import { injectEnabled, type JpiModule } from "../../src/core/module.ts";
+import backgroundModule from "../../modules/background/module.ts";
+import guardianModule from "../../modules/guardian/module.ts";
+import historyModule from "../../modules/history/module.ts";
+import memoryModule from "../../modules/memory/module.ts";
+import promptModule from "../../modules/prompt/module.ts";
+import scratchpadModule from "../../modules/scratchpad/module.ts";
+import statusModule from "../../modules/status/module.ts";
+import styleModule from "../../modules/style/module.ts";
+import subagentsModule from "../../modules/subagents/module.ts";
+import tasksModule from "../../modules/tasks/module.ts";
+import titleModule from "../../modules/title/module.ts";
+import webModule from "../../modules/web/module.ts";
 
 // Order encodes real constraints, not preference: prompt replaces the system
 // prompt before memory/scratchpad append to it, so it must load first. style
 // re-registers built-in tools, so it loads near the end, after the modules
 // whose tools it wraps. history owns the editor via setEditorComponent, where
 // the last caller wins, so it must load last of all.
-//
-// prompt, guardian, status, memory, web, title, background, subagents,
-// tasks, scratchpad, style, history
-const MODULES: readonly JpiModule[] = [];
+const MODULES: readonly JpiModule[] = [
+  promptModule,
+  guardianModule,
+  statusModule,
+  memoryModule,
+  webModule,
+  titleModule,
+  backgroundModule,
+  subagentsModule,
+  tasksModule,
+  scratchpadModule,
+  styleModule,
+  historyModule,
+];
 
 export interface LoadModulesResult {
   readonly issues: readonly string[];
