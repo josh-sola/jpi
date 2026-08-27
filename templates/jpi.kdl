@@ -1,19 +1,34 @@
-// jpi.kdl — config for all jpi modules.
-// Sections not listed here are added automatically by the jpi plugin on
-// first run: it seeds any missing module stanza with its defaults.
+// jpi.kdl — config for all jpi modules. Each stanza's leading `enabled` field
+// turns that module off before it even loads. A missing stanza is seeded with
+// its defaults on first run.
 
+// background tasks and monitors: the run tool, bg_status/bg_logs/bg_kill/bg_monitor, ctrl+b detach
+background {
+  enabled #true
+  // bytes of output a task may write before it is capped and killed
+  max-output-bytes 20971520
+  // default per-task timeout in seconds; 0 means tasks run until they exit
+  default-timeout-seconds 0
+  // lifetime in seconds for a non-persistent monitor before it is stopped
+  monitor-timeout-seconds 1800
+  // monitor events allowed per minute before flood suppression kicks in
+  max-monitor-events-per-minute 30
+}
+
+// auto-review gate for risky tool calls; /guardian pauses it for a session
 guardian {
+  enabled #true
   // model that runs the reviews; unset defaults to anthropic/claude-sonnet-5
   // model "provider/model-id"
-  // set to #false to disable reviews
-  enabled #true
   // per-review timeout in milliseconds
   timeout-ms 10000
   allow {
     // tool names that skip review (repeat: tool "name").
     // Read-only tools (read, grep, find, ls, ask_user_question, bg_status,
     // bg_logs, TaskList, TaskGet, get_subagent_result, web_search, web_fetch)
-    // are built into jpi-guardian by default. List only the extras here.
+    // are built into the guardian module by default. List only the extras here.
+    tool "write"
+    tool "edit"
     tool "bg_kill"
     tool "Agent"
     tool "steer_subagent"
@@ -43,25 +58,48 @@ guardian {
   // extra review policy lines
 }
 
+// prompt history with ctrl+r search and ghost-text suggestions; owns the editor
+history {
+  enabled #true
+  // prompts the log file retains; the oldest are dropped at session start
+  max-size 1000
+}
+
+// persistent markdown memories, folded into the system prompt per project
+memory {
+  enabled #true
+}
+
+// system prompt from the editable JPI-SYSTEM.md template
+prompt {
+  enabled #true
+}
+
+// steers temp files into a per-session scratch dir and sweeps stale ones
+scratchpad {
+  enabled #true
+  // age in days after which a stale session's scratchpad dir is swept
+  ttl-days 7
+}
+
+// the status footer
 status {
+  enabled #true
   format {
+    // status line rows, top to bottom
     row "@jpi/model" "@jpi/context" "@jpi/repository" "@jpi/branch"
     row "@jpi-guardian/review-mode" "@jpi-background/tasks" "@jpi-background/monitors" "@jpi/slot"
   }
 }
 
-background {
-  // bytes of output a task may write before it is capped and killed
-  max-output-bytes 20971520
-  // default per-task timeout in seconds; 0 means tasks run until they exit
-  default-timeout-seconds 0
-  // lifetime in seconds for a non-persistent monitor before it is stopped
-  monitor-timeout-seconds 1800
-  // monitor events allowed per minute before flood suppression kicks in
-  max-monitor-events-per-minute 30
+// Claude Code-style rendering for the built-in tools' calls and results
+style {
+  enabled #true
 }
 
+// the Agent tool: spawn, steer, and watch subagents; /agents
 subagents {
+  enabled #true
   // max concurrent background agents
   max-concurrent 10
   // max concurrent foreground (blocking) agents; 0 = unlimited
@@ -108,21 +146,21 @@ subagents {
   viewer-markdown all
 }
 
+// TaskCreate/TaskList/TaskGet/TaskUpdate, the task widget, /tasks
 tasks {
+  enabled #true
   // where the task list is stored — memory, session, or project
   scope "session"
   // when completed tasks are swept from the list
   auto-clear-completed "on_list_complete"
 }
 
-scratchpad {
-  // set to #false to disable the scratchpad
+// activity-aware terminal tab titles
+title {
   enabled #true
-  // age in days after which a stale session's scratchpad dir is swept
-  ttl-days 7
 }
 
-history {
-  // prompts the log file retains; the oldest are dropped at session start
-  max-size 1000
+// web_search and web_fetch, backed by the ketch CLI
+web {
+  enabled #true
 }
