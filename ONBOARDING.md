@@ -24,15 +24,17 @@ The script, in order:
 1. Checks Node is installed and its major version is at least 24. It exits
    with a clear message if not — see Troubleshooting below.
 2. Installs the `pi` CLI globally via pnpm if it is not already on `PATH`.
-3. Installs the 16 packages listed in the table below via `pi install`.
+3. Removes any of the 12 old `jpi-*` packages that are still installed (see
+   the "coming from the old multi-repo jpi" section below).
+4. Installs the 5 packages listed in the table below via `pi install`.
    Re-running this step is safe: `pi install` updates an already-installed
    package rather than failing.
-4. Seeds `jpi.kdl`, `mcp.json`, and `JPI-SYSTEM.md` into the Pi agent
+5. Seeds `jpi.kdl`, `mcp.json`, and `JPI-SYSTEM.md` into the Pi agent
    directory (`$PI_CODING_AGENT_DIR`, default `~/.pi/agent`) — but only for
    files that do not already exist there.
-5. Merges the UI and behavior defaults from `templates/settings-defaults.json`
+6. Merges the UI and behavior defaults from `templates/settings-defaults.json`
    into `settings.json`, without touching any key already set there.
-6. Prints next steps for the human (see part 4 below).
+7. Prints next steps for the human (see part 4 below).
 
 Do not re-implement these steps yourself — just run the script and report
 what happened.
@@ -41,14 +43,15 @@ what happened.
 
 After `setup.sh` finishes, confirm:
 
-- `pi list` shows all 16 packages from the table below.
+- `pi list` shows exactly the 5 packages from the table below, and none of
+  the 12 old `jpi-*` packages (`jpi-prompt`, `jpi-guardian`, `jpi-status`,
+  `jpi-memory`, `jpi-web`, `jpi-title`, `jpi-background`, `jpi-subagents`,
+  `jpi-tasks`, `jpi-scratchpad`, `jpi-style`, `jpi-history`).
 - `$AGENT_DIR/jpi.kdl` exists.
 - `$AGENT_DIR/mcp.json` exists.
 - `$AGENT_DIR/JPI-SYSTEM.md` exists.
-- `$AGENT_DIR/settings.json` has a `packages` array containing the 16
-  package sources, with `git:github.com/josh-sola/jpi-prompt` before
-  `jpi-memory` and `jpi-scratchpad` (jpi-prompt replaces the system prompt
-  outright, so packages that append to it must load after it).
+- `$AGENT_DIR/settings.json` has a `packages` array containing the 5
+  package sources from the table below.
 
 (`$AGENT_DIR` is `$PI_CODING_AGENT_DIR`, or `~/.pi/agent` if that variable
 is unset.)
@@ -60,10 +63,10 @@ These steps need a person, not just the agent:
 - **Authentication** — run `/login` inside `pi`, or set a provider API key
   as an environment variable.
 - **Default provider and model** — pick one in `pi`'s settings.
-- **Guardian review model** — `jpi-guardian` auto-reviews tool calls before
-  they run. Reviews default to `anthropic/claude-sonnet-5`; to use a different
-  model, set it in the `guardian { }` section of `jpi.kdl` (see the comment
-  above the `model` line there).
+- **Guardian review model** — jpi's guardian module auto-reviews tool calls
+  before they run. Reviews default to `anthropic/claude-sonnet-5`; to use a
+  different model, set it in the `guardian { }` section of `jpi.kdl` (see the
+  comment above the `model` line there).
 
 ## Troubleshooting
 
@@ -77,25 +80,25 @@ These steps need a person, not just the agent:
   person wants to adopt any of it.
 - **Something looks broken** — re-running `setup.sh` is always safe.
 - **Removing a package** — `pi remove <source>`, using the same source
-  string as in the table below (e.g. `pi remove git:github.com/josh-sola/jpi-tasks`).
+  string as in the table below (e.g. `pi remove git:github.com/josh-sola/jpi`).
+
+## If you're coming from the old multi-repo jpi
+
+The 12 `jpi-*` repos (prompt, guardian, status, memory, web, title,
+background, subagents, tasks, scratchpad, style, history) are archived. Their
+functionality all lives in this repo's single `jpi` package now. Just
+re-running `setup.sh` from this repo migrates an existing machine
+automatically: it removes the old packages and installs the new one. Your
+`jpi.kdl` carries over unchanged — the module stanzas it already has (all 12
+plus `enabled`) keep working, and any stanza you're missing appears the first
+time you start `pi` after the new package is installed.
 
 ## Plugin overview
 
-| Package | What it is |
-| --- | --- |
-| `npm:pi-mcp-adapter` | Bridges MCP servers into Pi's tool set. |
-| `npm:@juicesharp/rpiv-ask-user-question` | Adds an `ask_user_question` tool for mid-task clarification. |
-| `npm:pi-schedule-prompt` | Schedules a prompt to run later. |
-| `npm:pi-rewind` | Rewinds a session to an earlier point. |
-| `git:github.com/josh-sola/jpi-prompt` | The system prompt as a plain markdown file you own (`JPI-SYSTEM.md` in the agent dir), re-read every turn. |
-| `git:github.com/josh-sola/jpi-guardian` | Auto-review gate for tool calls, configured in the `guardian { }` section of `jpi.kdl`. |
-| `git:github.com/josh-sola/jpi-status` | Configurable status footer, configured in the `status { }` section of `jpi.kdl`. |
-| `git:github.com/josh-sola/jpi-memory` | Persistent memory: one markdown file per fact plus an index, under the agent dir. |
-| `git:github.com/josh-sola/jpi-web` | `web_search` / `web_fetch` tools backed by a keyless DuckDuckGo client. |
-| `git:github.com/josh-sola/jpi-title` | Activity-aware terminal tab titles. |
-| `git:github.com/josh-sola/jpi-background` | Background shell tasks and streaming watches, configured in the `background { }` section of `jpi.kdl`. |
-| `git:github.com/josh-sola/jpi-subagents` | Claude-Code-style subagents: a fleet view, delegation, and nested agents. |
-| `git:github.com/josh-sola/jpi-tasks` | A plain todo list: create/list/update tasks, plus a persistent widget. |
-| `git:github.com/josh-sola/jpi-scratchpad` | A session scratchpad directory, steering the model away from `/tmp`. |
-| `git:github.com/josh-sola/jpi-style` | Claude-Code-style rendering for tool calls and results. |
-| `git:github.com/josh-sola/jpi-history` | Prompt history across sessions: every prompt typed is one up-arrow or `ctrl+r` away. |
+| Package                                  | What it is                                                                                                                                                                                                                                                                                                    |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm:pi-mcp-adapter`                     | Bridges MCP servers into Pi's tool set.                                                                                                                                                                                                                                                                       |
+| `npm:@juicesharp/rpiv-ask-user-question` | Adds an `ask_user_question` tool for mid-task clarification.                                                                                                                                                                                                                                                  |
+| `npm:pi-schedule-prompt`                 | Schedules a prompt to run later.                                                                                                                                                                                                                                                                              |
+| `npm:pi-rewind`                          | Rewinds a session to an earlier point.                                                                                                                                                                                                                                                                        |
+| `git:github.com/josh-sola/jpi`           | One package holding all of Josh's modules: the system prompt, guardian, status, memory, web, title, background, subagents, tasks, scratchpad, style, and history. Each module has its own stanza in `jpi.kdl`, and setting that stanza's `enabled` field to `#false` turns the module off (restart required). |

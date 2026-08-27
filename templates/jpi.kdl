@@ -1,5 +1,6 @@
-// jpi.kdl — config for all jpi plugins.
-// Sections are added by each plugin on first load.
+// jpi.kdl — config for all jpi modules.
+// Sections not listed here are added automatically by the jpi plugin on
+// first run: it seeds any missing module stanza with its defaults.
 
 guardian {
   // model that runs the reviews; unset defaults to anthropic/claude-sonnet-5

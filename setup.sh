@@ -29,15 +29,21 @@ if ! command -v pi >/dev/null 2>&1; then
   fi
 fi
 
-# jpi-prompt must come before other prompt-modifying packages (jpi-memory,
-# jpi-scratchpad) in settings.json's packages array: it replaces the system
-# prompt outright and would discard sections a package before it appended.
+# Order among these entries is now inert (prompt ordering is internal to the
+# jpi package). jpi is listed first only to keep settings.json diffs boring.
 packages=(
-  "git:github.com/josh-sola/jpi-prompt"
+  "git:github.com/josh-sola/jpi"
   "npm:pi-mcp-adapter"
   "npm:@juicesharp/rpiv-ask-user-question"
   "npm:pi-schedule-prompt"
   "npm:pi-rewind"
+)
+
+# Superseded by the single jpi package; removed so old and new extensions
+# don't run side by side. Gated on presence: `pi remove` on a source that
+# was never installed is untested, and settings.json may not exist yet.
+old_sources=(
+  "git:github.com/josh-sola/jpi-prompt"
   "git:github.com/josh-sola/jpi-guardian"
   "git:github.com/josh-sola/jpi-status"
   "git:github.com/josh-sola/jpi-memory"
@@ -50,6 +56,12 @@ packages=(
   "git:github.com/josh-sola/jpi-style"
   "git:github.com/josh-sola/jpi-history"
 )
+for src in "${old_sources[@]}"; do
+  if [ -f "$AGENT_DIR/settings.json" ] && grep -q "\"$src\"" "$AGENT_DIR/settings.json"; then
+    echo "Removing superseded $src..."
+    pi remove "$src"
+  fi
+done
 
 # pi install updates an already-installed source in place rather than failing,
 # so calling it every run keeps this idempotent without checking settings.json first.
