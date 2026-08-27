@@ -166,7 +166,7 @@ export function createMentionProvider(
         if (!warnedInnerFailure) {
           warnedInnerFailure = true;
           console.warn(
-            "[pi-subagents] the autocomplete provider below us failed; showing agent rows only:",
+            "[jpi-subagents] the autocomplete provider below us failed; showing agent rows only:",
             err,
           );
         }

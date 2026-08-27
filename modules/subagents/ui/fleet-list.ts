@@ -159,7 +159,7 @@ function rightAlign(left: string, right: string, width: number): string {
 
 export class FleetList {
   private ui: FleetUICtx | undefined;
-  private tui: any | undefined;
+  private tui: any;
   private inputUnsub: (() => void) | undefined;
   private widgetRegistered = false;
   private timer: ReturnType<typeof setInterval> | undefined;

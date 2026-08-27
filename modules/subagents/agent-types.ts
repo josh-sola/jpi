@@ -130,7 +130,7 @@ export function isValidTypeIn(registry: Map<string, AgentConfig>, type: string):
 /** Get all enabled type names in a registry (for spawning and tool descriptions). */
 export function getAvailableTypesIn(registry: Map<string, AgentConfig>): string[] {
   return [...registry.entries()]
-    .filter(([_, config]) => config.enabled !== false)
+    .filter(([, config]) => config.enabled !== false)
     .map(([name]) => name);
 }
 
@@ -263,14 +263,14 @@ export function getAllTypes(): string[] {
 /** Get names of default agents currently in the registry. */
 export function getDefaultAgentNames(): string[] {
   return [...agents.entries()]
-    .filter(([_, config]) => config.isDefault === true)
+    .filter(([, config]) => config.isDefault === true)
     .map(([name]) => name);
 }
 
 /** Get names of user-defined agents (non-defaults) currently in the registry. */
 export function getUserAgentNames(): string[] {
   return [...agents.entries()]
-    .filter(([_, config]) => config.isDefault !== true)
+    .filter(([, config]) => config.isDefault !== true)
     .map(([name]) => name);
 }
 

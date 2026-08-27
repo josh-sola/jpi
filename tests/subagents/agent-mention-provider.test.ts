@@ -226,7 +226,7 @@ describe("agent suggestions", () => {
       for (const line of ["@e", "@ex", "@exp"]) await suggest(provider, line);
 
       expect(warn).toHaveBeenCalledTimes(1);
-      expect(warn.mock.calls[0][0]).toContain("[pi-subagents]");
+      expect(warn.mock.calls[0][0]).toContain("[jpi-subagents]");
     } finally {
       warn.mockRestore();
     }

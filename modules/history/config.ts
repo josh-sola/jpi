@@ -28,5 +28,3 @@ export const historySchema = j.node({
     }),
   },
 });
-
-export type HistoryConfigValue = j.infer<typeof historySchema>;

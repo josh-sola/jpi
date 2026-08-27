@@ -55,7 +55,7 @@ describe("documented defaults (README:441)", () => {
     try {
       expect(manager.getMaxConcurrent()).toBe(10);
     } finally {
-      manager.dispose();
+      await manager.dispose();
     }
   });
 
@@ -68,7 +68,7 @@ describe("documented defaults (README:441)", () => {
     try {
       expect(manager.getMaxConcurrentForeground()).toBe(0);
     } finally {
-      manager.dispose();
+      await manager.dispose();
     }
   });
 

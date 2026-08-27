@@ -1022,12 +1022,12 @@ export async function runAgent(
       if (maxTurns != null) {
         if (!softLimitReached && turnCount >= maxTurns) {
           softLimitReached = true;
-          session.steer(
+          void session.steer(
             "You have reached your turn limit. Wrap up immediately — provide your final answer now.",
           );
         } else if (softLimitReached && turnCount >= maxTurns + graceTurns) {
           aborted = true;
-          session.abort();
+          void session.abort();
         }
       }
     }

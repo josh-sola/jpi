@@ -25,10 +25,6 @@ export interface FleetProviderPayload {
   attach(consumer: FleetConsumer): () => void;
 }
 
-export interface FleetConsumerReadyPayload {
-  schema: "subagents.fleet.consumer-ready.v1";
-}
-
 /**
  * Emit the fleet render provider on `FLEET_PROVIDER_CHANNEL`, and re-emit it
  * whenever a consumer announces readiness on `FLEET_CONSUMER_READY_CHANNEL`.

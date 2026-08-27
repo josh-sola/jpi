@@ -80,7 +80,9 @@ describe("ConversationViewer.render — cold cache (first frame)", () => {
       `${n} messages`,
       () => {
         // Modulo only guards a miscount; a wrapped entry would be warm, not cold.
-        pool[next++ % pool.length].render(120);
+        const index = next % pool.length;
+        next += 1;
+        pool[index].render(120);
       },
       { time: 0, iterations, warmupTime: 0, warmupIterations: WARMUP },
     );

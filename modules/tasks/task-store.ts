@@ -2,7 +2,7 @@
  * task-store.ts — Store-backed task store with CRUD operations.
  *
  * Memory mode (no backing key given): an in-memory Map, no disk I/O. File-backed
- * mode persists through jpi-base's `Store`, which writes atomically (tmp file +
+ * mode persists through src/core's `Store`, which writes atomically (tmp file +
  * rename) but does not coordinate with any other process writing the same file.
  *
  * Every mutator reloads from disk, applies, then saves: a project-scoped file

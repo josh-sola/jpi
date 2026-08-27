@@ -6,8 +6,8 @@
  */
 
 const BASE_KEYS = new Set([
-  ..."abcdefghijklmnopqrstuvwxyz",
-  ..."0123456789",
+  ..."abcdefghijklmnopqrstuvwxyz".split(""),
+  ..."0123456789".split(""),
   "`",
   "-",
   "=",

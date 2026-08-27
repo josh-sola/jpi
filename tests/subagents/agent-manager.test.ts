@@ -38,8 +38,8 @@ const resolvedRun = () =>
 describe("AgentManager — Bug 1 race condition (resultConsumed vs onComplete)", () => {
   let manager: AgentManager;
 
-  afterEach(() => {
-    manager?.dispose();
+  afterEach(async () => {
+    await manager?.dispose();
   });
 
   it("reproduces bug: onComplete fires with resultConsumed=false when set after await", async () => {
@@ -453,8 +453,8 @@ describe("AgentManager — nested runtime propagation", () => {
 describe("AgentManager — completion callbacks", () => {
   let manager: AgentManager;
 
-  afterEach(() => {
-    manager?.dispose();
+  afterEach(async () => {
+    await manager?.dispose();
   });
 
   it("does not let onComplete errors turn a completed agent into a failed run", async () => {
@@ -476,8 +476,8 @@ describe("AgentManager — completion callbacks", () => {
 describe("AgentManager — cleanup timer", () => {
   let manager: AgentManager;
 
-  afterEach(() => {
-    manager?.dispose();
+  afterEach(async () => {
+    await manager?.dispose();
   });
 
   it("does not keep the process alive on its own", () => {
@@ -490,8 +490,8 @@ describe("AgentManager — cleanup timer", () => {
 describe("AgentManager — Bug 3 clearCompleted", () => {
   let manager: AgentManager;
 
-  afterEach(() => {
-    manager?.dispose();
+  afterEach(async () => {
+    await manager?.dispose();
   });
 
   it("clearCompleted removes completed records", async () => {
@@ -638,8 +638,8 @@ describe("AgentManager — Bug 3 clearCompleted", () => {
 describe("AgentManager — the usage hook fires once per assistant message", () => {
   let manager: AgentManager;
 
-  afterEach(() => {
-    manager?.dispose();
+  afterEach(async () => {
+    await manager?.dispose();
   });
 
   it("fires once per message, with the same delta the record accumulates", async () => {
@@ -713,8 +713,8 @@ describe("AgentManager — the usage hook fires once per assistant message", () 
 describe("AgentManager — lifetime usage + compaction count are eagerly initialized", () => {
   let manager: AgentManager;
 
-  afterEach(() => {
-    manager?.dispose();
+  afterEach(async () => {
+    await manager?.dispose();
   });
 
   it("spawn initializes lifetimeUsage to zeros and compactionCount to 0", () => {
@@ -844,8 +844,8 @@ describe("AgentManager — lifetime usage + compaction count are eagerly initial
 describe("AgentManager — isolation: worktree fails loud, no silent fallback", () => {
   let manager: AgentManager;
 
-  afterEach(() => {
-    manager?.dispose();
+  afterEach(async () => {
+    await manager?.dispose();
   });
 
   it("awaitStartup rejects when createWorktree returns undefined; no orphan record left behind", async () => {
@@ -982,7 +982,7 @@ describe("AgentManager — onBeforeWorktreeCleanup", () => {
   }
 
   afterEach(async () => {
-    manager?.dispose();
+    await manager?.dispose();
     const { createWorktree, cleanupWorktree } = await import("../../modules/subagents/worktree.ts");
     vi.mocked(createWorktree).mockReset();
     vi.mocked(cleanupWorktree).mockReset();
@@ -1097,7 +1097,7 @@ describe("AgentManager — kept-worktree result note", () => {
   let manager: AgentManager;
 
   afterEach(async () => {
-    manager?.dispose();
+    await manager?.dispose();
     const { cleanupWorktree } = await import("../../modules/subagents/worktree.ts");
     vi.mocked(cleanupWorktree).mockReset();
     vi.mocked(cleanupWorktree).mockImplementation(async () => ({ hasChanges: false }));
@@ -1160,8 +1160,8 @@ describe("AgentManager — kept-worktree result note", () => {
 describe("AgentManager — worktreeIsolation: false refuses worktrees", () => {
   let manager: AgentManager;
 
-  afterEach(() => {
-    manager?.dispose();
+  afterEach(async () => {
+    await manager?.dispose();
     vi.mocked(isWorktreeIsolationEnabled).mockReturnValue(true);
   });
 
@@ -2241,10 +2241,10 @@ describe("AgentManager — dispose prunes worktree repos", () => {
     await manager.awaitStartup(id);
     await manager.getRecord(id)!.promise;
 
-    manager.dispose();
+    await manager.dispose();
     expect(pruneWorktrees).not.toHaveBeenCalled();
 
-    manager.dispose(mockPi);
+    await manager.dispose(mockPi);
     expect(pruneWorktrees).toHaveBeenCalledWith(mockPi, process.cwd());
     // The caller-supplied cwd's repo too — that is where its worktree lived.
     expect(pruneWorktrees).toHaveBeenCalledWith(mockPi, "/");
@@ -2254,8 +2254,8 @@ describe("AgentManager — dispose prunes worktree repos", () => {
 describe("AgentManager — background resume", () => {
   let manager: AgentManager;
 
-  afterEach(() => {
-    manager?.dispose();
+  afterEach(async () => {
+    await manager?.dispose();
   });
 
   // Spawn a background agent and let it settle so it holds a session to resume.
@@ -2696,8 +2696,8 @@ describe("AgentManager — names as additive aliases", () => {
 describe("AgentManager — effective model and thinking write-back", () => {
   let manager: AgentManager;
 
-  afterEach(() => {
-    manager?.dispose?.();
+  afterEach(async () => {
+    await manager?.dispose?.();
     vi.restoreAllMocks();
   });
 

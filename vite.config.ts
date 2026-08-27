@@ -39,4 +39,7 @@ export default defineConfig({
     server: { deps: { inline: [/@earendil-works\/pi-/] } },
   },
   resolve: { dedupe: ["@earendil-works/pi-ai"] },
+  staged: {
+    "*.{js,mjs,ts,tsx}": "vp check --fix",
+  },
 });

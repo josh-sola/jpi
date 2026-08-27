@@ -1,4 +1,4 @@
-import type { Document, Location, Node as KdlNode } from "@bgotink/kdl";
+import type { Location, Node as KdlNode } from "@bgotink/kdl";
 import { getLocation } from "@bgotink/kdl";
 import { z } from "zod";
 
@@ -238,7 +238,7 @@ export function compileNode(spec: AnyJpiNodeSpec, path: string): CompiledNode {
 }
 
 export function cloneJson<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T;
+  return structuredClone(value);
 }
 
 export function formatIssue(
@@ -448,5 +448,3 @@ function renderField(
 export function renderStanza(sectionName: string, compiled: CompiledNode): string {
   return `${renderNode(sectionName, compiled, compiled.defaults, "").join("\n")}\n`;
 }
-
-export type { Document };

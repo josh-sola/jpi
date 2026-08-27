@@ -35,16 +35,6 @@ export interface ResponseEnvelope {
   readonly error?: string;
 }
 
-export interface TerminalEnvelope {
-  readonly schema: typeof TERMINAL_SCHEMA;
-  readonly task: BgTaskSnapshot | MonitorSnapshot;
-}
-
-export interface TasksLevelEnvelope {
-  readonly schema: typeof TASKS_SCHEMA;
-  readonly tasks: ReadonlyArray<BgTaskSnapshot | MonitorSnapshot>;
-}
-
 export interface BackgroundBus {
   /** Fire-and-forget broadcast of one task's or monitor's terminal snapshot. Consumers dedupe by id. */
   publishTerminal(snapshot: BgTaskSnapshot | MonitorSnapshot): void;

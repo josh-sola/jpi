@@ -38,8 +38,8 @@ describe("AgentManager — record GC", () => {
     vi.useFakeTimers();
   });
 
-  afterEach(() => {
-    manager?.dispose();
+  afterEach(async () => {
+    await manager?.dispose();
     vi.useRealTimers();
   });
 
@@ -170,8 +170,8 @@ describe("AgentManager — tombstones outliving the GC", () => {
   let manager: AgentManager;
 
   beforeEach(() => vi.useFakeTimers());
-  afterEach(() => {
-    manager?.dispose();
+  afterEach(async () => {
+    await manager?.dispose();
     vi.useRealTimers();
   });
 

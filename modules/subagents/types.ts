@@ -11,9 +11,6 @@ export type { ThinkingLevel };
 /** Agent type: any string name (built-in defaults or user-defined). */
 export type SubagentType = string;
 
-/** Names of the three embedded default agents. */
-export const DEFAULT_AGENT_NAMES = ["general-purpose", "explore", "plan"] as const;
-
 /**
  * Isolation mode for agent execution.
  *

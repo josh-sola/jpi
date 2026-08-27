@@ -83,8 +83,8 @@ describe("maxConcurrentForeground", () => {
     vi.mocked(runAgent).mockClear();
   });
 
-  afterEach(() => {
-    manager?.dispose();
+  afterEach(async () => {
+    await manager?.dispose();
     vi.mocked(createWorktree).mockReset();
   });
 

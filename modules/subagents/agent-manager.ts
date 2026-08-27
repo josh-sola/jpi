@@ -583,7 +583,7 @@ export class AgentManager {
       return id;
     }
 
-    this.launch(id, record, args, undefined);
+    void this.launch(id, record, args, undefined);
     return id;
   }
 

@@ -24,7 +24,6 @@ async function touch(dir: string, ageMs: number, now: number): Promise<void> {
   await utimes(dir, seconds, seconds);
 }
 
-const alwaysAlive = () => true;
 const alwaysDead = () => false;
 
 test("isPidAlive is true for the current process", () => {

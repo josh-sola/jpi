@@ -1730,7 +1730,7 @@ Terse command-style prompts produce shallow, generic work.
     return template.replace(/\{\{(\w+)\}\}/g, (raw, name: string) => {
       if (vars[name]) return vars[name]();
       console.warn(
-        `[pi-subagents] agent-tool-description.md: unknown placeholder ${raw} left as-is`,
+        `[jpi-subagents] agent-tool-description.md: unknown placeholder ${raw} left as-is`,
       );
       return raw;
     });
@@ -1742,10 +1742,10 @@ Terse command-style prompts produce shallow, generic work.
       if (!existsSync(path)) return undefined;
       const text = readFileSync(path, "utf-8").trim();
       if (text) return renderToolDescriptionTemplate(text);
-      console.warn(`[pi-subagents] ${path} is empty — ignoring`);
+      console.warn(`[jpi-subagents] ${path} is empty — ignoring`);
     } catch (err) {
       console.warn(
-        `[pi-subagents] failed to read ${path}: ${err instanceof Error ? err.message : String(err)}`,
+        `[jpi-subagents] failed to read ${path}: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
     return undefined;
@@ -1758,7 +1758,7 @@ Terse command-style prompts produce shallow, generic work.
       const custom = loadCustomToolDescription();
       if (custom) return custom;
       console.warn(
-        '[pi-subagents] toolDescriptionMode is "custom" but no agent-tool-description.md found — using "full"',
+        '[jpi-subagents] toolDescriptionMode is "custom" but no agent-tool-description.md found — using "full"',
       );
     }
     return fullAgentToolDescription;

@@ -1,5 +1,5 @@
 /**
- * jpi-tasks — A pi extension providing Claude Code-style task tracking.
+ * tasks — jpi module providing Claude Code-style task tracking.
  *
  * Tools:
  *   TaskCreate   — Create a structured task

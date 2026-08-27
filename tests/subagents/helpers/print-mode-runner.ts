@@ -494,7 +494,7 @@ export async function runPrintMode(options: RunPrintModeOptions): Promise<PrintM
     // shutdown handler calls manager.abortAll()).
     failed = true;
     try {
-      session.abort();
+      void session.abort();
     } catch {
       /* ignore */
     }

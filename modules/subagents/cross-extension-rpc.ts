@@ -20,9 +20,6 @@ export interface EventBus {
   emit(event: string, data: unknown): void;
 }
 
-/** RPC reply envelope — matches pi-mono's RpcResponse shape. */
-export type RpcReply<T = void> = { success: true; data?: T } | { success: false; error: string };
-
 /** RPC protocol version — bumped when the envelope or method contracts change. */
 export const PROTOCOL_VERSION = 2;
 
@@ -49,7 +46,7 @@ export interface SpawnCapable {
 export interface RpcDeps {
   events: EventBus;
   pi: unknown; // passed through to manager.spawn
-  getCtx: () => unknown | undefined; // returns current ExtensionContext
+  getCtx: () => unknown; // returns current ExtensionContext
   manager: SpawnCapable;
 }
 
@@ -67,7 +64,7 @@ export interface RpcHandle {
 function handleRpc<P extends { requestId: string }>(
   events: EventBus,
   channel: string,
-  fn: (params: P) => unknown | Promise<unknown>,
+  fn: (params: P) => unknown,
 ): () => void {
   return events.on(channel, async (raw: unknown) => {
     const params = raw as P;

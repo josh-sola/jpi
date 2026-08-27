@@ -50,5 +50,3 @@ export const backgroundSchema = j.node({
       .default("ctrl+b"),
   },
 });
-
-export type BackgroundConfigValue = j.infer<typeof backgroundSchema>;
