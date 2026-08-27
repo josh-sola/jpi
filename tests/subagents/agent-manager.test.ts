@@ -1477,6 +1477,39 @@ describe("AgentManager — abort() state machine", () => {
     expect(record.status).toBe("stopped"); // not overwritten to "completed"
     expect(record.result).toBe("partial output"); // partial result still captured
   });
+
+  it("a user abort survives a foreground resume settling — stays 'stopped', never 'error'", async () => {
+    // Same guard as the background resume/spawn settle paths, but for the
+    // inline foreground resume() try/catch: an abort mid-await makes
+    // resumeAgent reject (its AbortSignal fired), and that rejection must not
+    // flip the user-stopped status back to "error".
+    manager = new AgentManager();
+    resolvedRun();
+    const id = manager.spawn(mockPi, mockCtx, "X", "p", { description: "x", isBackground: true });
+    const record = manager.getRecord(id)!;
+    await record.promise;
+    expect(record.status).toBe("completed");
+
+    let rejectResume!: (err: unknown) => void;
+    vi.mocked(resumeAgent).mockImplementation(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectResume = reject;
+        }),
+    );
+
+    const resumePromise = manager.resume(id, "more");
+    expect(record.status).toBe("running");
+
+    expect(manager.abort(id)).toBe(true);
+    expect(record.status).toBe("stopped");
+
+    rejectResume(new Error("Aborted"));
+    await resumePromise;
+
+    expect(record.status).toBe("stopped"); // not overwritten to "error"
+    expect(record.error).toBeUndefined();
+  });
 });
 
 // Regression for #44: ESC during a foreground Agent call must propagate to
@@ -2469,6 +2502,52 @@ describe("AgentManager — background resume", () => {
     expect(manager.abort(id)).toBe(true);
     expect(manager.getRecord(id)!.status).toBe("stopped");
     expect(onStarted).not.toHaveBeenCalled();
+  });
+
+  // Guards the retry catch in the queued-resume drain path: a stop landing
+  // between the drain committing to this record and resumeAgent() failing
+  // must not be overwritten back to "error".
+  it("a queued resume stopped as it drains stays 'stopped' even when the retry throws", async () => {
+    manager = new AgentManager(undefined, 1); // maxConcurrent = 1
+    const id = await spawnSettled(manager);
+
+    // Occupy the only slot with a run we can release on demand.
+    let releaseBlocker!: (v: any) => void;
+    vi.mocked(runAgent).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          releaseBlocker = resolve;
+        }),
+    );
+    manager.spawn(mockPi, mockCtx, "general-purpose", "blocker", {
+      description: "blocker",
+      isBackground: true,
+    });
+
+    // onStarted fires synchronously inside the drained start(), before
+    // resumeAgent is called, so aborting there lands the stop in the same
+    // synchronous stretch as the retry's throw below.
+    vi.mocked(resumeAgent).mockImplementation(() => {
+      throw new Error("provider unavailable");
+    });
+    const record = await manager.resume(id, "later", undefined, {
+      isBackground: true,
+      onStarted: () => {
+        manager.abort(id);
+      },
+    });
+    expect(record?.status).toBe("queued");
+
+    releaseBlocker({
+      responseText: "blocker done",
+      session: mockSession(),
+      aborted: false,
+      steered: false,
+    });
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(manager.getRecord(id)!.status).toBe("stopped");
+    expect(manager.getRecord(id)!.error).toBeUndefined();
   });
 });
 

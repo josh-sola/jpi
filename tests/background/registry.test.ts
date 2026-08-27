@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { mkdtemp, readFile, realpath, rm } from "node:fs/promises";
+import { chmod, mkdtemp, readFile, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { projectSlug, Store } from "../../src/core/index.ts";
@@ -13,6 +13,34 @@ import {
   type CompletionNotificationMessage,
   type CompletionNotificationOptions,
 } from "../../modules/background/registry.ts";
+
+// root bypasses permission checks, so the metadata-write-failure test below skips under root.
+const runningAsRoot = process.getuid?.() === 0;
+
+/**
+ * Collect unhandled rejections for the duration of a block.
+ *
+ * Vitest installs its own handler, so `process.on` alone would not observe them —
+ * `removeAllListeners` is used and the originals restored afterwards.
+ */
+async function withUnhandledRejectionSpy(fn: () => Promise<void>): Promise<unknown[]> {
+  const seen: unknown[] = [];
+  const prior = process.listeners("unhandledRejection");
+  process.removeAllListeners("unhandledRejection");
+  const capture = (reason: unknown) => {
+    seen.push(reason);
+  };
+  process.on("unhandledRejection", capture);
+  try {
+    await fn();
+    // Unhandled rejections are reported on a later macrotask, not a microtask.
+    await new Promise((r) => setTimeout(r, 20));
+  } finally {
+    process.off("unhandledRejection", capture);
+    for (const l of prior) process.on("unhandledRejection", l as never);
+  }
+  return seen;
+}
 
 async function withTempCwd(t: {
   onTestFinished: (fn: () => Promise<void> | void) => void;
@@ -429,3 +457,31 @@ test("reset after shutdown lets a new session start tasks under its own session 
   // History from before the reset is kept, not discarded.
   assert.equal(registry.get(first.id).id, first.id);
 });
+
+test.skipIf(runningAsRoot)(
+  "a task whose terminal metadata write fails still resolves its waiters, with no unhandled rejection",
+  async (t) => {
+    const cwd = await withTempCwd(t);
+    const errors: unknown[][] = [];
+    const { registry } = makeRegistry({
+      logger: { error: (...args: unknown[]) => void errors.push(args) },
+    });
+    const ctx = makeCtx(cwd);
+    const dir = await registry.ensureSessionDir(ctx);
+    const started = await registry.start(ctx, "printf hi");
+    await chmod(dir, 0o500);
+    try {
+      const rejections = await withUnhandledRejectionSpy(async () => {
+        const done = await registry.waitForTask(started.id);
+        assert.equal(done.status, "completed");
+      });
+      assert.deepEqual(rejections, []);
+    } finally {
+      await chmod(dir, 0o700);
+    }
+    assert.ok(
+      errors.some((args) => /metadata write failed/.test(String(args[0]))),
+      "expected the metadata write failure to be logged",
+    );
+  },
+);

@@ -43,6 +43,7 @@ export type UICtx = {
     content: undefined | ((tui: any, theme: Theme) => { render(): string[]; invalidate(): void }),
     options?: { placement?: "aboveEditor" | "belowEditor" },
   ): void;
+  notify(message: string, type?: "info" | "warning" | "error"): void;
 };
 
 /** Per-task runtime metrics (elapsed time, token usage). */
@@ -89,6 +90,8 @@ export class TaskWidget {
   private tui: any;
   /** Whether the widget callback is currently registered. */
   private widgetRegistered = false;
+  /** Latch so a render failure warns the user once per session, not every frame. */
+  private renderErrorNotified = false;
 
   constructor(private store: TaskStore) {}
 
@@ -144,7 +147,14 @@ export class TaskWidget {
   private renderWidget(tui: any, theme: Theme): string[] {
     try {
       return this.buildWidgetLines(tui, theme);
-    } catch {
+    } catch (error) {
+      if (!this.renderErrorNotified) {
+        this.renderErrorNotified = true;
+        this.uiCtx?.notify(
+          `Task widget failed to render and will stay blank: ${error instanceof Error ? error.message : String(error)}`,
+          "warning",
+        );
+      }
       return [];
     }
   }

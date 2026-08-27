@@ -873,7 +873,11 @@ export class BackgroundTaskRegistry {
       endTime: this.now(),
       error: finalError,
     };
-    await this.writeMetadata(task, terminalSnapshot);
+    try {
+      await this.writeMetadata(task, terminalSnapshot);
+    } catch (writeError) {
+      this.logger.error(`[jpi-background] metadata write failed for task ${task.id}:`, writeError);
+    }
 
     task.exitCode = terminalSnapshot.exitCode;
     task.signal = terminalSnapshot.signal;

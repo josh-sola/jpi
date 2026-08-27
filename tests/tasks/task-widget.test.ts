@@ -11,14 +11,16 @@ function mockTheme(): Theme {
   };
 }
 
-/** Create a mock UICtx that captures setWidget calls. */
+/** Create a mock UICtx that captures setWidget and notify calls. */
 function mockUICtx() {
   const state: {
     widgets: Map<string, any>;
     statuses: Map<string, string | undefined>;
+    notifications: { message: string; type?: "info" | "warning" | "error" }[];
   } = {
     widgets: new Map(),
     statuses: new Map(),
+    notifications: [],
   };
 
   const ctx: UICtx = {
@@ -27,6 +29,9 @@ function mockUICtx() {
     },
     setStatus(key, text) {
       state.statuses.set(key, text);
+    },
+    notify(message, type) {
+      state.notifications.push({ message, type });
     },
   };
 
@@ -501,5 +506,47 @@ describe("spinner animation timing", () => {
     vi.advanceTimersByTime(150);
 
     expect(glyph()).not.toBe(before);
+  });
+});
+
+describe("render failure notification", () => {
+  let store: TaskStore;
+  let widget: TaskWidget;
+  let ui: ReturnType<typeof mockUICtx>;
+
+  beforeEach(async () => {
+    store = new TaskStore();
+    widget = new TaskWidget(store);
+    ui = mockUICtx();
+    widget.setUICtx(ui.ctx);
+    // Register the widget on a working store before swapping in a broken one —
+    // renderWidget must already be wired for a later render to reach it.
+    await store.create("Task", "Desc");
+    widget.update();
+  });
+
+  afterEach(() => {
+    widget.dispose();
+  });
+
+  /** A store whose list() always throws, to force buildWidgetLines to fail. */
+  function brokenStore(): TaskStore {
+    return {
+      list: () => {
+        throw new Error("disk read failed");
+      },
+    } as unknown as TaskStore;
+  }
+
+  it("notifies once on the first render failure and keeps returning an empty widget", () => {
+    widget.setStore(brokenStore());
+
+    expect(renderWidget(ui.state)).toEqual([]);
+    expect(ui.state.notifications).toHaveLength(1);
+    expect(ui.state.notifications[0]?.type).toBe("warning");
+    expect(ui.state.notifications[0]?.message).toContain("disk read failed");
+
+    expect(renderWidget(ui.state)).toEqual([]);
+    expect(ui.state.notifications).toHaveLength(1); // still just the one notification
   });
 });

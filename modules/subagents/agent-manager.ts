@@ -887,7 +887,7 @@ export class AgentManager {
           if (aborted) {
             record.status = "aborted";
           } else if (failure) {
-            record.status = "error";
+            this.markErrored(record);
             record.error = failure;
           } else {
             record.status = steered ? "steered" : "completed";
@@ -940,10 +940,7 @@ export class AgentManager {
         return responseText;
       })
       .catch(async (err) => {
-        // Don't overwrite status if externally stopped via abort()
-        if (record.status !== "stopped") {
-          record.status = "error";
-        }
+        this.markErrored(record);
         record.error = err instanceof Error ? err.message : String(err);
         record.completedAt ??= Date.now();
 
@@ -1265,9 +1262,12 @@ export class AgentManager {
             try {
               start();
             } catch (err) {
-              record.status = "error";
-              record.error = err instanceof Error ? err.message : String(err);
-              record.completedAt = Date.now();
+              // Don't overwrite status if externally stopped via abort() while queued.
+              if (record.status !== "stopped") {
+                this.markErrored(record);
+                record.error = err instanceof Error ? err.message : String(err);
+              }
+              record.completedAt ??= Date.now();
               this.onComplete?.(record);
             }
           },
@@ -1304,16 +1304,27 @@ export class AgentManager {
         },
         signal,
       });
-      // Same contract as the spawn path (#144): a failed final turn is an
-      // error, not a completion — but the resumed text stays available.
-      record.status = failure ? "error" : "completed";
-      if (failure) record.error = failure;
+      // Compared via isStopped(), not inline: TS narrows record.status to
+      // its pre-await literal here, hiding that abort() can rewrite it while
+      // the resume is in flight.
+      if (!this.isStopped(record)) {
+        // Same contract as the spawn path (#144): a failed final turn is an
+        // error, not a completion — but the resumed text stays available.
+        if (failure) {
+          this.markErrored(record);
+          record.error = failure;
+        } else {
+          record.status = "completed";
+        }
+      }
       record.result = text;
-      record.completedAt = Date.now();
+      record.completedAt ??= Date.now();
     } catch (err) {
-      record.status = "error";
-      record.error = err instanceof Error ? err.message : String(err);
-      record.completedAt = Date.now();
+      if (!this.isStopped(record)) {
+        this.markErrored(record);
+        record.error = err instanceof Error ? err.message : String(err);
+      }
+      record.completedAt ??= Date.now();
     }
 
     // Same contract as the spawn settle paths: children spawned during the
@@ -1408,12 +1419,15 @@ export class AgentManager {
       signal: abortController.signal,
     })
       .then(({ text, failure }) => {
-        // Don't overwrite status if externally stopped via abort().
         if (record.status !== "stopped") {
           // Same contract as the spawn path (#144): a failed final turn is an
           // error, not a completion — but the resumed text stays available.
-          record.status = failure ? "error" : "completed";
-          if (failure) record.error = failure;
+          if (failure) {
+            this.markErrored(record);
+            record.error = failure;
+          } else {
+            record.status = "completed";
+          }
         }
         record.result = text;
         record.completedAt ??= Date.now();
@@ -1422,7 +1436,7 @@ export class AgentManager {
       })
       .catch((err) => {
         if (record.status !== "stopped") {
-          record.status = "error";
+          this.markErrored(record);
           record.error = err instanceof Error ? err.message : String(err);
         }
         record.completedAt ??= Date.now();
@@ -1532,6 +1546,21 @@ export class AgentManager {
 
   listAgents(): AgentRecord[] {
     return [...this.agents.values()].sort((a, b) => b.startedAt - a.startedAt);
+  }
+
+  /** Behind a method call so callers re-reading it after an `await` get the
+   *  real current value, not a type narrowed from before the suspension. */
+  private isStopped(record: AgentRecord): boolean {
+    return record.status === "stopped";
+  }
+
+  /**
+   * Marks a record errored, unless a user-initiated stop already claimed it —
+   * abort() sets "stopped" and must win over a run failure that surfaces later.
+   */
+  private markErrored(record: AgentRecord): void {
+    if (this.isStopped(record)) return;
+    record.status = "error";
   }
 
   abort(id: string): boolean {
