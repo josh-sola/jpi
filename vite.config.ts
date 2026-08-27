@@ -4,7 +4,7 @@ export default defineConfig({
   fmt: {
     ignorePatterns: [
       // Byte-exact test fixture (subagents' tool-description-mode test pins it against the extension's built-in description) — reformatting it breaks that pin.
-      "examples/agent-tool-description.md",
+      "tests/subagents/fixtures/agent-tool-description.md",
       // Bootstrap docs owned by a later workstream; not yet under this repo's formatting.
       "README.md",
       "ONBOARDING.md",
