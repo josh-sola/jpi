@@ -3,7 +3,7 @@ import { access as fsAccess } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { errorMessage } from "../../src/core/index.ts";
+import { errorMessage, truncateEnd } from "../../src/core/index.ts";
 
 function readKetchVersion(): string {
   const manifestUrl = new URL("../../ketch-release.json", import.meta.url);
@@ -169,9 +169,7 @@ export async function resolveKetchExecutable(
 }
 
 export function truncateDiagnostic(value: string, maxChars = MAX_KETCH_DIAGNOSTIC_CHARS): string {
-  const normalized = value.replace(/\0/g, "").trim();
-  if (normalized.length <= maxChars) return normalized;
-  return `${normalized.slice(0, Math.max(0, maxChars - 1))}…`;
+  return truncateEnd(value.replace(/\0/g, "").trim(), maxChars);
 }
 
 function formatDiagnostics(stderr: string | undefined): string {

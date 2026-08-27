@@ -15,7 +15,7 @@ import {
   wrapTextWithAnsi,
 } from "@earendil-works/pi-tui";
 
-import { errorMessage } from "../../src/core/index.ts";
+import { errorMessage, splitDuration, truncateEnd } from "../../src/core/index.ts";
 import { type MonitorManager, type MonitorSnapshot, resolveBackgroundItem } from "./monitor.ts";
 import type { BackgroundTaskRegistry, BgTaskSnapshot } from "./registry.ts";
 
@@ -37,9 +37,7 @@ const CHROME_LINES = 8;
 const MIN_VIEWPORT = 3;
 
 function truncate(text: string, max: number): string {
-  const trimmed = text.trim();
-  if (trimmed.length <= max) return trimmed;
-  return `${trimmed.slice(0, Math.max(0, max - 1))}…`;
+  return truncateEnd(text.trim(), max);
 }
 
 function isMonitorSnapshot(item: Snapshot): item is MonitorSnapshot {
@@ -53,9 +51,7 @@ function titleOf(item: Snapshot): string {
 
 export function formatDuration(ms: number): string {
   const totalSeconds = Math.max(0, Math.round(ms / 1000));
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
+  const { hours, minutes, seconds } = splitDuration(totalSeconds * 1000);
   if (hours > 0) return `${hours}h${String(minutes).padStart(2, "0")}m`;
   if (minutes > 0) return `${minutes}m${String(seconds).padStart(2, "0")}s`;
   return `${seconds}s`;

@@ -10,7 +10,7 @@
 
 import { truncateToWidth } from "@earendil-works/pi-tui";
 
-import { errorMessage, type Notifier } from "../../../src/core/index.ts";
+import { errorMessage, splitDuration, type Notifier } from "../../../src/core/index.ts";
 import type { TaskStore } from "../task-store.ts";
 import type { Task } from "../types.ts";
 
@@ -59,12 +59,9 @@ export interface TaskMetrics {
 function formatDuration(ms: number): string {
   const totalSec = Math.floor(ms / 1000);
   if (totalSec < 60) return `${totalSec}s`;
-  const min = Math.floor(totalSec / 60);
-  const sec = totalSec % 60;
-  if (min < 60) return sec > 0 ? `${min}m ${sec}s` : `${min}m`;
-  const hr = Math.floor(min / 60);
-  const remMin = min % 60;
-  return remMin > 0 ? `${hr}h ${remMin}m` : `${hr}h`;
+  const { hours, minutes, seconds } = splitDuration(totalSec * 1000);
+  if (hours === 0) return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
+  return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
 }
 
 /** Format token count with k suffix (e.g., "4.1k", "850"). */

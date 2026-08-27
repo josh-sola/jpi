@@ -1,6 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 import { Config } from "../../src/core/config.ts";
+import { errorMessage } from "../../src/core/errors.ts";
 import { injectEnabled, type JpiModule } from "../../src/core/module.ts";
 import backgroundModule from "../../modules/background/module.ts";
 import guardianModule from "../../modules/guardian/module.ts";
@@ -57,8 +58,7 @@ export async function loadModules(
     try {
       await mod.setup(pi, { config, value, issues: loadIssues });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      failures.push(`${mod.name}: ${message}`);
+      failures.push(`${mod.name}: ${errorMessage(error)}`);
     }
   }
 

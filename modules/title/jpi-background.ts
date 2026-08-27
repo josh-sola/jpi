@@ -1,4 +1,4 @@
-import { jpiBackgroundRunningIds, TASKS_CHANNEL, type EventBus } from "../background/bus.ts";
+import { jpiBackgroundRunningIds, TASKS_CHANNEL, type EventBus } from "../../src/core/index.ts";
 
 export class JpiBackgroundActivityMonitor {
   private unsubscribe?: () => void;

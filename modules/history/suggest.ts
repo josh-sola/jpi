@@ -1,7 +1,7 @@
 import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 
-import { isRecord } from "../../src/core/index.ts";
+import { isRecord, truncateMiddle } from "../../src/core/index.ts";
 
 /** The real return type of ModelRegistry.find, derived rather than duplicated. */
 export type PiModel = NonNullable<ReturnType<ModelRegistry["find"]>>;
@@ -56,15 +56,6 @@ export function parseModel(spec: string): { provider: string; modelId: string } 
   return { provider, modelId };
 }
 
-function truncateMiddle(value: string, maxChars: number): string {
-  if (value.length <= maxChars) return value;
-  const marker = "\n[…]\n";
-  const retained = Math.max(0, maxChars - marker.length);
-  const headLength = Math.ceil(retained / 2);
-  const tailLength = Math.floor(retained / 2);
-  return `${value.slice(0, headLength)}${marker}${value.slice(value.length - tailLength)}`;
-}
-
 // Shared by user and assistant messages: keeping only "text" parts is what
 // strips tool-use and thinking blocks out of the transcript.
 function extractMessageText(content: unknown): string {
@@ -108,6 +99,7 @@ export function renderTranscript(entries: readonly TranscriptEntryLike[]): strin
     const text = truncateMiddle(
       extractMessageText(entry.message.content),
       MAX_TRANSCRIPT_MESSAGE_CHARS,
+      "\n[…]\n",
     );
     if (text) items.push({ role, text });
   }

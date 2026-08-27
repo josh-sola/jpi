@@ -8,22 +8,23 @@
  * consumer-ready on its own `session_start` after subscribing to the provider
  * channel — so whichever extension's `session_start` runs first, the other's
  * emit still reaches a live listener.
+ *
+ * The channels and payload shape live in src/core so this module and
+ * jpi-status can each consume them without depending on the other.
  */
 
+import {
+  FLEET_CONSUMER_READY_CHANNEL,
+  FLEET_PROVIDER_CHANNEL,
+  type FleetProviderPayload as CoreFleetProviderPayload,
+} from "../../src/core/index.ts";
 import type { EventBus } from "./cross-extension-rpc.ts";
 import type { Theme } from "./ui/agent-widget.ts";
-import type { FleetConsumer, FleetList } from "./ui/fleet-list.ts";
+import type { FleetList } from "./ui/fleet-list.ts";
 
-export const FLEET_PROVIDER_CHANNEL = "subagents:fleet:provider:v1";
-export const FLEET_CONSUMER_READY_CHANNEL = "subagents:fleet:consumer-ready:v1";
+export { FLEET_CONSUMER_READY_CHANNEL, FLEET_PROVIDER_CHANNEL };
 
-export interface FleetProviderPayload {
-  schema: "subagents.fleet.provider.v1";
-  /** Fleet lines for the given width/theme; `[]` when the fleet view is off or empty. */
-  render(width: number, theme: Theme): string[];
-  /** Attach a render consumer; returns a detach function. */
-  attach(consumer: FleetConsumer): () => void;
-}
+export type FleetProviderPayload = CoreFleetProviderPayload<Theme>;
 
 /**
  * Emit the fleet render provider on `FLEET_PROVIDER_CHANNEL`, and re-emit it

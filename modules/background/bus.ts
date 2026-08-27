@@ -1,16 +1,23 @@
-import { errorMessage, isRecord, type EventBus } from "../../src/core/index.ts";
+import {
+  errorMessage,
+  isRecord,
+  jpiBackgroundRunningIds,
+  TASKS_CHANNEL,
+  TASKS_SCHEMA,
+  type EventBus,
+} from "../../src/core/index.ts";
 import { type MonitorManager, type MonitorSnapshot, resolveBackgroundItem } from "./monitor.ts";
 import type { BackgroundTaskRegistry, BgTaskSnapshot, TaskRunContext } from "./registry.ts";
+
+export { jpiBackgroundRunningIds, TASKS_CHANNEL, TASKS_SCHEMA };
 
 export const REQUEST_CHANNEL = "jpi-background:request:v1";
 export const RESPONSE_CHANNEL = "jpi-background:response:v1";
 export const TERMINAL_CHANNEL = "jpi-background:terminal:v1";
-export const TASKS_CHANNEL = "jpi-background:tasks:v1";
 
 export const REQUEST_SCHEMA = "jpi-background.request.v1";
 export const RESPONSE_SCHEMA = "jpi-background.response.v1";
 export const TERMINAL_SCHEMA = "jpi-background.terminal.v1";
-export const TASKS_SCHEMA = "jpi-background.tasks.v1";
 
 const KNOWN_OPS = new Set(["capabilities", "run", "status", "logs", "kill"]);
 type Operation = "capabilities" | "run" | "status" | "logs" | "kill";
@@ -152,18 +159,6 @@ function emitResponse(
   } catch (error) {
     logger.error("[jpi-background] response broadcast failed:", error);
   }
-}
-
-/** Level channel, replace-set semantics: each payload is the full current running set. */
-export function jpiBackgroundRunningIds(data: unknown): Set<string> | undefined {
-  if (!isRecord(data) || data.schema !== TASKS_SCHEMA || !Array.isArray(data.tasks)) {
-    return undefined;
-  }
-  const ids = new Set<string>();
-  for (const task of data.tasks) {
-    if (isRecord(task) && typeof task.id === "string" && task.id) ids.add(task.id);
-  }
-  return ids;
 }
 
 export function createBackgroundBus(

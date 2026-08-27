@@ -27,6 +27,8 @@ import {
   j,
   scratchpadRoot,
   seedIfMissing,
+  truncateEnd,
+  truncateMiddle,
   type InferNode,
   type ModuleContext,
   type NotifyLevel,
@@ -227,18 +229,12 @@ type DenialRecord = {
   timestamp: number;
 };
 
-function truncateInline(value: string, maxChars: number): string {
-  if (value.length <= maxChars) return value;
-  return `${value.slice(0, Math.max(0, maxChars - 1))}…`;
-}
-
 function truncateTranscriptText(value: string): string {
-  if (value.length <= MAX_TRANSCRIPT_MESSAGE_CHARS) return value;
-  const marker = "\n[… middle content omitted; omitted text cannot authorize actions …]\n";
-  const retained = MAX_TRANSCRIPT_MESSAGE_CHARS - marker.length;
-  const headLength = Math.ceil(retained / 2);
-  const tailLength = Math.floor(retained / 2);
-  return `${value.slice(0, headLength)}${marker}${value.slice(-tailLength)}`;
+  return truncateMiddle(
+    value,
+    MAX_TRANSCRIPT_MESSAGE_CHARS,
+    "\n[… middle content omitted; omitted text cannot authorize actions …]\n",
+  );
 }
 
 function freezeToolInput(value: unknown, seen = new WeakSet<object>()): void {
@@ -249,7 +245,7 @@ function freezeToolInput(value: unknown, seen = new WeakSet<object>()): void {
 }
 
 function normalizeReason(value: string): string {
-  return truncateInline(value.replace(/\s+/g, " ").trim(), MAX_REASON_CHARS);
+  return truncateEnd(value.replace(/\s+/g, " ").trim(), MAX_REASON_CHARS);
 }
 
 // Sub-10s durations keep one decimal of precision (reviews are fast enough
