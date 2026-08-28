@@ -46,9 +46,9 @@ describe("documented defaults (README:441)", () => {
     expect(getMaxSubagentDepth()).toBe(2);
   });
 
-  // Raised from 4 when top-level spawns started defaulting to background:
-  // foreground bypasses the pool entirely, so a limit tuned for opt-in
-  // background would now queue the tail of ordinary parallel fan-outs.
+  // Every top-level agent is charged to this one pool — a lower limit
+  // would silently queue the tail of the parallel fan-outs the `Agent` tool
+  // description tells the model to send.
   it("background concurrency defaults to 10", async () => {
     const { AgentManager } = await import("../../modules/subagents/agent-manager.ts");
     const manager = new AgentManager();
@@ -59,39 +59,18 @@ describe("documented defaults (README:441)", () => {
     }
   });
 
-  // Off, not a number: nothing here ever bounded foreground work, and pi runs a
-  // message's tool calls through Promise.all, so any default above 0 would be a
-  // behaviour change for everyone rather than an opt-in for #253's reporter.
-  it("foreground concurrency is unlimited by default", async () => {
-    const { AgentManager } = await import("../../modules/subagents/agent-manager.ts");
-    const manager = new AgentManager();
-    try {
-      expect(manager.getMaxConcurrentForeground()).toBe(0);
-    } finally {
-      await manager.dispose();
-    }
-  });
-
-  it("top-level spawns default to background, nested spawns to foreground", async () => {
+  it("resolveAgentInvocationConfig: defaultRunInBackground fills the gap for a nested spawn, and an explicit param wins", async () => {
     const { resolveAgentInvocationConfig } =
       await import("../../modules/subagents/invocation-config.ts");
-    // The setting's default (true) is what index.ts passes for top-level calls.
-    expect(
-      resolveAgentInvocationConfig(undefined, {}, { defaultRunInBackground: true }).runInBackground,
-    ).toBe(true);
-    // nested-tools.ts passes false unconditionally.
+    // nested-tools.ts passes false unconditionally — a nested spawn defaults
+    // to inline since a detached child has no wake channel. The top-level
+    // Agent tool never calls this with a default at all: every top-level
+    // spawn is background unconditionally.
     expect(
       resolveAgentInvocationConfig(undefined, {}, { defaultRunInBackground: false })
         .runInBackground,
     ).toBe(false);
-    // An explicit param still wins over either default.
-    expect(
-      resolveAgentInvocationConfig(
-        undefined,
-        { run_in_background: false },
-        { defaultRunInBackground: true },
-      ).runInBackground,
-    ).toBe(false);
+    // An explicit param still wins over the default either way.
     expect(
       resolveAgentInvocationConfig(
         undefined,
@@ -99,6 +78,13 @@ describe("documented defaults (README:441)", () => {
         { defaultRunInBackground: false },
       ).runInBackground,
     ).toBe(true);
+    expect(
+      resolveAgentInvocationConfig(
+        undefined,
+        { run_in_background: false },
+        { defaultRunInBackground: true },
+      ).runInBackground,
+    ).toBe(false);
   });
 
   it("model scope is off by default", async () => {

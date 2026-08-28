@@ -114,16 +114,12 @@ subagents {
   enabled #true
   // max concurrent background agents
   max-concurrent 10
-  // max concurrent foreground (blocking) agents; 0 = unlimited
-  max-concurrent-foreground 0
   // default max turns before wrap-up; 0 = unlimited
   default-max-turns 0
   // grace turns after wrap-up steer
   grace-turns 5
   // default join mode for background agents
   default-join-mode smart
-  // an Agent call that doesn't say run_in_background runs detached
-  background-by-default #true
   // validate subagent models against pi's enabledModels
   scope-models #true
   // abort extension load on a broken agent file instead of skipping it with a warning

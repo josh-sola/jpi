@@ -31,7 +31,7 @@ import {
   subagentsExtension,
 } from "./helpers/boot-extension.ts";
 
-/** Drive one foreground run that spends `usage` on a single assistant message. */
+/** Drive one run that spends `usage` on a single assistant message. */
 function runSpending(usage: {
   input: number;
   output: number;
@@ -67,7 +67,6 @@ const spawn = (tools: Map<string, any>, toolCallId: string | undefined) =>
       prompt: "go",
       description: "spend",
       subagent_type: "general-purpose",
-      run_in_background: false,
     },
     undefined,
     undefined,
@@ -151,7 +150,7 @@ describe("reporting subagent usage back to the parent session", () => {
     expect(result.usage).toBeUndefined();
     // And the text result is untouched — the setting must not change what the
     // orchestrator reads.
-    expect(result.content[0].text).toContain("Agent completed");
+    expect(result.content[0].text).toContain("Agent started in background");
   });
 
   it("defaults to off", async () => {
@@ -218,7 +217,6 @@ describe("reporting subagent usage back to the parent session", () => {
         description: "spend",
         subagent_type: "general-purpose",
         resume: id,
-        run_in_background: true,
       },
       undefined,
       undefined,
@@ -302,7 +300,6 @@ describe("reporting subagent usage back to the parent session", () => {
         description: "spend",
         subagent_type: "general-purpose",
         resume: id,
-        run_in_background: false,
       },
       undefined,
       undefined,

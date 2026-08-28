@@ -80,14 +80,16 @@ interface ResolveOptions {
    */
   worktreeAllowed?: boolean;
   /**
-   * What an unqualified spawn means — neither the call nor the agent file said.
+   * What an unqualified NESTED spawn means — neither the call nor the agent
+   * file said. The top-level `Agent` tool never reads this field at all: every
+   * top-level spawn runs in the background unconditionally, so it has nothing
+   * to resolve here.
    *
-   * Top-level callers pass the `backgroundByDefault` setting (default `true`,
-   * following Claude Code). Nested callers pass `false` unconditionally: a
-   * detached child is killed by `abortOwnedChildren` when its parent settles
-   * and has no notification path of its own, so backgrounding one loses its
-   * work. Both call sites pass it explicitly; the `false` fallback only covers
-   * a caller that supplies no options at all, which in-tree means tests.
+   * The nested tool passes `false` unconditionally: a detached child is killed
+   * by `abortOwnedChildren` when its parent settles and has no notification
+   * path of its own, so backgrounding one loses its work. The `false` fallback
+   * below only covers a caller that supplies no options at all, which in-tree
+   * means tests.
    */
   defaultRunInBackground?: boolean;
 }

@@ -137,7 +137,7 @@ describe("nested delegation e2e (real pi-mono, faux model)", () => {
             .map((b) => b.text ?? "")
             .join("");
           // Echo the child's own text: if it never arrived, the marker is absent
-          // and the top-level assertion fails rather than passing vacuously.
+          // and the record assertion below fails rather than passing vacuously.
           return `orchestrator saw: ${inner}`;
         }
         return agentCall({
@@ -147,28 +147,17 @@ describe("nested delegation e2e (real pi-mono, faux model)", () => {
         });
       }
 
-      // Top-level parent.
+      // Top-level parent — background, so it never sees the orchestrator's
+      // real answer inline; just acknowledge and let the hold settle the tree.
       toolsSeen.set("parent", names);
       const spawned = context.messages.some(
         (m) => m.role === "toolResult" && (m as { toolName?: string }).toolName === "Agent",
       );
-      if (spawned) {
-        const result = [...context.messages]
-          .reverse()
-          .find(
-            (m) => m.role === "toolResult" && (m as { toolName?: string }).toolName === "Agent",
-          );
-        const inner = ((result?.content ?? []) as Array<{ text?: string }>)
-          .map((b) => b.text ?? "")
-          .join("");
-        return `parent saw: ${inner}`;
-      }
+      if (spawned) return "acknowledged";
       return agentCall({
         subagent_type: "orchestrator",
         description: "delegate",
         prompt: "Delegate this downward.",
-        // Foreground: this test reads the parent's inline Agent tool result.
-        run_in_background: false,
       });
     };
 
@@ -181,6 +170,7 @@ describe("nested delegation e2e (real pi-mono, faux model)", () => {
         registerAgents(loadCustomAgents(cwd));
       },
     });
+    await run.manager?.waitForAll();
 
     // pi admitted the injected nested tools into the opted-in child's active set,
     // despite their names colliding with the ones stripped from every subagent.
@@ -192,8 +182,17 @@ describe("nested delegation e2e (real pi-mono, faux model)", () => {
     expect(toolsSeen.get("worker")).toBeDefined();
     expect(toolsSeen.get("worker")).not.toContain("Agent");
 
-    // Two hops home: worker → orchestrator → parent.
-    expect(run.responseText).toContain(WORKER_MARKER);
+    // Two hops home: worker → orchestrator's own record. The parent's spawn is
+    // background, so its own tool result is only the envelope — the real
+    // relayed text lands on the orchestrator's record instead.
+    const envelope = run.parentSession.messages
+      .filter((m) => m.role === "toolResult")
+      .flatMap((m) => (m.content as Array<{ text?: string }>).map((b) => b.text ?? ""))
+      .join("\n");
+    const id = /Agent ID:\s*(\S+)/.exec(envelope)?.[1];
+    expect(id).toBeTruthy();
+    const record = run.manager?.getRecord(id as string) as { result?: string };
+    expect(record?.result).toContain(WORKER_MARKER);
   });
 
   it("backgrounds a nested child, polls it by id, and streams its transcript", async () => {
@@ -238,8 +237,6 @@ describe("nested delegation e2e (real pi-mono, faux model)", () => {
         subagent_type: "orchestrator",
         description: "delegate",
         prompt: "Delegate this downward.",
-        // Foreground: this test reads the parent's inline Agent tool result.
-        run_in_background: false,
       });
     };
 
@@ -253,15 +250,21 @@ describe("nested delegation e2e (real pi-mono, faux model)", () => {
           registerAgents(loadCustomAgents(cwd));
         },
       });
+      await run.manager?.waitForAll();
 
-      // The background child ran and its output came back through the id the
-      // spawn handed out — so it was never queued behind its waiting parent.
-      const orchestratorResult = run.parentSession.messages
+      // The parent's own spawn is background, so its tool result is only the
+      // envelope — the orchestrator's real answer (which itself polled the
+      // background worker by id, never queued behind its waiting parent)
+      // lands on the orchestrator's own record instead.
+      const envelope = run.parentSession.messages
         .filter((m) => m.role === "toolResult")
         .flatMap((m) => (m.content as Array<{ text?: string }>).map((b) => b.text ?? ""))
         .join("\n");
-      expect(orchestratorResult).toContain("orchestrator polled");
-      expect(orchestratorResult).toContain(WORKER_MARKER);
+      const id = /Agent ID:\s*(\S+)/.exec(envelope)?.[1];
+      expect(id).toBeTruthy();
+      const record = run.manager?.getRecord(id as string) as { result?: string };
+      expect(record?.result).toContain("orchestrator polled");
+      expect(record?.result).toContain(WORKER_MARKER);
 
       // Only the REAL manager wires onSessionCreated → streamToOutputFile for a
       // nested spawn, and only real rootSessionId propagation puts the file under

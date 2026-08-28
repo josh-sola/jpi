@@ -47,11 +47,9 @@ describe("subagents settings (jpi.kdl)", () => {
       // Loader-injected, not part of subagents' own schema — see module.ts.
       enabled: true,
       maxConcurrent: 10,
-      maxConcurrentForeground: 0,
       defaultMaxTurns: 0,
       graceTurns: 5,
       defaultJoinMode: "smart",
-      backgroundByDefault: true,
       scopeModels: false,
       strictAgentFiles: false,
       disableDefaultAgents: false,
@@ -69,7 +67,6 @@ describe("subagents settings (jpi.kdl)", () => {
       showCost: false,
       showModel: false,
       viewerMarkdown: "assistant",
-      backgroundShortcut: "ctrl+b",
     } satisfies SubagentsSettings & { enabled: boolean });
     expect(existsSync(kdlPath())).toBe(true);
   });
@@ -89,12 +86,6 @@ describe("subagents settings (jpi.kdl)", () => {
     const loaded = await loadSubagentsSettings(newConfig());
     expect(loaded.value.worktreeIsolation).toBe(false);
     expect(loaded.value.worktreeCleanupPeriodDays).toBe(7);
-  });
-
-  it("round-trips a custom backgroundShortcut", async () => {
-    await newConfig().save({ backgroundShortcut: "ctrl+g" });
-    const loaded = await loadSubagentsSettings(newConfig());
-    expect(loaded.value.backgroundShortcut).toBe("ctrl+g");
   });
 
   it("round-trips fallbackSubagent's #false arm alongside a named agent", async () => {
@@ -135,11 +126,9 @@ describe("subagents settings (jpi.kdl)", () => {
 function makeAppliers(): SettingsAppliers {
   return {
     setMaxConcurrent: vi.fn(),
-    setMaxConcurrentForeground: vi.fn(),
     setDefaultMaxTurns: vi.fn(),
     setGraceTurns: vi.fn(),
     setDefaultJoinMode: vi.fn(),
-    setBackgroundByDefault: vi.fn(),
     setScopeModels: vi.fn(),
     setStrictAgentFiles: vi.fn(),
     setDisableDefaultAgents: vi.fn(),
@@ -157,7 +146,6 @@ function makeAppliers(): SettingsAppliers {
     setShowCost: vi.fn(),
     setShowModel: vi.fn(),
     setViewerMarkdown: vi.fn(),
-    setBackgroundShortcut: vi.fn(),
   };
 }
 
@@ -165,11 +153,9 @@ function makeAppliers(): SettingsAppliers {
 function fullSettings(overrides: Partial<SubagentsSettings> = {}): SubagentsSettings {
   return {
     maxConcurrent: 10,
-    maxConcurrentForeground: 0,
     defaultMaxTurns: 0,
     graceTurns: 5,
     defaultJoinMode: "smart",
-    backgroundByDefault: true,
     scopeModels: false,
     strictAgentFiles: false,
     disableDefaultAgents: false,
@@ -187,7 +173,6 @@ function fullSettings(overrides: Partial<SubagentsSettings> = {}): SubagentsSett
     showCost: false,
     showModel: false,
     viewerMarkdown: "assistant",
-    backgroundShortcut: "ctrl+b",
     ...overrides,
   };
 }
@@ -207,21 +192,12 @@ describe("applySettings", () => {
     expect(appliers.setMaxConcurrent).toHaveBeenCalledWith(4);
     expect(appliers.setGraceTurns).toHaveBeenCalledWith(3);
     expect(appliers.setDefaultJoinMode).toHaveBeenCalledWith("group");
-    expect(appliers.setMaxConcurrentForeground).toHaveBeenCalledWith(0);
     expect(appliers.setScopeModels).toHaveBeenCalledWith(false);
     expect(appliers.setStrictAgentFiles).toHaveBeenCalledWith(false);
     expect(appliers.setToolDescriptionMode).toHaveBeenCalledWith("full");
     expect(appliers.setWidgetMode).toHaveBeenCalledWith("background");
     expect(appliers.setViewerMarkdown).toHaveBeenCalledWith("assistant");
     expect(appliers.setWorktreeCleanupPeriodDays).toHaveBeenCalledWith(30);
-    expect(appliers.setBackgroundShortcut).toHaveBeenCalledWith("ctrl+b");
-  });
-
-  // 0 is a real value here (unlimited), so `if (s.x)` truthiness would silently
-  // skip it — assert the exact call rather than just "was called".
-  it("passes maxConcurrentForeground: 0 through, not just truthy values", () => {
-    applySettings(fullSettings({ maxConcurrentForeground: 0 }), appliers);
-    expect(appliers.setMaxConcurrentForeground).toHaveBeenCalledWith(0);
   });
 
   it("maps fallbackSubagent: false to the NO_FALLBACK sentinel", () => {

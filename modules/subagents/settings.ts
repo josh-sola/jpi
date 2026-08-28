@@ -11,18 +11,6 @@ export type ToolDescriptionMode = "full" | "compact" | "custom";
 export const subagentsSchema = j.node({
   fields: {
     maxConcurrent: j.number().default(10).describe("max concurrent background agents"),
-    /**
-     * Max concurrent FOREGROUND (blocking) agents — `0` = unlimited, the default,
-     * which preserves the behaviour that has always applied: nothing bounds
-     * foreground work, and pi dispatches a message's tool calls through
-     * `Promise.all`, so an unqualified fan-out of blocking `Agent` calls runs all
-     * at once. Set it to bound that (#253 — on local models, parallel agents
-     * thrash the prompt cache).
-     */
-    maxConcurrentForeground: j
-      .number()
-      .default(0)
-      .describe("max concurrent foreground (blocking) agents; 0 = unlimited"),
     /** 0 = unlimited — `normalizeMaxTurns()` in agent-runner.ts treats 0 → `undefined`. */
     defaultMaxTurns: j
       .number()
@@ -33,15 +21,6 @@ export const subagentsSchema = j.node({
       .union(j.literal("async"), j.literal("group"), j.literal("smart"))
       .default("smart")
       .describe("default join mode for background agents"),
-    /**
-     * Whether a top-level `Agent` spawn that doesn't say runs detached.
-     * Defaults to `true`, following Claude Code. Top-level only — nested spawns
-     * always default to foreground regardless (see nested-tools.ts).
-     */
-    backgroundByDefault: j
-      .boolean()
-      .default(true)
-      .describe("an Agent call that doesn't say run_in_background runs detached"),
     /**
      * When true, the effective model of each subagent spawn is validated
      * against `enabledModels` from pi's settings. No-op when pi's
@@ -149,15 +128,6 @@ export const subagentsSchema = j.node({
       .union(j.literal("off"), j.literal("assistant"), j.literal("all"))
       .default("assistant")
       .describe("how much of the conversation viewer's transcript renders as Markdown"),
-    /**
-     * Key that converts every currently-blocking top-level `Agent` call into a
-     * background one. An unparseable value falls back to this same default
-     * rather than disabling the shortcut.
-     */
-    backgroundShortcut: j
-      .string()
-      .default("ctrl+b")
-      .describe("key that moves the current blocking Agent call(s) to the background"),
   },
 });
 
@@ -195,11 +165,9 @@ export async function loadSubagentsSettings(
 /** Setter hooks used by applySettings to wire persisted values into in-memory state. */
 export interface SettingsAppliers {
   setMaxConcurrent: (n: number) => void;
-  setMaxConcurrentForeground: (n: number) => void;
   setDefaultMaxTurns: (n: number) => void;
   setGraceTurns: (n: number) => void;
   setDefaultJoinMode: (mode: JoinMode) => void;
-  setBackgroundByDefault: (b: boolean) => void;
   setScopeModels: (enabled: boolean) => void;
   setStrictAgentFiles: (b: boolean) => void;
   setDisableDefaultAgents: (b: boolean) => void;
@@ -217,7 +185,6 @@ export interface SettingsAppliers {
   setShowCost: (b: boolean) => void;
   setShowModel: (b: boolean) => void;
   setViewerMarkdown: (mode: ViewerMarkdownMode) => void;
-  setBackgroundShortcut: (keyId: string) => void;
 }
 
 /** Emit callback — a subset of `pi.events.emit` to keep helpers testable. */
@@ -226,7 +193,6 @@ export type SettingsEmit = (event: string, payload: unknown) => void;
 /** Apply loaded settings to in-memory state via caller-supplied setters. Every field is always present. */
 export function applySettings(s: SubagentsSettings, appliers: SettingsAppliers): void {
   appliers.setMaxConcurrent(s.maxConcurrent);
-  appliers.setMaxConcurrentForeground(s.maxConcurrentForeground);
   appliers.setDefaultMaxTurns(s.defaultMaxTurns);
   appliers.setGraceTurns(s.graceTurns);
   appliers.setMaxSubagentDepth(s.maxSubagentDepth);
@@ -235,7 +201,6 @@ export function applySettings(s: SubagentsSettings, appliers: SettingsAppliers):
   // resolver checks for, matching every other agent-name comparison.
   appliers.setFallbackSubagent(s.fallbackSubagent === false ? NO_FALLBACK : s.fallbackSubagent);
   appliers.setDefaultJoinMode(s.defaultJoinMode);
-  appliers.setBackgroundByDefault(s.backgroundByDefault);
   appliers.setScopeModels(s.scopeModels);
   appliers.setStrictAgentFiles(s.strictAgentFiles);
   appliers.setDisableDefaultAgents(s.disableDefaultAgents);
@@ -255,7 +220,6 @@ export function applySettings(s: SubagentsSettings, appliers: SettingsAppliers):
   appliers.setShowCost(s.showCost);
   appliers.setShowModel(s.showModel);
   appliers.setViewerMarkdown(s.viewerMarkdown);
-  appliers.setBackgroundShortcut(s.backgroundShortcut);
 }
 
 /**

@@ -491,7 +491,7 @@ extensions: <true (inherit all MCP/extension tools), false (none), or comma-sepa
 skills: <true (inherit all), false (none), or comma-separated skill names to preload into prompt. Default: true>
 disallowed_tools: <comma-separated tool names to block, even if otherwise available. Omit for none>
 inherit_context: <true to fork parent conversation into agent so it sees chat history. Default: false>
-run_in_background: <pin this agent to background (true) or foreground (false). Omit to follow the backgroundByDefault setting, which is background>
+run_in_background: <only affects a NESTED spawn of this agent — pin it to background (true) or foreground (false); top-level spawns always run in the background. Omit for foreground when nested>
 output_transcript: <false to write no transcript file or path for this agent. Independent of persist_session. Default: true>
 isolated: <true for no extension/MCP tools, only built-in tools. Default: false>${
     // Offering the field on a project that turned worktrees off would bake a
@@ -522,12 +522,6 @@ Write the file using the write tool. Only write the file, nothing else.`;
   const { record } = await rt.manager.spawnAndWait(rt.pi, ctx, "general-purpose", generatePrompt, {
     description: `Generate ${name} agent`,
     maxTurns: 5,
-    // Exempt from maxConcurrentForeground. This runs from a modal wizard, not
-    // a tool call: it passes no signal, and Esc in `ctx.ui` never reaches the
-    // manager — so a user waiting behind a full pool would have no way to
-    // cancel at all. It is also one human action that cannot fan out, which
-    // is what the limit exists to bound. It still counts once started.
-    bypassQueue: true,
   });
 
   if (record.status === "error") {
@@ -634,18 +628,11 @@ async function showManualWizard(
   ctx.ui.notify(`Created ${targetPath}`, "info");
 }
 
-const NUMERIC_IDS = new Set([
-  "maxConcurrent",
-  "maxConcurrentForeground",
-  "defaultMaxTurns",
-  "graceTurns",
-  "maxSubagentDepth",
-]);
+const NUMERIC_IDS = new Set(["maxConcurrent", "defaultMaxTurns", "graceTurns", "maxSubagentDepth"]);
 
 async function showSettings(rt: SubagentsRuntime, ctx: ExtensionCommandContext) {
   function buildItems(): SettingItem[] {
     const mc = rt.manager.getMaxConcurrent();
-    const mcf = rt.manager.getMaxConcurrentForeground();
     const dmt = getDefaultMaxTurns() ?? 0;
     const gt = getGraceTurns();
     const msd = getMaxSubagentDepth();
@@ -664,13 +651,6 @@ async function showSettings(rt: SubagentsRuntime, ctx: ExtensionCommandContext) 
         description: "Max concurrent background agents (Enter to type)",
         currentValue: String(mc),
         values: [String(mc)],
-      },
-      {
-        id: "maxConcurrentForeground",
-        label: "Max foreground concurrency",
-        description: "Max concurrent foreground (blocking) agents (0 = unlimited, Enter to type)",
-        currentValue: String(mcf),
-        values: [String(mcf)],
       },
       {
         id: "defaultMaxTurns",
@@ -700,14 +680,6 @@ async function showSettings(rt: SubagentsRuntime, ctx: ExtensionCommandContext) 
         description: "Default join mode for background agents",
         currentValue: rt.getDefaultJoinMode(),
         values: ["smart", "async", "group"],
-      },
-      {
-        id: "backgroundByDefault",
-        label: "Background by default",
-        description:
-          "An Agent call that doesn't say runs detached (off = blocks the turn and returns inline)",
-        currentValue: rt.getBackgroundByDefault() ? "on" : "off",
-        values: ["on", "off"],
       },
       {
         id: "scopeModels",
@@ -837,18 +809,6 @@ async function showSettings(rt: SubagentsRuntime, ctx: ExtensionCommandContext) 
         rt.manager.setMaxConcurrent(n);
         void rt.notifyApplied(ctx, `Max concurrency set to ${n}`);
       }
-    } else if (id === "maxConcurrentForeground") {
-      // 0 is meaningful here, unlike maxConcurrent above: it means unlimited.
-      const n = parseInt(value, 10);
-      if (n >= 0) {
-        rt.manager.setMaxConcurrentForeground(n);
-        void rt.notifyApplied(
-          ctx,
-          n === 0
-            ? "Max foreground concurrency set to unlimited"
-            : `Max foreground concurrency set to ${n}`,
-        );
-      }
     } else if (id === "defaultMaxTurns") {
       const n = parseInt(value, 10);
       if (n === 0) {
@@ -878,15 +838,6 @@ async function showSettings(rt: SubagentsRuntime, ctx: ExtensionCommandContext) 
     } else if (id === "joinMode") {
       rt.setDefaultJoinMode(value as JoinMode);
       void rt.notifyApplied(ctx, `Default join mode set to ${value}`);
-    } else if (id === "backgroundByDefault") {
-      const enabled = value === "on";
-      rt.setBackgroundByDefault(enabled);
-      void rt.notifyApplied(
-        ctx,
-        enabled
-          ? "Agent calls run in the background unless they pass run_in_background: false"
-          : "Agent calls block and return inline unless they pass run_in_background: true",
-      );
     } else if (id === "scopeModels") {
       const enabled = value === "on";
       setScopeModelsEnabled(enabled);
@@ -1029,24 +980,20 @@ async function showSettings(rt: SubagentsRuntime, ctx: ExtensionCommandContext) 
     const current =
       result === "maxConcurrent"
         ? String(rt.manager.getMaxConcurrent())
-        : result === "maxConcurrentForeground"
-          ? String(rt.manager.getMaxConcurrentForeground())
-          : result === "defaultMaxTurns"
-            ? String(getDefaultMaxTurns() ?? 0)
-            : result === "maxSubagentDepth"
-              ? String(getMaxSubagentDepth())
-              : String(getGraceTurns());
+        : result === "defaultMaxTurns"
+          ? String(getDefaultMaxTurns() ?? 0)
+          : result === "maxSubagentDepth"
+            ? String(getMaxSubagentDepth())
+            : String(getGraceTurns());
 
     const label =
       result === "maxConcurrent"
         ? "Max concurrency (1+)"
-        : result === "maxConcurrentForeground"
-          ? "Max foreground concurrency (0 = unlimited)"
-          : result === "defaultMaxTurns"
-            ? "Default max turns (0 = unlimited)"
-            : result === "maxSubagentDepth"
-              ? "Nested depth (0/1 = nesting off)"
-              : "Grace turns (1+)";
+        : result === "defaultMaxTurns"
+          ? "Default max turns (0 = unlimited)"
+          : result === "maxSubagentDepth"
+            ? "Nested depth (0/1 = nesting off)"
+            : "Grace turns (1+)";
 
     // Loop until user enters a valid integer or cancels (Esc / null).
     // Silently trims whitespace; rejects non-numeric input by re-prompting.

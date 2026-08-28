@@ -45,34 +45,35 @@ describe("issue #144 — empty-error final turns must not be 'completed'", () =>
     run = await runPrintMode({
       prompt: "Delegate.",
       respond: routeBySession({
-        parentInitial: agentCall({
-          run_in_background: false,
-          description: "doomed",
-          prompt: "Do work.",
-        }),
+        parentInitial: agentCall({ description: "doomed", prompt: "Do work." }),
         parentFinal: "parent done",
         // The child's one and only turn: provider error, zero content.
         subagent: () => fauxAssistantMessage([], { stopReason: "error", errorMessage: FATAL }),
       }),
       live: false,
     });
+    await run.manager?.waitForAll();
 
-    // DESIRED: the orchestrator sees a failure naming the provider error —
-    // not a clean success reading "No output.".
-    const toolResult = agentToolResult(run.parentSession);
-    expect(toolResult).toContain(FATAL);
-    expect(toolResult).not.toContain("No output.");
+    // The spawn is background, so the parent's own tool result is only the
+    // envelope — the real terminal status and error live on the record.
+    const id = /Agent ID: (\S+)/.exec(agentToolResult(run.parentSession))?.[1];
+    expect(id).toBeTruthy();
+    const record = run.manager?.getRecord(id as string) as {
+      status?: string;
+      error?: string;
+      result?: string;
+    };
+    // DESIRED: a failure naming the provider error — not a clean "completed".
+    expect(record?.status).toBe("error");
+    expect(record?.error).toContain(FATAL);
+    expect(record?.result ?? "").toBe("");
   });
 
   it("an earlier turn's text must not mask a failed final turn as a fresh success", async () => {
     run = await runPrintMode({
       prompt: "Delegate.",
       respond: routeBySession({
-        parentInitial: agentCall({
-          run_in_background: false,
-          description: "masked",
-          prompt: "Do work.",
-        }),
+        parentInitial: agentCall({ description: "masked", prompt: "Do work." }),
         parentFinal: "parent done",
         subagent: (ctx) => {
           const hasToolResult = ctx.messages.some((m) => m.role === "toolResult");
@@ -88,35 +89,38 @@ describe("issue #144 — empty-error final turns must not be 'completed'", () =>
       }),
       live: false,
     });
+    await run.manager?.waitForAll();
 
-    // The orchestrator sees the failure (not the earlier text as a clean
-    // answer), AND the partial output is salvaged, clearly labeled as
-    // pre-failure so it can't be mistaken for the final answer.
-    const toolResult = agentToolResult(run.parentSession);
-    expect(toolResult).toContain(FATAL);
-    expect(toolResult).toContain("Partial output before the failure:");
-    expect(toolResult).toContain("EARLIER-PARTIAL-TEXT");
-    // The failure headline comes before the salvaged partial output.
-    expect(toolResult.indexOf(FATAL)).toBeLessThan(toolResult.indexOf("EARLIER-PARTIAL-TEXT"));
+    // The record reports the failure (not the earlier text as a clean answer),
+    // AND keeps the salvaged partial output separately from the error.
+    const id = /Agent ID: (\S+)/.exec(agentToolResult(run.parentSession))?.[1];
+    expect(id).toBeTruthy();
+    const record = run.manager?.getRecord(id as string) as {
+      status?: string;
+      error?: string;
+      result?: string;
+    };
+    expect(record?.status).toBe("error");
+    expect(record?.error).toContain(FATAL);
+    expect(record?.result).toContain("EARLIER-PARTIAL-TEXT");
   });
 
-  it("a pure empty-error run shows no 'partial output' section", async () => {
+  it("a pure empty-error run leaves no result to salvage", async () => {
     run = await runPrintMode({
       prompt: "Delegate.",
       respond: routeBySession({
-        parentInitial: agentCall({
-          run_in_background: false,
-          description: "empty",
-          prompt: "Do work.",
-        }),
+        parentInitial: agentCall({ description: "empty", prompt: "Do work." }),
         parentFinal: "parent done",
         subagent: () => fauxAssistantMessage([], { stopReason: "error", errorMessage: FATAL }),
       }),
       live: false,
     });
+    await run.manager?.waitForAll();
 
-    const toolResult = agentToolResult(run.parentSession);
-    expect(toolResult).toContain(FATAL);
-    expect(toolResult).not.toContain("Partial output before the failure:");
+    const id = /Agent ID: (\S+)/.exec(agentToolResult(run.parentSession))?.[1];
+    expect(id).toBeTruthy();
+    const record = run.manager?.getRecord(id as string) as { error?: string; result?: string };
+    expect(record?.error).toContain(FATAL);
+    expect(record?.result ?? "").toBe("");
   });
 });

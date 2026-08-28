@@ -1,17 +1,13 @@
 /**
  * agent-manager.ts — Tracks agents, background execution, resume support.
  *
- * There are two independent concurrency pools, never one:
- *
- * - Background (`maxConcurrent`, default 10) bounds detached agents.
- * - Foreground (`maxConcurrentForeground`, default 0 = unlimited) bounds
- *   agents a caller is blocking on inline — `spawnAndWait`.
- *
- * Independent by design: a foreground agent blocks the parent anyway, so
- * charging it to the background pool would let a saturated pool starve the main
- * session of work it could have done itself. Excess agents in either pool are
- * queued and auto-started as slots free up. Nested children take no slot in
- * either — see `occupiesPoolSlot` / `occupiesForegroundSlot`.
+ * One concurrency pool: background (`maxConcurrent`, default 10) bounds
+ * detached top-level agents. Excess spawns are queued and auto-started as
+ * slots free up. Nothing bounds a caller blocking on an agent inline
+ * (`spawnAndWait`) — those calls start immediately, since the caller (a
+ * nested tool, or the `/agents` generator) is already parked waiting for the
+ * one result and queuing it behind other work would gain nothing. Nested
+ * children take no slot either — see `occupiesPoolSlot`.
  */
 
 import { randomUUID } from "node:crypto";
@@ -20,7 +16,7 @@ import { isAbsolute } from "node:path";
 import type { Model } from "@earendil-works/pi-ai";
 import type { AgentSession, ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { errorMessage } from "../../src/core/index.ts";
-import { abortable, queuePendingSteer } from "./abortable.ts";
+import { queuePendingSteer } from "./abortable.ts";
 import { resumeAgent, runAgent, type ToolActivity } from "./agent-runner.ts";
 import { assignHandle, handleBase } from "./mention.ts";
 import { describeModel } from "./model-resolver.ts";
@@ -59,26 +55,12 @@ export type CompactionInfo = { reason: "manual" | "threshold" | "overflow"; toke
 /**
  * Default max concurrent background agents.
  *
- * Raised from 4 when top-level spawns started defaulting to background
- * (`backgroundByDefault`): foreground agents bypass this pool entirely, so
- * while foreground was the default a fan-out of six ran six. With background
- * as the default every top-level agent takes a slot, and a limit of 4 would
- * have silently queued the tail of exactly the parallel fan-outs the `Agent`
- * tool description tells the model to send.
+ * Every top-level agent runs in the background and takes a slot here, so this
+ * has to cover the parallel fan-outs the `Agent` tool description tells the
+ * model to send — a lower limit would silently queue the tail of exactly
+ * that fan-out.
  */
 const DEFAULT_MAX_CONCURRENT = 10;
-
-/**
- * Default max concurrent foreground (blocking) agents — `0` = unlimited, the
- * extension's existing convention for "no ceiling" (`defaultMaxTurns`).
- *
- * Off by default because nothing here ever bounded foreground work, and pi
- * dispatches a message's tool calls through `Promise.all`, so an unqualified
- * fan-out of blocking `Agent` calls has always run all at once. Users who want
- * it bounded — chiefly local models, where parallel agents thrash the prompt
- * cache (#253) — opt in; everyone else keeps today's behaviour exactly.
- */
-const DEFAULT_MAX_CONCURRENT_FOREGROUND = 0;
 
 /**
  * How many evicted agents stay addressable by name. Only a bound on memory —
@@ -135,38 +117,8 @@ export function isTopLevelAgent(record: Pick<AgentRecord, "parentAgentId">): boo
   return record.parentAgentId === undefined;
 }
 
-/**
- * Whether a record occupies one of the `maxConcurrentForeground` slots.
- *
- * Keyed on `blocking` — a caller awaiting this record inline — rather than on
- * `isBackground === false`, because `spawn()` is also the funnel for DETACHED
- * starts (cross-extension RPC, `@handle` mentions, the registry) that may pass
- * `isBackground: false` and are documented to run immediately regardless. Those
- * block nobody, so bounding them buys nothing and would park a record with no
- * one waiting to release it.
- *
- * Nested children are excluded for the same reason as `occupiesPoolSlot`, and
- * more sharply: their parent is blocked *awaiting them*, so queueing a child
- * behind its own parent is a guaranteed deadlock rather than a possible one.
- * Enforced here rather than at the call site so no caller can reintroduce it.
- *
- * Like the background pool this bounds width at the top level only — a parent's
- * own fan-out is limited by nothing but its turn budget.
- */
-function occupiesForegroundSlot(record: Pick<AgentRecord, "blocking" | "parentAgentId">): boolean {
-  return !!record.blocking && isTopLevelAgent(record);
-}
-
-/** Which concurrency pool a spawn is charged to, if any. */
-type Pool = "background" | "foreground";
-
-/**
- * Rejection reason `spawnAndWait`'s internal detach `AbortController` aborts
- * with. Private to this module — a caller could never construct one, so
- * seeing it identifies the rejection unambiguously as a `detachBlocking()`
- * call rather than a caller-supplied `options.signal` abort or a real error.
- */
-const DETACH_MARKER = Symbol("subagent-detach");
+/** The one concurrency pool a spawn can be charged to. */
+type Pool = "background";
 
 interface SpawnArgs {
   pi: ExtensionAPI;
@@ -220,10 +172,10 @@ interface SpawnOptions {
    */
   bypassQueue?: boolean;
   /**
-   * A caller is awaiting this record inline (`spawnAndWait`) — what
-   * `maxConcurrentForeground` bounds. Set only by `spawnAndWait`; stripped from
-   * caller-supplied options by `spawnTopLevel`, since a forged `blocking` would
-   * defer a detached start behind a queue its caller cannot see or release.
+   * A caller is awaiting this record inline (`spawnAndWait`). Set only by
+   * `spawnAndWait`; stripped from caller-supplied options by `spawnTopLevel`,
+   * since every spawn reaching that path is meant to be detached and a forged
+   * `blocking` would misrepresent that.
    */
   blocking?: boolean;
   /** Isolation mode — "worktree" creates a temp git worktree for the agent. */
@@ -370,7 +322,6 @@ export class AgentManager {
   private onCompact?: OnAgentCompact | undefined;
   private onUsage?: OnAgentUsage | undefined;
   private maxConcurrent: number;
-  private maxConcurrentForeground = DEFAULT_MAX_CONCURRENT_FOREGROUND;
   /** Base repos worktrees were created from — so dispose() can prune them all,
    *  not just the parent repo (caller-supplied cwd can target other repos). */
   private worktreeRepos = new Set<string>();
@@ -387,14 +338,6 @@ export class AgentManager {
   private startups = new Map<string, Promise<void>>();
 
   /**
-   * One entry per in-flight `spawnAndWait` call, keyed by agent id — present
-   * only while a caller is actually blocked on that record (queued or
-   * running). `detachBlocking` aborts the entry it finds here to release the
-   * waiter; its absence is also how the method reports "nothing to detach".
-   */
-  private blockingWaits = new Map<string, AbortController>();
-
-  /**
    * Evicted agents that can still be reached by name, keyed by handle. Outlives
    * the 10-minute record cleanup — that timer exists to bound memory, not to
    * expire a conversation the user might still want — and is cleared alongside
@@ -403,24 +346,15 @@ export class AgentManager {
   private tombstones = new Map<string, AgentTombstone>();
 
   /**
-   * Agents waiting to start, tagged with the pool they wait on. One queue for
-   * both pools: `drainQueue` picks the earliest entry whose own pool has room,
-   * so neither can head-of-line-block the other, and every removal path
-   * (`abort`, `abortAll`, `dispose`) stays a single filter.
-   *
-   * `release` wakes a caller blocked in `spawnAndWait`, and is fired once the
-   * entry's `start` has SETTLED rather than at drain time: startup is async
-   * now, so releasing earlier would wake the caller before `record.promise`
-   * exists and it would read a still-starting agent as one that never ran.
-   * Removing an entry from this array MUST release it — a queued record has no
-   * promise to await, and pi has no tool-execution timeout to bail the caller
-   * out.
+   * Agents waiting for a background pool slot — the only spawns that ever
+   * queue, since a blocking `spawnAndWait` caller never occupies this pool
+   * (see `poolFor`). `abort`/`abortAll`/`dispose` remove an entry by filtering
+   * it out of this array with `dequeue`; nothing else needs to know when that
+   * happens, since no caller is waiting on a queued record inline.
    */
-  private queue: { id: string; pool: Pool; start: () => Promise<void>; release: () => void }[] = [];
+  private queue: { id: string; pool: Pool; start: () => Promise<void> }[] = [];
   /** Number of currently running background agents. */
   private runningBackground = 0;
-  /** Number of currently running foreground (blocking) agents. */
-  private runningForeground = 0;
 
   constructor(
     onComplete?: OnAgentComplete,
@@ -450,41 +384,17 @@ export class AgentManager {
     return this.maxConcurrent;
   }
 
-  /** Update the max concurrent foreground (blocking) agents limit. 0 = unlimited. */
-  setMaxConcurrentForeground(n: number) {
-    // Floor 0, not 1: unlimited is a meaningful value here and the default.
-    this.maxConcurrentForeground = Math.max(0, n);
-    // Start queued agents if the new limit allows — including everything, when
-    // the limit is cleared back to unlimited mid-run.
-    this.drainQueue();
-  }
-
-  getMaxConcurrentForeground(): number {
-    return this.maxConcurrentForeground;
-  }
-
   /**
    * Which pool a spawn is charged to, or undefined for one that is charged to
-   * neither (nested children, detached non-background spawns).
-   *
-   * Nothing here queues when the limit is unset — `poolHasRoom` reports an
-   * unlimited pool as always having room, so that alone is what keeps the
-   * default path identical. The `> 0` guard is belt and braces on top: it also
-   * keeps the counter from churning and the settle path from calling a drain
-   * that would find nothing to do. Both are unobservable, which is why no test
-   * pins them; the observable half — that the default start stays synchronous —
-   * is pinned in `tests/foreground-concurrency.test.ts`.
+   * neither: nested children, blocking `spawnAndWait` callers, and detached
+   * non-background starts (cross-extension RPC, `@handle` mentions).
    */
   private poolFor(record: AgentRecord): Pool | undefined {
-    if (occupiesPoolSlot(record)) return "background";
-    if (this.maxConcurrentForeground > 0 && occupiesForegroundSlot(record)) return "foreground";
-    return undefined;
+    return occupiesPoolSlot(record) ? "background" : undefined;
   }
 
-  private poolHasRoom(pool: Pool): boolean {
-    return pool === "background"
-      ? this.runningBackground < this.maxConcurrent
-      : this.maxConcurrentForeground === 0 || this.runningForeground < this.maxConcurrentForeground;
+  private poolHasRoom(_pool: Pool): boolean {
+    return this.runningBackground < this.maxConcurrent;
   }
 
   /**
@@ -563,22 +473,16 @@ export class AgentManager {
 
     const pool = this.poolFor(record);
     if (pool !== undefined && !options.bypassQueue && !this.poolHasRoom(pool)) {
-      // Queue it — started when a running agent in the same pool completes.
-      // Idempotent for background (already "queued"); the flip that matters is
-      // a blocking foreground spawn, optimistically marked "running" above.
+      // Queue it — started when a running background agent completes.
+      // Idempotent: a background spawn's status is already "queued" here.
       record.status = "queued";
       // A queued record never reaches startAgent's signal wiring, so arm the
       // parent abort here or Esc could not release the position.
       if (!this.armQueuedAbort(id, record, options.signal)) return id;
-      let release!: () => void;
-      record.startGate = new Promise<void>((resolve) => {
-        release = resolve;
-      });
       this.queue.push({
         id,
         pool,
         start: () => this.launch(id, record, args, pool),
-        release: () => release(),
       });
       options.onQueued?.(id, this.queue.filter((e) => e.pool === pool).length - 1);
       return id;
@@ -598,12 +502,8 @@ export class AgentManager {
    * an aborted signal, so a `spawnAndWait` on it would wait forever — pi has no
    * tool-execution timeout to bail it out.
    *
-   * The listener is left in place when the agent starts — `startAgent` adds its
-   * own, so both fire on a later abort — UNLESS `detachBlocking` removed it
-   * first. Without that removable reference, a ctrl+b detach of a still-QUEUED
-   * agent would strip `startAgent`'s later listener but leave this one wired,
-   * so the agent it just detached would still die on the next Esc once it
-   * started running.
+   * The listener stays in place once the agent starts — `startAgent` adds its
+   * own on top, so both fire on a later abort.
    */
   private armQueuedAbort(id: string, record: AgentRecord, signal?: AbortSignal): boolean {
     if (signal === undefined) return true;
@@ -614,7 +514,6 @@ export class AgentManager {
     }
     const onAbort = () => this.abort(id);
     signal.addEventListener("abort", onAbort, { once: true });
-    record.detachAbortListener = () => signal.removeEventListener("abort", onAbort);
     return true;
   }
 
@@ -644,10 +543,6 @@ export class AgentManager {
       (err) => {
         this.startups.delete(id);
         if (queuedPool !== undefined) {
-          // Mirrors settleRun: an inline caller gets this failure as a throw
-          // out of spawnAndWait, so an unconsumed record would ALSO nudge the
-          // session about it — the same failure reported twice.
-          if (queuedPool === "foreground") record.resultConsumed = true;
           record.status = "error";
           record.error = errorMessage(err);
           record.completedAt = Date.now();
@@ -704,22 +599,19 @@ export class AgentManager {
     // abortAll() able to reach an agent whose worktree is still being created.
     //
     // The pool is resolved ONCE, here, and carried to `settleRun` below:
-    // `poolFor` reads `maxConcurrentForeground`, which the user can change from
+    // `poolFor` reads `maxConcurrent`, which the user can change from
     // `/agents → Settings` mid-run, so recomputing it at settle time would
     // decrement a pool this run never charged (counter underflow, limit
     // silently lifted) or skip the decrement for one it did (leaked slot —
-    // every later blocking spawn queues forever). The two startup exits below
-    // never reach `settleRun`, so they hand the slot back themselves.
+    // every later background spawn queues forever). The two startup exits
+    // below never reach `settleRun`, so they hand the slot back themselves.
     const pool = this.poolFor(record);
     const releaseSlot = () => {
       if (pool === "background") this.runningBackground--;
-      else if (pool === "foreground") this.runningForeground--;
     };
     record.status = "running";
     record.startedAt = Date.now();
-    record.startGate = undefined;
     if (pool === "background") this.runningBackground++;
-    else if (pool === "foreground") this.runningForeground++;
 
     // Worktree isolation: try to create a temporary git worktree. Strict —
     // fail loud if not possible (no silent fallback to main tree). Done BEFORE
@@ -763,11 +655,8 @@ export class AgentManager {
     this.onStart?.(record);
 
     // Wire parent abort signal to stop the subagent when the parent is interrupted.
-    // Skipped when `record.blocking` is explicitly false: that only happens when
-    // `detachBlocking` fired while this spawn was still queued, and re-wiring the
-    // kill switch here would undo the detach the moment the queue starts it.
     let detachParentSignal: (() => void) | undefined;
-    if (options.signal && record.blocking !== false) {
+    if (options.signal) {
       // A queued spawn can start minutes after the caller handed us its signal,
       // by which time it may already be aborted — and `addEventListener` would
       // never fire, leaving a child the parent can no longer reach.
@@ -781,16 +670,6 @@ export class AgentManager {
     const detach = () => {
       detachParentSignal?.();
       detachParentSignal = undefined;
-    };
-    // Compose with, rather than overwrite, whatever `armQueuedAbort` left here:
-    // for a spawn that just left the queue, that is a SEPARATE listener on the
-    // same signal, still attached. Dropping it would leave it live forever —
-    // including past a later `detachBlocking`, which needs one call to strip
-    // every listener this record has ever armed.
-    const detachQueuedListener = record.detachAbortListener;
-    record.detachAbortListener = () => {
-      detachQueuedListener?.();
-      detach();
     };
 
     const promise = runAgent(ctx, type, prompt, {
@@ -991,20 +870,19 @@ export class AgentManager {
    * only fires its controller and leaves the run to settle normally, so
    * decrementing there too would double-free — permanently lifting the limit.
    *
-   * Foreground agents fire `onComplete` for lifecycle symmetry, with
-   * `resultConsumed` set so the callback skips notifications the inline result
-   * already delivered.
+   * An inline (`blocking`) caller already has its answer from `spawnAndWait`'s
+   * return, so `resultConsumed` is set here to suppress the completion
+   * notification that would otherwise report the same result twice.
    *
    * @param guardCallback swallow a throwing `onComplete` (the success path does;
    *   the error path historically did not, and keeps not doing so).
    * @param pool the pool this run was CHARGED TO at start time — passed in, not
-   *   recomputed, so a mid-run change to `maxConcurrentForeground` can't make
-   *   the release disagree with the acquire.
+   *   recomputed, so a mid-run change to `maxConcurrent` can't make the
+   *   release disagree with the acquire.
    */
   private settleRun(record: AgentRecord, guardCallback: boolean, pool: Pool | undefined): void {
     if (!record.isBackground) record.resultConsumed = true;
     if (pool === "background") this.runningBackground--;
-    else if (pool === "foreground") this.runningForeground--;
 
     if (guardCallback) {
       try {
@@ -1016,13 +894,10 @@ export class AgentManager {
       this.onComplete?.(record);
     }
 
-    // The isBackground half reproduces the pre-pool condition exactly — a
-    // background settle has always drained, even for a nested child that held
-    // no slot — so that path is unchanged whether or not the foreground pool is
-    // on. The `pool` half only adds the drain a freed FOREGROUND slot needs.
-    // A drain with nothing freed is a no-op anyway, but "no-op" is a claim
-    // about reachability, and matching the old condition needs no such claim.
-    if (record.isBackground || pool !== undefined) this.drainQueue();
+    // A background settle always drains, even for a nested child that held no
+    // slot of its own — draining is what starts whatever the freed slot (if
+    // any) was queued behind. A drain with nothing freed is a no-op.
+    if (record.isBackground) this.drainQueue();
   }
 
   /**
@@ -1037,14 +912,7 @@ export class AgentManager {
     }
   }
 
-  /**
-   * Start queued agents up to each pool's concurrency limit.
-   *
-   * `findIndex` on the entry's OWN pool rather than `shift`: with one queue
-   * serving two independent limits, a saturated foreground pool at the head
-   * would otherwise stall every background agent behind it. Taking the earliest
-   * eligible entry keeps FIFO within each pool, which is what callers see.
-   */
+  /** Start queued agents up to the concurrency limit, earliest first. */
   private drainQueue() {
     for (;;) {
       const i = this.queue.findIndex((e) => this.poolHasRoom(e.pool));
@@ -1052,48 +920,29 @@ export class AgentManager {
       const next = this.queue[i]!;
       this.queue.splice(i, 1);
       const record = this.agents.get(next.id);
-      // Stale entries (aborted while queued) are not started — but are still
-      // released, since nothing else will.
-      if (!record || record.status !== "queued") {
-        next.release();
-        continue;
-      }
+      // Stale entries (aborted while queued) are not started.
+      if (!record || record.status !== "queued") continue;
       // Detached, and never rejects: a late failure (e.g. strict worktree
       // isolation) lands on the record inside `launch`, exactly as the
       // synchronous throw did here before, and draining continues either way.
-      //
-      // The release waits for that startup to SETTLE rather than firing here.
-      // Startup is async now, so a release at drain time would wake a blocked
-      // `spawnAndWait` while `record.promise` was still undefined, and it would
-      // read a perfectly healthy agent as one that never ran.
-      void next.start().then(
-        () => next.release(),
-        () => next.release(),
-      );
+      void next.start();
     }
   }
 
   /**
-   * Remove queued entries and wake anyone blocked on them. The single point
-   * that enforces "leaving the queue releases the waiter" — a missed release is
-   * an unbounded hang, not a failed call.
+   * Remove queued entries matching `pred` — used by `abort`/`abortAll`/
+   * `dispose` to clear a stopped or torn-down record out of the queue.
    */
   private dequeue(pred: (entry: { id: string; pool: Pool }) => boolean): void {
-    const kept: typeof this.queue = [];
-    for (const entry of this.queue) {
-      if (pred(entry)) entry.release();
-      else kept.push(entry);
-    }
-    this.queue = kept;
+    this.queue = this.queue.filter((entry) => !pred(entry));
   }
 
   /**
-   * Spawn an agent and wait for completion (foreground use).
-   * Charged to the foreground pool (`maxConcurrentForeground`), which is
-   * unlimited by default; never to the background one.
-   * Returns `{ id, record, detached: false }` on a normal finish, or
-   * `{ id, record, detached: true }` when `detachBlocking` released this wait
-   * early — the run itself keeps going untouched.
+   * Spawn an agent and wait for completion — used by the nested `Agent` tool's
+   * blocking default and the `/agents` agent-file generator. Never charged to
+   * the background pool (`isBackground: false`), so it always starts
+   * immediately: a caller already parked here waiting on the one result gains
+   * nothing from being queued behind other work.
    *
    * @param onSpawned - Called synchronously once the run is kicked off, before
    *   onSessionCreated fires. Use this to set record.outputFile so
@@ -1106,12 +955,12 @@ export class AgentManager {
     prompt: string,
     options: Omit<SpawnOptions, "isBackground">,
     onSpawned?: (id: string) => void,
-  ): Promise<{ id: string; record: AgentRecord; detached: boolean }> {
-    // `blocking` is what maxConcurrentForeground bounds, and this is its only
-    // source. onSpawned rides on the options rather than on a field of this
-    // manager: a queued spawn starts at drain time, long after any install/
-    // restore pair around this call would have put the field back — and it now
-    // fires after an await (worktree creation) even on the immediate path.
+  ): Promise<{ id: string; record: AgentRecord }> {
+    // `blocking: true` marks the record as one a caller is awaiting inline —
+    // see the field's docstring on SpawnOptions. onSpawned rides on the
+    // options rather than on a field of this manager: it fires after an await
+    // (worktree creation), so an install/restore pair around this call could
+    // run into the next caller's spawn before its own fires.
     const id = this.spawn(pi, ctx, type, prompt, {
       ...options,
       isBackground: false,
@@ -1120,97 +969,24 @@ export class AgentManager {
     });
     const record = this.agents.get(id)!;
 
-    // Own controller per call, not per agent: it exists only to let
-    // `detachBlocking` release THIS wait, distinct from the record's own
-    // `abortController`, which stops the run itself.
-    const detachController = new AbortController();
-    this.blockingWaits.set(id, detachController);
+    // The run promise only exists once startup is past its awaited repo copy —
+    // without this the call would return before the agent had started at all.
+    // A startup failure (strict worktree isolation) rejects here, which is what
+    // the immediate path owes its caller: pi only marks a tool result failed
+    // when `execute` throws.
+    await this.awaitStartup(id);
 
-    try {
-      // Queued: nothing to await yet — the promise appears when the drain starts
-      // it. The gate resolves (never rejects) on every path out of the queue,
-      // start and abort alike, so a rejection can never escape into the caller's
-      // tool `execute` and take down pi's whole Promise.all tool batch. Wrapped
-      // in `abortable` so a ctrl+b detach works even before the agent starts.
-      if (record.status === "queued") {
-        try {
-          await abortable(record.startGate!, detachController.signal);
-        } catch (err) {
-          if (err === DETACH_MARKER) return { id, record, detached: true };
-          throw err;
-        }
-      }
-
-      // The run promise only exists once startup is past its awaited repo copy —
-      // without this the call would return before the agent had started at all.
-      // A startup failure (strict worktree isolation) rejects here, which is what
-      // the immediate path owes its caller: pi only marks a tool result failed
-      // when `execute` throws. A queued spawn's failure landed on the record
-      // instead (nobody was awaiting `startups` at drain time) and is rethrown
-      // below, so the contract is the same either way.
-      await this.awaitStartup(id);
-
-      // undefined when it was aborted while queued, or stopped mid-copy, and so
-      // never ran — the record is already terminal with a completedAt, which is
-      // what the caller renders.
-      if (record.promise) {
-        try {
-          await abortable(record.promise, detachController.signal);
-        } catch (err) {
-          if (err === DETACH_MARKER) return { id, record, detached: true };
-          throw err;
-        }
-      }
-
-      // A record that ended "error" without ever getting a promise never ran: the
-      // same startup failure spawn() rethrows on the immediate path (#179). Keep
-      // one contract rather than letting queue pressure decide whether a strict
-      // worktree failure throws or returns as a result.
-      if (record.promise === undefined && record.status === "error") {
-        throw new Error(record.error ?? "Agent failed to start");
-      }
-      return { id, record, detached: false };
-    } finally {
-      this.blockingWaits.delete(id);
+    if (record.promise) {
+      await record.promise;
     }
-  }
 
-  /**
-   * Detach a caller currently blocked in `spawnAndWait` on `id` (ctrl+b):
-   * releases the wait early and converts the record to a background one so
-   * its normal completion notification fires later. The run itself is
-   * untouched — only the caller's inline wait ends.
-   *
-   * Returns false when nobody is currently blocked on `id` — an unknown id, or
-   * a record that has already settled or was detached once already. Works on
-   * a nested child's blocking wait too; callers that must stay top-level (the
-   * ctrl+b shortcut) filter with `listBlockingAgents()` first.
-   */
-  detachBlocking(id: string): boolean {
-    const controller = this.blockingWaits.get(id);
-    const record = this.agents.get(id);
-    if (!controller || !record) return false;
-
-    record.blocking = false;
-    record.isBackground = true;
-    // Must run before the abort below: once the caller's wait ends, nothing
-    // else guarantees this runs before the agent's next turn, and a stray
-    // Esc in that window would still kill a "detached" agent.
-    record.detachAbortListener?.();
-    record.detachAbortListener = undefined;
-
-    controller.abort(DETACH_MARKER);
-    return true;
-  }
-
-  /** Top-level records a caller is currently blocked on inline — what ctrl+b can detach. */
-  listBlockingAgents(): AgentRecord[] {
-    const records: AgentRecord[] = [];
-    for (const id of this.blockingWaits.keys()) {
-      const record = this.agents.get(id);
-      if (record && isTopLevelAgent(record)) records.push(record);
+    // A record that ended "error" without ever getting a promise never ran: the
+    // same startup failure spawn() rethrows on the immediate path (#179). Keep
+    // one contract regardless of which exit hit the failure.
+    if (record.promise === undefined && record.status === "error") {
+      throw new Error(record.error ?? "Agent failed to start");
     }
-    return records;
+    return { id, record };
   }
 
   /**
@@ -1227,10 +1003,10 @@ export class AgentManager {
 
     // Background resume: settle asynchronously and notify on completion exactly
     // like a background spawn, returning immediately with the record still
-    // "running" — or "queued" when at the concurrency limit. Previously
-    // run_in_background was ignored on resume (the Agent tool's resume branch
-    // returned before its background branch, and resume() only ever awaited
-    // inline), so a resumed agent always blocked the caller until it finished.
+    // "running" — or "queued" when at the concurrency limit. Used by the
+    // top-level Agent tool's resume branch, which is always detached; the
+    // nested tool's resume stays inline (below) since a nested agent has no
+    // notification path of its own.
     if (options?.isBackground) {
       // Never re-enter a run that is still in flight. Detaching means the caller
       // gets control back while the record stays "running", so nothing stops the
@@ -1252,8 +1028,7 @@ export class AgentManager {
 
       const start = () => this.startResume(id, record, prompt, signal, options);
       if (occupiesPoolSlot(record) && !this.poolHasRoom("background")) {
-        // At the concurrency limit — queue it, drains when a slot frees. A
-        // detached resume has no inline caller, hence nothing to release. The
+        // At the concurrency limit — queue it, drains when a slot frees. The
         // queue is shared with spawns, whose startup is async, so entries are
         // promise-shaped even though a resume starts synchronously; failures
         // land on the record here, since drainQueue no longer catches.
@@ -1273,7 +1048,6 @@ export class AgentManager {
               this.onComplete?.(record);
             }
           },
-          release: () => {},
         });
       } else {
         start();
@@ -1716,8 +1490,8 @@ export class AgentManager {
    */
   async dispose(pi?: ExtensionAPI): Promise<void> {
     clearInterval(this.cleanupInterval);
-    // Clear queue — via dequeue, so anyone blocked in spawnAndWait is woken
-    // rather than left awaiting a gate nothing will ever resolve.
+    // Clear queue — via dequeue, so nothing is left awaiting a gate that will
+    // never resolve.
     this.dequeue(() => true);
     const sessions = [...this.agents.values()].map((record) => record.session);
     this.agents.clear();

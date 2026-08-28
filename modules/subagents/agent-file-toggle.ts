@@ -254,11 +254,12 @@ export function serializeAgentFile(cfg: AgentConfig): string {
   if (cfg.disallowedTools?.length)
     fmFields.push(`disallowed_tools: ${cfg.disallowedTools.join(", ")}`);
   if (cfg.inheritContext) fmFields.push("inherit_context: true");
-  // Both cases, not just `true`: with `backgroundByDefault` on, omitting the
-  // field means background, so `false` is the only way to pin an agent file to
-  // foreground and is no longer interchangeable with absence. No caller can
-  // reach it yet — Eject only handles built-in defaults, which omit the field —
-  // so this keeps the writer symmetric with the loader, nothing more.
+  // Both cases, not just `true`: `run_in_background` now governs only a
+  // NESTED spawn of this agent (a top-level spawn is always background), and
+  // a nested spawn defaults to foreground — so `false` is not interchangeable
+  // with omitting the field there either. No caller can reach it yet — Eject
+  // only handles built-in defaults, which omit the field — so this keeps the
+  // writer symmetric with the loader, nothing more.
   if (cfg.runInBackground !== undefined) fmFields.push(`run_in_background: ${cfg.runInBackground}`);
   if (cfg.outputTranscript === false) fmFields.push("output_transcript: false");
   if (cfg.isolated) fmFields.push("isolated: true");

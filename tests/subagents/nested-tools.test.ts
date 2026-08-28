@@ -474,6 +474,57 @@ describe("child-safe nested Agent tools", () => {
     expect(result.content[0].text.indexOf("half an answer")).toBeGreaterThan(0);
   });
 
+  // Nested spawns are the only place left that inlines a child's status this
+  // way — a top-level spawn is always background, so this is the sole
+  // real-code-path coverage of getForegroundOutcomeNote's aborted/stopped arms.
+  it("flags a turn-limit abort with the exact lead clause, not a generic partial note", async () => {
+    spawnAndWait.mockImplementation(async () => ({
+      id: "child-1",
+      record: {
+        id: "child-1",
+        status: "aborted",
+        result: "partial work so far",
+        parentAgentId: "parent-1",
+      },
+    }));
+    const [agent] = tools();
+    const result = await execute(agent, {
+      subagent_type: "scout",
+      description: "hit the limit",
+      prompt: "Do work",
+    });
+
+    const text = result.content[0].text;
+    expect(result.isError).toBe(false);
+    expect(text).toContain("aborted at the turn limit");
+    expect(text).toContain("everything the agent produced is above");
+    expect(text).not.toContain("STOPPED BY THE USER");
+  });
+
+  it("flags a user stop distinctly from a turn-limit abort", async () => {
+    spawnAndWait.mockImplementation(async () => ({
+      id: "child-1",
+      record: {
+        id: "child-1",
+        status: "stopped",
+        result: "partial work so far",
+        parentAgentId: "parent-1",
+      },
+    }));
+    const [agent] = tools();
+    const result = await execute(agent, {
+      subagent_type: "scout",
+      description: "user stopped it",
+      prompt: "Do work",
+    });
+
+    const text = result.content[0].text;
+    expect(result.isError).toBe(false);
+    expect(text).toContain("STOPPED BY THE USER");
+    expect(text).toContain("everything the agent produced is above");
+    expect(text).not.toContain("aborted at the turn limit");
+  });
+
   it("uses the fetchable wording when the parent polls a background child by id", async () => {
     records.set("child-1", {
       id: "child-1",

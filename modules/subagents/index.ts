@@ -24,7 +24,6 @@ import type {
   ExtensionCommandContext,
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
-import { isKeyRelease, type KeyId, matchesKey } from "@earendil-works/pi-tui";
 import { errorMessage } from "../../src/core/index.ts";
 import type { ModuleContext } from "../../src/core/module.ts";
 import { AgentManager, isTopLevelAgent } from "./agent-manager.ts";
@@ -62,7 +61,6 @@ import { inChildSessionContext } from "./child-context.ts";
 import { loadCustomAgents } from "./custom-agents.ts";
 import { wireFleetFooterProvider } from "./fleet-footer-bridge.ts";
 import type { GroupJoinManager } from "./group-join.ts";
-import { resolveKeyId } from "./key-id.ts";
 import {
   describeMention,
   handleBase,
@@ -186,8 +184,6 @@ export interface SubagentsRuntime {
   setAgentMentionMode(mode: AgentMentionMode): void;
   getDefaultJoinMode(): JoinMode;
   setDefaultJoinMode(mode: JoinMode): void;
-  getBackgroundByDefault(): boolean;
-  setBackgroundByDefault(b: boolean): void;
   setDisableDefaultAgents(b: boolean): void;
   getToolDescriptionMode(): ToolDescriptionMode;
   setToolDescriptionMode(mode: ToolDescriptionMode): void;
@@ -199,9 +195,6 @@ export interface SubagentsRuntime {
 }
 
 // ---- Shared helpers ----
-
-/** Default `background-shortcut` — also the fallback for an unparseable configured value. */
-const DEFAULT_BACKGROUND_SHORTCUT = "ctrl+b";
 
 /** Helper: build event data for lifecycle events from an AgentRecord. */
 function buildEventData(record: AgentRecord) {
@@ -328,14 +321,6 @@ export default async function setupSubagents(
   function chooseViewerMarkdown(mode: ViewerMarkdownMode, ctx?: ExtensionCommandContext): void {
     setViewerMarkdown(mode);
     void persistSettings(ctx, `Viewer markdown set to ${mode}`);
-  }
-  /** Key that converts every currently-blocking top-level `Agent` call to background (ctrl+b). */
-  let backgroundShortcut = DEFAULT_BACKGROUND_SHORTCUT;
-  function getBackgroundShortcut(): string {
-    return backgroundShortcut;
-  }
-  function setBackgroundShortcut(keyId: string): void {
-    backgroundShortcut = resolveKeyId(keyId, DEFAULT_BACKGROUND_SHORTCUT);
   }
   const pendingUsage = new PendingUsagePool();
 
@@ -504,8 +489,8 @@ export default async function setupSubagents(
     // agent's name and make `@handle` ambiguous. Same rule: dispatcher only.
     delete safeOptions.reclaim;
     // Every spawn through here is DETACHED — the caller gets an id back and
-    // awaits nothing. A forged `blocking` would charge it to the foreground
-    // pool and could defer it behind a queue whose gate nobody is holding.
+    // awaits nothing. A forged `blocking` would misrepresent that: nothing is
+    // actually awaiting this record inline.
     delete safeOptions.blocking;
     return spawnResolved(piRef, ctxRef, type, prompt, safeOptions);
   };
@@ -596,32 +581,6 @@ export default async function setupSubagents(
     fleet.setEnabled(b);
   }
 
-  /**
-   * ctrl+b (configurable): convert every currently-blocking top-level `Agent`
-   * call into a background one. Only consumes the key when it actually detached
-   * something — otherwise the key must fall through untouched, since ctrl+b has
-   * no other meaning here and the editor may want it.
-   */
-  function handleBackgroundShortcut(data: string): { consume?: boolean } | undefined {
-    if (isKeyRelease(data)) return undefined;
-    if (!matchesKey(data, backgroundShortcut as KeyId)) return undefined;
-    const targets = manager.listBlockingAgents();
-    if (targets.length === 0) return undefined;
-    for (const record of targets) manager.detachBlocking(record.id);
-    widget.update();
-    fleet.update();
-    return { consume: true };
-  }
-  /** Re-registers only when handed a new `ui` — same idempotence as `fleet.setUICtx`. */
-  let backgroundShortcutUI: FleetUICtx | undefined;
-  let backgroundShortcutUnsub: (() => void) | undefined;
-  function registerBackgroundShortcut(ui: FleetUICtx): void {
-    if (ui === backgroundShortcutUI) return;
-    backgroundShortcutUnsub?.();
-    backgroundShortcutUI = ui;
-    backgroundShortcutUnsub = ui.onTerminalInput(handleBackgroundShortcut);
-  }
-
   // Claude Code-style `@handle message` prompt mentions. Read live by both the
   // `input` hook and the stacked autocomplete provider, so the toggle applies
   // immediately — the provider itself can never be unregistered (pi's wrapper
@@ -652,17 +611,6 @@ export default async function setupSubagents(
   }
   function setDefaultJoinMode(mode: JoinMode) {
     defaultJoinMode = mode;
-  }
-
-  // What an unqualified top-level spawn means. Defaults to background,
-  // following Claude Code; `backgroundByDefault: false` restores the previous
-  // foreground default. Nested spawns ignore this — see nested-tools.ts.
-  let backgroundByDefault = true;
-  function getBackgroundByDefault(): boolean {
-    return backgroundByDefault;
-  }
-  function setBackgroundByDefault(b: boolean) {
-    backgroundByDefault = b;
   }
 
   // ---- Disable default agents configuration ----
@@ -730,14 +678,11 @@ export default async function setupSubagents(
   function snapshotSettings() {
     return {
       maxConcurrent: manager.getMaxConcurrent(),
-      // 0 = unlimited, and the default — see SubagentsSettings.
-      maxConcurrentForeground: manager.getMaxConcurrentForeground(),
       // 0 = unlimited — per SubagentsSettings.defaultMaxTurns docstring and
       // normalizeMaxTurns() in agent-runner.ts (which maps 0 → undefined).
       defaultMaxTurns: getDefaultMaxTurns() ?? 0,
       graceTurns: getGraceTurns(),
       defaultJoinMode: getDefaultJoinMode(),
-      backgroundByDefault: getBackgroundByDefault(),
       scopeModels: isScopeModelsEnabled(),
       strictAgentFiles,
       disableDefaultAgents: isDefaultsDisabled(),
@@ -761,7 +706,6 @@ export default async function setupSubagents(
       showCost: isShowCostEnabled(),
       showModel: isShowModelEnabled(),
       viewerMarkdown: getViewerMarkdown(),
-      backgroundShortcut: getBackgroundShortcut(),
     } satisfies SubagentsSettings;
   }
 
@@ -888,8 +832,6 @@ export default async function setupSubagents(
     setAgentMentionMode,
     getDefaultJoinMode,
     setDefaultJoinMode,
-    getBackgroundByDefault,
-    setBackgroundByDefault,
     setDisableDefaultAgents,
     getToolDescriptionMode,
     setToolDescriptionMode,
@@ -913,7 +855,6 @@ export default async function setupSubagents(
     if (ctx.hasUI) {
       widget.setUICtx(ctx.ui);
       fleet.setUICtx(ctx.ui as any);
-      registerBackgroundShortcut(ctx.ui as unknown as FleetUICtx);
       // Wired once per activation, like rpcHandle below: jpi-status (if present)
       // picks the rows up from here instead of the belowEditor widget.
       if (!fleetBridgeWired) {
@@ -1225,11 +1166,9 @@ export default async function setupSubagents(
   // back to defaults.
   applySettings(loadedSettings, {
     setMaxConcurrent: (n) => manager.setMaxConcurrent(n),
-    setMaxConcurrentForeground: (n) => manager.setMaxConcurrentForeground(n),
     setDefaultMaxTurns,
     setGraceTurns,
     setDefaultJoinMode,
-    setBackgroundByDefault,
     setScopeModels: setScopeModelsEnabled,
     setStrictAgentFiles: (b) => {
       strictAgentFiles = b;
@@ -1249,7 +1188,6 @@ export default async function setupSubagents(
     setShowCost,
     setShowModel,
     setViewerMarkdown,
-    setBackgroundShortcut,
   });
   pi.events.emit("subagents:settings_loaded", { settings: loadedSettings });
 
@@ -1257,7 +1195,6 @@ export default async function setupSubagents(
   pi.on("tool_execution_start", async (_event, ctx) => {
     widget.setUICtx(ctx.ui as UICtx);
     fleet.setUICtx(ctx.ui as unknown as FleetUICtx);
-    registerBackgroundShortcut(ctx.ui as unknown as FleetUICtx);
     widget.onTurnStart();
   });
 
