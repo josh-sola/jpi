@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "vite-plus/test";
 
-import type { Editor, TUI, TuiInputListenerResult } from "@earendil-works/pi-tui";
-import { visibleWidth } from "@earendil-works/pi-tui";
+import type { EditorTheme, TUI, TuiInputListenerResult } from "@earendil-works/pi-tui";
+import { Container, Editor, ScrollView, VStack, visibleWidth } from "@earendil-works/pi-tui";
+// pi-tui doesn't re-export its layout engine (unlike Container/VStack/ScrollView, which
+// are the real classes pi's fullscreen mode composes the editor with) — this regression
+// test needs the real box tree those classes produce, not a hand-built stand-in.
+import { renderLayoutFrame } from "@earendil-works/pi-tui/dist/layout.js";
 
 import {
   applySelectionHighlightToRow,
@@ -523,4 +527,101 @@ test("applyHighlight wraps the selected span and preserves each row's visible wi
   assert.ok(highlighted[1]!.includes("\x1b[7m"));
   assert.equal(highlighted[0], rendered[0]);
   assert.equal(highlighted[2], rendered[2]);
+});
+
+// --- Regression: the editor is mounted in a plain Container, not given its own box ----
+//
+// pi's real fullscreen mode mounts the editor as `editorContainer.addChild(editor)`
+// and docks that Container in a VStack alongside pendingMessages/status/widgets/footer
+// (interactive-mode.js). A plain Container has no layout node of its own, so pi-tui's
+// layout pass never recurses into it — the container itself becomes a leaf box, and the
+// editor never gets one with `component === editor`. These tests build that exact real
+// composition (real Container/VStack/ScrollView, real layout pass) instead of a fake box.
+
+function buildRealFullscreenLayout(editor: Editor, width: number, height: number) {
+  const stub = (text: string) => ({ render: () => [text], invalidate: () => {} });
+
+  const documentContainer = stub("transcript");
+  const pendingMessagesContainer = new Container();
+  const statusContainer = new Container();
+  const widgetContainerAbove = new Container();
+  const widgetContainerBelow = new Container();
+  const footerContainer = new Container();
+  footerContainer.addChild(stub("footer"));
+
+  const editorContainer = new Container();
+  editorContainer.addChild(editor);
+
+  const transcriptScrollView = new ScrollView(documentContainer, { follow: "end", primary: true });
+
+  const dock = new VStack([
+    { component: pendingMessagesContainer, shrink: 1, minSize: 0 },
+    { component: statusContainer, shrink: 1, minSize: 0 },
+    { component: widgetContainerAbove, shrink: 1, minSize: 0 },
+    { component: editorContainer, shrink: 1, minSize: 3 },
+    { component: widgetContainerBelow, shrink: 1, minSize: 0 },
+    { component: footerContainer, shrink: 1, minSize: 1 },
+  ]);
+
+  const root = new VStack([
+    { component: transcriptScrollView, basis: 0, grow: 1, shrink: 1, minSize: 1 },
+    { component: dock, basis: "auto", grow: 0, shrink: 1, minSize: 1 },
+  ]);
+
+  return renderLayoutFrame(root, width, height, () => {});
+}
+
+function realMouseTui(rows: number, columns: number) {
+  const raw = {
+    terminal: { rows, columns },
+    requestRender: () => {},
+    hasOverlay: () => false,
+    handleViewportInput: (_data: string) => undefined,
+    currentLayout: undefined as unknown,
+  };
+  return { tui: raw as unknown as TUI, raw };
+}
+
+function newRealRegressionEditor(): {
+  tui: TUI;
+  raw: ReturnType<typeof realMouseTui>["raw"];
+  editor: Editor;
+} {
+  const theme = { borderColor: (text: string) => text, selectList: {} } as unknown as EditorTheme;
+  const { tui, raw } = realMouseTui(40, 80);
+  const editor = new Editor(tui, theme, {});
+  const lines = Array.from({ length: 20 }, (_, i) => `line ${i} some text here`);
+  editor.setText(lines.join("\n"));
+  editor.focused = true; // required for the CURSOR_MARKER that drives layout.js's lineOffset
+  return { tui, raw, editor };
+}
+
+test("REGRESSION: a click resolves through pi's real editorContainer/dock/VStack composition, lineOffset 0", () => {
+  const { tui, raw, editor } = newRealRegressionEditor();
+  const mouse = installMouseSupport(tui, editor);
+  assert.ok(mouse, "installMouseSupport must still detect the real Editor's private surface");
+
+  // A generous window: editorContainer gets its full natural height, lineOffset 0.
+  // scrollOffset keeps the last 12 of 20 lines visible (cursor is on line 19), so the
+  // first visible text row is logical line 8.
+  raw.currentLayout = buildRealFullscreenLayout(editor, 80, 40);
+  raw.handleViewportInput(sgr(0, 0, 26));
+
+  assert.deepEqual(editor.getCursor(), { line: 8, col: 0 });
+});
+
+test("REGRESSION: a click resolves through pi's real editorContainer/dock/VStack composition, nonzero lineOffset", () => {
+  const { tui, raw, editor } = newRealRegressionEditor();
+  const mouse = installMouseSupport(tui, editor);
+  assert.ok(mouse);
+
+  // A short window: the dock's shrink:1 squeezes editorContainer's allocated height
+  // below the editor's natural render height, so pi-tui's leaf-box branch (layout.js:
+  // 55-59) applies a nonzero lineOffset that clips off the editor's own top border and
+  // first couple of text rows. The lookup must fold that lineOffset in, not just the
+  // container's rect.y.
+  raw.currentLayout = buildRealFullscreenLayout(editor, 80, 12);
+  raw.handleViewportInput(sgr(0, 5, 1));
+
+  assert.deepEqual(editor.getCursor(), { line: 10, col: 5 });
 });

@@ -53,10 +53,90 @@ interface MinimalLayoutBox {
   readonly rect: Rect;
   readonly clip: Rect;
   readonly children: readonly MinimalLayoutBox[];
+  /** Rows trimmed off the top of `component`'s own rendered lines before they reach `rect`. */
+  readonly lineOffset?: number;
 }
 
 interface MinimalLayoutFrame {
   readonly root: MinimalLayoutBox;
+}
+
+/** Duck-types pi-tui's Container — the shape used to walk into an unrecognized component's children. */
+interface ContainerLike {
+  readonly children: readonly unknown[];
+}
+
+function isContainerLike(value: unknown): value is ContainerLike {
+  return (
+    typeof value === "object" && value !== null && Array.isArray((value as ContainerLike).children)
+  );
+}
+
+function renderedLineCount(component: unknown, width: number): number {
+  const renderable = component as { render?: (width: number) => string[] };
+  return typeof renderable.render === "function" ? renderable.render(width).length : 0;
+}
+
+/**
+ * pi mounts the editor inside a plain Container with no layout node of its own
+ * (`editorContainer.addChild(editor)`), so pi-tui's layout pass never recurses into it —
+ * the container is the leaf box, and the editor never gets a box. Walks the container's
+ * (possibly nested) children in render order to find how many lines land before the
+ * editor, so its position within that leaf box's rendered lines can be recovered.
+ */
+function locateInContainer(
+  container: ContainerLike,
+  editor: unknown,
+  width: number,
+): { linesBefore: number } | undefined {
+  let linesBefore = 0;
+  for (const child of container.children) {
+    if (child === editor) return { linesBefore };
+    if (isContainerLike(child)) {
+      const nested = locateInContainer(child, editor, width);
+      if (nested) return { linesBefore: linesBefore + nested.linesBefore };
+    }
+    linesBefore += renderedLineCount(child, width);
+  }
+  return undefined;
+}
+
+/**
+ * Finds where the editor renders on screen: by identity when it has its own layout box,
+ * otherwise by locating it inside the nearest ancestor Container's leaf box and folding
+ * that container's lineOffset (see layout.js's leaf-box branch) and the editor's
+ * position within the container's own rendered lines into a synthetic rect.
+ */
+function locateEditorBox(
+  root: MinimalLayoutBox,
+  editor: unknown,
+): { rect: Rect; clip: Rect } | undefined {
+  const stack: MinimalLayoutBox[] = [root];
+  const containerBoxes: MinimalLayoutBox[] = [];
+  while (stack.length > 0) {
+    const box = stack.pop()!;
+    if (box.component === editor) return { rect: box.rect, clip: box.clip };
+    // A VStack/HStack/ScrollView already gets its own children recursed into (box.children
+    // is populated), so it can't be hiding the editor. Only a leaf box — no layout node of
+    // its own, hence no children here — can be an opaque plain Container hiding it.
+    if (box.children.length === 0 && isContainerLike(box.component)) containerBoxes.push(box);
+    for (const child of box.children) stack.push(child);
+  }
+
+  for (const box of containerBoxes) {
+    const located = locateInContainer(box.component as ContainerLike, editor, box.rect.width);
+    if (!located) continue;
+    return {
+      clip: box.clip,
+      rect: {
+        x: box.rect.x,
+        y: box.rect.y - (box.lineOffset ?? 0) + located.linesBefore,
+        width: box.rect.width,
+        height: box.rect.height,
+      },
+    };
+  }
+  return undefined;
 }
 
 export interface RowHighlightRange {
@@ -105,19 +185,6 @@ export function isLeftButtonRelevant(event: SgrMouseEvent): boolean {
 
 export function containsPoint(rect: Rect, x: number, y: number): boolean {
   return x >= rect.x && x < rect.x + rect.width && y >= rect.y && y < rect.y + rect.height;
-}
-
-function findComponentBox(
-  root: MinimalLayoutBox,
-  component: unknown,
-): MinimalLayoutBox | undefined {
-  const stack: MinimalLayoutBox[] = [root];
-  while (stack.length > 0) {
-    const box = stack.pop()!;
-    if (box.component === component) return box;
-    for (const child of box.children) stack.push(child);
-  }
-  return undefined;
 }
 
 /** Mirrors Editor#render's own padding clamp: `Math.min(paddingX, Math.floor((width - 1) / 2))`. */
@@ -361,12 +428,16 @@ export function installMouseSupport(tui: TUI, editor: Editor): MouseSupport | un
   let selection: Selection | undefined;
   let dragging = false;
 
-  function findEditorBox(): MinimalLayoutBox | undefined {
+  function findEditorBox(): { rect: Rect; clip: Rect } | undefined {
     const frame = getCurrentLayout();
-    return frame ? findComponentBox(frame.root, editor) : undefined;
+    return frame ? locateEditorBox(frame.root, editor) : undefined;
   }
 
-  function resolvePosition(box: MinimalLayoutBox, x: number, y: number): Position | undefined {
+  function resolvePosition(
+    box: { rect: Rect; clip: Rect },
+    x: number,
+    y: number,
+  ): Position | undefined {
     const state = editorAccess.getState();
     const paddingX = editor.getPaddingX();
     const layoutWidth = computeLayoutWidth(box.rect.width, paddingX);
