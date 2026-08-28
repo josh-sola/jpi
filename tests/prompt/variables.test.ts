@@ -18,7 +18,6 @@ test("buildToolList renders one line per tool that has a snippet", () => {
 
 test("buildToolList falls back to pi's default tool set when none is selected", () => {
   const result = buildToolList({
-    selectedTools: undefined,
     toolSnippets: { write: "writes files" },
   });
   assert.equal(result, "- write: writes files");
@@ -26,7 +25,7 @@ test("buildToolList falls back to pi's default tool set when none is selected", 
 
 test("buildToolList is empty when no selected tool has a snippet", () => {
   assert.equal(buildToolList({ selectedTools: ["bash"], toolSnippets: {} }), "");
-  assert.equal(buildToolList({ selectedTools: [], toolSnippets: undefined }), "");
+  assert.equal(buildToolList({ selectedTools: [] }), "");
 });
 
 test("buildGuidelines dedupes bullets and trims whitespace", () => {
@@ -38,7 +37,7 @@ test("buildGuidelines dedupes bullets and trims whitespace", () => {
 
 test("buildGuidelines drops blank entries and returns empty string when nothing remains", () => {
   assert.equal(buildGuidelines({ promptGuidelines: ["  ", ""] }), "");
-  assert.equal(buildGuidelines({ promptGuidelines: undefined }), "");
+  assert.equal(buildGuidelines({}), "");
 });
 
 test("buildPiDocsBlock reproduces stock pi's documentation block", () => {

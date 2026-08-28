@@ -183,7 +183,7 @@ interface SpawnOptions {
    * (`@auth-audit`) alongside the type-derived one. Slugged, not validated —
    * anything unusable degrades via `handleBase` rather than failing the spawn.
    */
-  name?: string;
+  name?: string | undefined;
   /**
    * Reopen this pi session file instead of starting a fresh conversation, so a
    * mention of an evicted agent continues where it left off. The agent's
@@ -203,11 +203,11 @@ interface SpawnOptions {
    * `spawnTopLevel` strips it from anything a caller sends.
    */
   reclaim?: { handle: string; alias?: string };
-  model?: Model<any>;
-  maxTurns?: number;
-  isolated?: boolean;
-  inheritContext?: boolean;
-  thinkingLevel?: ThinkingLevel;
+  model?: Model<any> | undefined;
+  maxTurns?: number | undefined;
+  isolated?: boolean | undefined;
+  inheritContext?: boolean | undefined;
+  thinkingLevel?: ThinkingLevel | undefined;
   isBackground?: boolean;
   /**
    * Skip whichever pool's queue check applies to this spawn — start immediately
@@ -227,7 +227,7 @@ interface SpawnOptions {
    */
   blocking?: boolean;
   /** Isolation mode — "worktree" creates a temp git worktree for the agent. */
-  isolation?: IsolationMode;
+  isolation?: IsolationMode | undefined;
   /**
    * Working directory for the agent (absolute path). Default: parent session
    * cwd. The agent's tools operate here, but .pi config (extensions, skills,
@@ -256,9 +256,9 @@ interface SpawnOptions {
    */
   onBeforeWorktreeCleanup?: (worktreePath: string) => Promise<void>;
   /** Resolved invocation snapshot captured for UI display. */
-  invocation?: AgentInvocation;
+  invocation?: AgentInvocation | undefined;
   /** Parent abort signal — when aborted, the subagent is also stopped. */
-  signal?: AbortSignal;
+  signal?: AbortSignal | undefined;
   /**
    * Called synchronously once the record is in the map and its promise is set,
    * before `onSessionCreated` fires — where callers attach the output file.
@@ -268,7 +268,7 @@ interface SpawnOptions {
    * long after any such field would have been restored, and the callback would
    * silently never fire (or fire into an unrelated caller's closure).
    */
-  onSpawned?: (id: string) => void;
+  onSpawned?: ((id: string) => void) | undefined;
   /**
    * Called synchronously when the spawn is queued instead of started, with how
    * many entries in its own pool are ahead of it. The foreground UI uses it to
@@ -296,7 +296,7 @@ interface SpawnOptions {
   /** Config-discovery root inherited by nested launches when it differs from the working directory. */
   configCwd?: string;
   /** Root session id, inherited by nested launches so transcripts stay grouped. */
-  rootSessionId?: string;
+  rootSessionId?: string | undefined;
 }
 
 interface ResumeOptions {
@@ -365,10 +365,10 @@ async function shutdownChildSession(session: AgentSession | undefined): Promise<
 export class AgentManager {
   private agents = new Map<string, AgentRecord>();
   private cleanupInterval: ReturnType<typeof setInterval>;
-  private onComplete?: OnAgentComplete;
-  private onStart?: OnAgentStart;
-  private onCompact?: OnAgentCompact;
-  private onUsage?: OnAgentUsage;
+  private onComplete?: OnAgentComplete | undefined;
+  private onStart?: OnAgentStart | undefined;
+  private onCompact?: OnAgentCompact | undefined;
+  private onUsage?: OnAgentUsage | undefined;
   private maxConcurrent: number;
   private maxConcurrentForeground = DEFAULT_MAX_CONCURRENT_FOREGROUND;
   /** Base repos worktrees were created from — so dispose() can prune them all,

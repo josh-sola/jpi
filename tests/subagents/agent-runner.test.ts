@@ -181,7 +181,7 @@ function createSession(finalText: string) {
     }),
     // pi's Agent; `beforeToolCall` is an optional, assignable hook the scope
     // installer wraps to block out-of-scope calls on turn 1.
-    agent: { beforeToolCall: undefined } as {
+    agent: {} as {
       beforeToolCall?: (context: any, signal?: any) => Promise<any>;
     },
     setSessionName: vi.fn(),
@@ -2527,7 +2527,7 @@ describe("resolveDefaultModel", () => {
   function registry(available?: any[]) {
     return {
       find: vi.fn((provider: string, id: string) => ({ provider, id }) as any),
-      getAvailable: available ? () => available : undefined,
+      ...(available && { getAvailable: () => available }),
     };
   }
 
@@ -2557,7 +2557,7 @@ describe("resolveDefaultModel", () => {
   });
 
   it("falls back to the parent when the registry cannot find the model", () => {
-    const r = { find: vi.fn(() => undefined), getAvailable: undefined };
+    const r = { find: vi.fn(() => undefined) };
     expect(resolveDefaultModel(parent, r as any, "anthropic/nope")).toBe(parent);
   });
 

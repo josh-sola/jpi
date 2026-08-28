@@ -185,9 +185,9 @@ export interface NewAgentInput {
   /** Already-resolved `tools:` value ("none", "all", or a CSV of tool names). */
   tools: string;
   /** `provider/modelId`, or undefined to inherit the parent's model. */
-  model?: string;
+  model?: string | undefined;
   /** A pi thinking level, or undefined to inherit. */
-  thinking?: string;
+  thinking?: string | undefined;
   systemPrompt: string;
 }
 

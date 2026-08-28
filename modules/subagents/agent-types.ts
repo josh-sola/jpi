@@ -292,11 +292,11 @@ export function getToolNamesForType(type: string): string[] {
 /** Get config for a type (case-insensitive, returns a SubagentTypeConfig-compatible object). Falls back to general-purpose. */
 export function getConfig(type: string): {
   displayName: string;
-  color?: string;
+  color?: string | undefined;
   description: string;
   builtinToolNames: string[];
   extensions: true | string[] | false;
-  excludeExtensions?: string[];
+  excludeExtensions?: string[] | undefined;
   skills: true | string[] | false;
   promptMode: "replace" | "append";
 } {

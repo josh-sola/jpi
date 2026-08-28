@@ -47,7 +47,7 @@ export type StatusLineConfigResult = {
   config: StatusLineConfig;
   path: string;
   issues: string[];
-  problem?: string;
+  problem?: string | undefined;
 };
 
 export function createDefaultStatusLineConfig(): StatusLineConfig {

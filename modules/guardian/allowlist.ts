@@ -73,7 +73,7 @@ export function mapConfigValue(
 
   return {
     path,
-    model,
+    ...(model !== undefined && { model }),
     allowTools: value.allow.tool,
     allowBash,
     allowMcp: value.allow.mcp,

@@ -22,7 +22,7 @@ function makeRegistry(models = MODELS, available?: typeof MODELS): ModelRegistry
     getAll() {
       return models;
     },
-    getAvailable: available ? () => available : undefined,
+    ...(available && { getAvailable: () => available }),
   };
 }
 

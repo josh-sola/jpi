@@ -690,7 +690,7 @@ test("custom commands start immediately, run duplicates concurrently, and use on
   let renderRequests = 0;
   const exec: ExecCommand = (command, args, options) =>
     new Promise((resolve) => {
-      calls.push({ command, args, options });
+      calls.push({ command, args, ...(options !== undefined && { options }) });
       pending.push(resolve);
     });
   const controller = new CustomStatusController({
@@ -827,7 +827,7 @@ test("disposing custom commands aborts in-flight execution and clears its timer"
 test("metadata loading uses bounded git and wt commands and degrades optional fields", async () => {
   const calls: ExecCall[] = [];
   const exec: ExecCommand = async (command, args, options) => {
-    calls.push({ command, args, options });
+    calls.push({ command, args, ...(options !== undefined && { options }) });
     const key = `${command} ${args.join(" ")}`;
     const outputs = new Map([
       ["git rev-parse --show-toplevel", "/trees/uuid\n"],
@@ -945,7 +945,7 @@ test("reloading status config rerenders valid and fail-default changes", async (
         footerFactory = value;
       },
       notify(message, level) {
-        notifications.push({ message, level });
+        notifications.push({ message, ...(level !== undefined && { level }) });
       },
     },
   };
@@ -1050,7 +1050,7 @@ test("reloading config aborts stale custom runs and immediately rebuilds occurre
       });
     }
     if (command === newPath) {
-      newCall = { command, args, options };
+      newCall = { command, args, ...(options !== undefined && { options }) };
       return ok(" new\noutput ");
     }
     return { ...ok(), code: 1 };
@@ -1067,7 +1067,7 @@ test("reloading config aborts stale custom runs and immediately rebuilds occurre
         footerFactory = value;
       },
       notify(message, level) {
-        notifications.push({ message, level });
+        notifications.push({ message, ...(level !== undefined && { level }) });
       },
     },
   };
@@ -1152,7 +1152,7 @@ test("the extension installs only in TUI mode and cleans up component resources"
         footerFactory = value;
       },
       notify(message, level) {
-        notifications.push({ message, level });
+        notifications.push({ message, ...(level !== undefined && { level }) });
       },
     },
   };

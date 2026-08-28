@@ -56,22 +56,22 @@ const NESTED_TOOL_NAMES = ["Agent", "get_subagent_result", "steer_subagent"] as 
 
 interface NestedSpawnOptions {
   description: string;
-  model?: Model<any>;
-  maxTurns?: number;
-  isolated?: boolean;
-  inheritContext?: boolean;
-  thinkingLevel?: ThinkingLevel;
+  model?: Model<any> | undefined;
+  maxTurns?: number | undefined;
+  isolated?: boolean | undefined;
+  inheritContext?: boolean | undefined;
+  thinkingLevel?: ThinkingLevel | undefined;
   isBackground?: boolean;
-  isolation?: IsolationMode;
+  isolation?: IsolationMode | undefined;
   invocation?: AgentInvocation;
-  signal?: AbortSignal;
+  signal?: AbortSignal | undefined;
   onAssistantUsage?: (usage: { input: number; output: number; cacheWrite: number }) => void;
   onSessionCreated?: (session: AgentSession) => void;
   depth: number;
   parentAgentId: string;
   maxSubagentDepth: number;
   configCwd?: string;
-  rootSessionId?: string;
+  rootSessionId?: string | undefined;
 }
 
 export interface NestedAgentManager {

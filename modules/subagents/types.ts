@@ -28,52 +28,52 @@ export type IsolationMode = "worktree" | "off";
 export interface AgentConfig {
   name: string;
   /** UI name. `display_name` wins; Claude Code's `name` is accepted as a fallback. */
-  displayName?: string;
+  displayName?: string | undefined;
   /** Claude Code-compatible name color (named color or #RRGGBB). */
-  color?: string;
+  color?: string | undefined;
   description: string;
   builtinToolNames?: string[];
   /** Raw `ext:` selector entries from the `tools:` CSV, e.g. ["ext:foo", "ext:bar/x"].
    * Presence of any entry flips extension tools to an explicit allowlist. */
-  extSelectors?: string[];
+  extSelectors?: string[] | undefined;
   /** Tool denylist — these tools are removed even if `builtinToolNames` or extensions include them. */
-  disallowedTools?: string[];
+  disallowedTools?: string[] | undefined;
   /** true = inherit all, string[] = only listed, false = none */
   extensions: true | string[] | false;
   /** Extension-name denylist applied after the `extensions:` include set. Exclude wins.
    * Plain canonical names only (case-insensitive); no paths, no wildcard. */
-  excludeExtensions?: string[];
+  excludeExtensions?: string[] | undefined;
   /** true = inherit all, string[] = only listed, false = none */
   skills: true | string[] | false;
-  model?: string;
+  model?: string | undefined;
   /** Soft default: only used when neither `model` nor the caller's spawn-time `model` names one. */
-  modelDefault?: string;
-  thinking?: ThinkingLevel;
-  maxTurns?: number;
+  modelDefault?: string | undefined;
+  thinking?: ThinkingLevel | undefined;
+  maxTurns?: number | undefined;
   /** Persist this subagent as a normal pi session instead of keeping it in memory only. */
-  persistSession?: boolean;
+  persistSession?: boolean | undefined;
   /** Write the subagent's .output transcript. Defaults to true; false suppresses only that transcript. */
-  outputTranscript?: boolean;
+  outputTranscript?: boolean | undefined;
   /** Optional session directory used when persistSession is true. Omitted = pi's normal session location. */
-  sessionDir?: string;
+  sessionDir?: string | undefined;
   /**
    * Nested delegation, off by default: undefined = no nested tools;
    * "all" = any enabled agent; string[] = only those agent types.
    */
-  allowedSubagents?: "all" | string[];
+  allowedSubagents?: "all" | string[] | undefined;
   systemPrompt: string;
   promptMode: "replace" | "append";
   /** Default for spawn: fork parent conversation. undefined = caller decides. */
-  inheritContext?: boolean;
+  inheritContext?: boolean | undefined;
   /** Default for spawn: run in background. undefined = caller decides. */
-  runInBackground?: boolean;
+  runInBackground?: boolean | undefined;
   /** Default for spawn: no extension tools. undefined = caller decides. */
-  isolated?: boolean;
+  isolated?: boolean | undefined;
   /**
    * Isolation mode — "worktree" runs the agent in a temporary git worktree,
    * "off" refuses one even when the caller asks (frontmatter outranks params).
    */
-  isolation?: IsolationMode;
+  isolation?: IsolationMode | undefined;
   /** true = this is an embedded default agent (informational) */
   isDefault?: boolean;
   /** false = agent is hidden from the registry */
@@ -81,7 +81,7 @@ export interface AgentConfig {
   /** Where this agent was loaded from */
   source?: "default" | "project" | "global";
   /** Path of the .md it was loaded from. Unset for embedded defaults. */
-  sourcePath?: string;
+  sourcePath?: string | undefined;
 }
 
 export type JoinMode = "async" | "group" | "smart";
@@ -130,7 +130,7 @@ export type AgentMentionMode = "model" | "direct" | "off";
  */
 export interface AgentTombstone {
   handle: string;
-  alias?: string;
+  alias?: string | undefined;
   id: string;
   type: SubagentType;
   description: string;
@@ -156,22 +156,22 @@ export interface AgentRecord {
    * Top-level agents only — nested children are hidden from every top-level
    * surface, so nothing can address them.
    */
-  handle?: string;
+  handle?: string | undefined;
   /**
    * A second, memorable handle from the spawner's `name` (`@auth-audit`), drawn
    * from the same namespace as `handle` so the two can never collide. Purely
    * additive: `handle` is assigned regardless, so a named agent stays reachable
    * by its type and `@explore` never comes to mean "start another one".
    */
-  alias?: string;
+  alias?: string | undefined;
   description: string;
   status: "queued" | "running" | "completed" | "steered" | "aborted" | "stopped" | "error";
-  result?: string;
-  error?: string;
+  result?: string | undefined;
+  error?: string | undefined;
   toolUses: number;
   startedAt: number;
-  completedAt?: number;
-  session?: AgentSession;
+  completedAt?: number | undefined;
+  session?: AgentSession | undefined;
   abortController?: AbortController;
   promise?: Promise<string>;
   /**
@@ -181,7 +181,7 @@ export interface AgentRecord {
    * cross-extension RPC spawn is foreground by that measure and yet blocks
    * nobody, so it takes no slot.
    */
-  blocking?: boolean;
+  blocking?: boolean | undefined;
   /**
    * Present only while the record is "queued": resolves when it leaves the
    * queue, started or aborted. `spawnAndWait` waits on this because a queued
@@ -189,19 +189,19 @@ export interface AgentRecord {
    * would escape into the caller's tool `execute` and take down pi's whole
    * Promise.all tool batch.
    */
-  startGate?: Promise<void>;
+  startGate?: Promise<void> | undefined;
   groupId?: string;
   joinMode?: JoinMode;
   /** Set when result was already consumed via get_subagent_result — suppresses completion notification. */
   resultConsumed?: boolean;
   /** Steering messages queued before the session was ready. */
-  pendingSteers?: string[];
+  pendingSteers?: string[] | undefined;
   /** Worktree info if the agent is running in an isolated worktree. */
   worktree?: { path: string; baseSha: string; workPath: string };
   /** Worktree cleanup result after agent completion. */
   worktreeResult?: { hasChanges: boolean; path?: string };
   /** The tool_use_id from the original Agent tool call. */
-  toolCallId?: string;
+  toolCallId?: string | undefined;
   /** Path to the streaming output transcript file. */
   outputFile?: string;
   /**
@@ -210,16 +210,16 @@ export interface AgentRecord {
    * conversation after the record itself has been evicted; undefined for an
    * in-memory session, which leaves nothing to reopen.
    */
-  sessionFile?: string;
+  sessionFile?: string | undefined;
   /** Cleanup function for the output file stream subscription. */
-  outputCleanup?: () => void;
+  outputCleanup?: (() => void) | undefined;
   /**
    * Removes whatever parent-abort-signal listener is currently wired to kill
    * this agent on Esc. `detachBlocking` (ctrl+b) must call this before it lets
    * the caller's wait end, or a later Esc would still kill an agent the user
    * just moved to the background.
    */
-  detachAbortListener?: () => void;
+  detachAbortListener?: (() => void) | undefined;
   /**
    * Lifetime usage breakdown, accumulated via `message_end` events. Survives
    * compaction. Total = input + output + cacheWrite (cacheRead deliberately
@@ -238,21 +238,21 @@ export interface AgentRecord {
    * Reliable across ALL spawn paths, unlike the UI-only `invocation` snapshot,
    * which only the Agent-tool path populates.
    */
-  isBackground?: boolean;
+  isBackground?: boolean | undefined;
   /** Resolved spawn params, captured for UI display. Fixed at spawn time. */
-  invocation?: AgentInvocation;
+  invocation?: AgentInvocation | undefined;
   /** Nesting depth: top-level subagent = 1. */
   depth?: number;
   /** Parent agent ID for ownership-scoped nested controls. */
-  parentAgentId?: string;
+  parentAgentId?: string | undefined;
   /** Effective inherited nesting cap for this branch. */
-  maxSubagentDepth?: number;
+  maxSubagentDepth?: number | undefined;
   /**
    * Session id of the root (main) session this branch descends from. Nested
    * spawns inherit it so their transcripts file under the same session
    * directory as their ancestors' instead of the child session's own id.
    */
-  rootSessionId?: string;
+  rootSessionId?: string | undefined;
 }
 
 /**
@@ -264,11 +264,11 @@ export type EffectiveThinkingLevel = ThinkingLevel | "off";
 
 export interface AgentInvocation {
   /** Short display name for tight rows, e.g. "haiku 4.5". Always set once known. */
-  modelName?: string;
+  modelName?: string | undefined;
   /** Canonical `provider/id`, for surfaces with room to disambiguate providers. */
-  modelId?: string;
+  modelId?: string | undefined;
   /** The level actually in effect, once a session exists to report one. */
-  thinking?: EffectiveThinkingLevel;
+  thinking?: EffectiveThinkingLevel | undefined;
   /**
    * What the caller asked for, kept only when they did not get it — pi clamped
    * the level to the model's capabilities, or an agent file's frontmatter
@@ -276,14 +276,14 @@ export interface AgentInvocation {
    * honor my instructions?" (#62), which it cannot do if the request is lost, so
    * neither `requested*` field is overwritten once set.
    */
-  requestedThinking?: EffectiveThinkingLevel;
+  requestedThinking?: EffectiveThinkingLevel | undefined;
   /** The caller's `model` parameter, as written, when an agent file's pin won. */
-  requestedModel?: string;
-  maxTurns?: number;
-  isolated?: boolean;
-  inheritContext?: boolean;
-  runInBackground?: boolean;
-  isolation?: IsolationMode;
+  requestedModel?: string | undefined;
+  maxTurns?: number | undefined;
+  isolated?: boolean | undefined;
+  inheritContext?: boolean | undefined;
+  runInBackground?: boolean | undefined;
+  isolation?: IsolationMode | undefined;
 }
 
 /** Details attached to custom notification messages for visual rendering. */
@@ -293,7 +293,7 @@ export interface NotificationDetails {
   status: string;
   toolUses: number;
   turnCount: number;
-  maxTurns?: number;
+  maxTurns?: number | undefined;
   totalTokens: number;
   /**
    * Estimated cost in USD, from pi's per-message `usage.cost.total`. Always
@@ -302,8 +302,8 @@ export interface NotificationDetails {
    */
   totalCost?: number;
   durationMs: number;
-  outputFile?: string;
-  error?: string;
+  outputFile?: string | undefined;
+  error?: string | undefined;
   resultPreview: string;
   /** Additional agents in a group notification. */
   others?: NotificationDetails[];

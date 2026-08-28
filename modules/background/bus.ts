@@ -62,7 +62,7 @@ export function parseRequest(data: unknown): RequestEnvelope | undefined {
     schema: REQUEST_SCHEMA,
     request_id: requestId,
     operation: operation as Operation,
-    params,
+    ...(params !== undefined && { params }),
   };
 }
 
@@ -99,10 +99,13 @@ async function handleRequest(
         if (!ctx) throw new Error("No active session context yet");
         const command = optionalString(params.command);
         if (!command) throw new Error("run requires a command string");
+        const name = optionalString(params.name);
+        const timeoutSeconds = optionalNumber(params.timeoutSeconds);
+        const wakeOnCompletion = optionalBoolean(params.wakeOnCompletion);
         const task = await registry.start(ctx, command, {
-          name: optionalString(params.name),
-          timeoutSeconds: optionalNumber(params.timeoutSeconds),
-          wakeOnCompletion: optionalBoolean(params.wakeOnCompletion),
+          ...(name !== undefined && { name }),
+          ...(timeoutSeconds !== undefined && { timeoutSeconds }),
+          ...(wakeOnCompletion !== undefined && { wakeOnCompletion }),
         });
         result = { task };
         break;
@@ -120,9 +123,11 @@ async function handleRequest(
       case "logs": {
         const taskId = optionalString(params.taskId);
         if (!taskId) throw new Error("logs requires a taskId");
+        const maxBytes = optionalNumber(params.maxBytes);
+        const tail = optionalBoolean(params.tail);
         result = await registry.readOutput(taskId, {
-          maxBytes: optionalNumber(params.maxBytes),
-          tail: optionalBoolean(params.tail),
+          ...(maxBytes !== undefined && { maxBytes }),
+          ...(tail !== undefined && { tail }),
         });
         break;
       }

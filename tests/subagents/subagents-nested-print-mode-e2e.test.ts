@@ -288,7 +288,7 @@ describe("PR #164 nested agents through the real print-mode boundary", () => {
     // stay running while a foreign peer probes the live nested record. Spawn
     // both owner and probe as top-level background agents (hold:false so the
     // root can continue); the nested tools themselves enforce ownership.
-    const probeResults: { get?: string; steer?: string } = {};
+    const probeResults: { get?: string | undefined; steer?: string | undefined } = {};
     let ownedChildBlocked = false;
     let releaseOwnedChild = () => {};
     let releaseOwner = () => {};

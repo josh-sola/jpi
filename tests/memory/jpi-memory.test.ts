@@ -157,7 +157,7 @@ test("/jpi-memory command reports dir, existence, size, entry and file counts, a
     cwd,
     ui: {
       notify(message: string, level?: string) {
-        notifications.push({ message, level });
+        notifications.push({ message, ...(level !== undefined && { level }) });
       },
     },
   };
@@ -184,7 +184,7 @@ test("/jpi-memory command reports a not-yet-created index without failing", asyn
     cwd,
     ui: {
       notify(message: string, level?: string) {
-        notifications.push({ message, level });
+        notifications.push({ message, ...(level !== undefined && { level }) });
       },
     },
   };

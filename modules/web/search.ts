@@ -99,7 +99,7 @@ export async function executeWebSearch(
 ): Promise<AgentToolResult<WebSearchDetails>> {
   const rawResults = await runner.runJson(
     ["search", "--backend", backend, "--limit", "5", "--json", "--", input.query],
-    { timeoutMs: WEB_SEARCH_TIMEOUT_MS, signal },
+    { timeoutMs: WEB_SEARCH_TIMEOUT_MS, ...(signal !== undefined && { signal }) },
   );
 
   if (!Array.isArray(rawResults)) throw new Error("Ketch returned malformed search output.");

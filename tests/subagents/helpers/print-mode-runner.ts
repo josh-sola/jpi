@@ -368,7 +368,7 @@ export async function runPrintMode(options: RunPrintModeOptions): Promise<PrintM
   const { session } = await createAgentSession({
     cwd,
     agentDir,
-    model,
+    ...(model !== undefined && { model }),
     // Structural faux registry/runtime in faux mode; undefined in live mode (defaults).
     // Spread (not literal keys) so the excess-property check doesn't reject
     // `modelRegistry` on the pi version whose CreateAgentSessionOptions dropped it.

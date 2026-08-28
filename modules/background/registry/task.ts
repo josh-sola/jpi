@@ -64,8 +64,8 @@ export function snapshot(task: BgTask): BgTaskSnapshot {
     wakeOnCompletion: task.wakeOnCompletion,
     timeoutSeconds: task.timeoutSeconds,
     killKind: task.killKind,
-    language: task.language,
-    stageDir: task.stageDir,
+    ...(task.language !== undefined && { language: task.language }),
+    ...(task.stageDir !== undefined && { stageDir: task.stageDir }),
   };
 }
 

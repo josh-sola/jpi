@@ -31,7 +31,7 @@ function mockUICtx() {
       state.statuses.set(key, text);
     },
     notify(message, type) {
-      state.notifications.push({ message, type });
+      state.notifications.push({ message, ...(type !== undefined && { type }) });
     },
   };
 
