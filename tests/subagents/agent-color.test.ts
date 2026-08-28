@@ -49,14 +49,7 @@ describe("renderAgentNameLabel", () => {
     expect(neutral).toContain("\u001b[48;5;244m");
   });
 
-  it("restores an enclosing tool background after the badge", () => {
-    const label = renderAgentNameLabel("Reviewer", "purple", theme, {
-      restoreBackground: "\u001b[48;2;1;2;3m",
-    });
-    expect(label).toMatch(/\u001b\[39m\u001b\[48;2;1;2;3m$/);
-  });
-
-  it("resets the background when the caller paints none", () => {
+  it("resets the background after the badge", () => {
     expect(renderAgentNameLabel("Reviewer", "purple", theme)).toMatch(/\u001b\[39m\u001b\[49m$/);
   });
 

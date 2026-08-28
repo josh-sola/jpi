@@ -54,8 +54,6 @@ export interface AgentNameTheme {
 export interface AgentNameStyle {
   /** Existing theme foreground used when no valid agent color is configured. */
   fallbackColor?: string;
-  /** Reapply an enclosing background after the badge instead of resetting it. */
-  restoreBackground?: string;
   bold?: boolean;
 }
 
@@ -149,8 +147,7 @@ export function renderAgentNameLabel(
     ansiColor("background", quantized?.index ?? rgb) +
     ansiColor("foreground", quantized ? rgbTo256(contrasting).index : contrasting) +
     label +
-    "\u001b[39m" +
-    (style.restoreBackground ?? "\u001b[49m")
+    "\u001b[39m\u001b[49m"
   );
 }
 

@@ -1,3 +1,5 @@
+import { Theme } from "@earendil-works/pi-coding-agent";
+import { stripTerminalSequences } from "@earendil-works/pi-tui";
 import { describe, expect, it } from "vite-plus/test";
 import { renderRunningAgentStatus } from "../../modules/subagents/index.ts";
 import type { AgentRecord, WidgetMode } from "../../modules/subagents/types.ts";
@@ -8,6 +10,70 @@ import {
   formatCost,
   formatSessionTokens,
 } from "../../modules/subagents/ui/agent-widget.ts";
+
+const THEME_COLOR_NAMES = [
+  "accent",
+  "border",
+  "borderAccent",
+  "borderMuted",
+  "success",
+  "error",
+  "warning",
+  "muted",
+  "dim",
+  "text",
+  "thinkingText",
+  "userMessageText",
+  "customMessageText",
+  "customMessageLabel",
+  "toolTitle",
+  "toolOutput",
+  "mdHeading",
+  "mdLink",
+  "mdLinkUrl",
+  "mdCode",
+  "mdCodeBlock",
+  "mdCodeBlockBorder",
+  "mdQuote",
+  "mdQuoteBorder",
+  "mdHr",
+  "mdListBullet",
+  "toolDiffAdded",
+  "toolDiffRemoved",
+  "toolDiffContext",
+  "syntaxComment",
+  "syntaxKeyword",
+  "syntaxFunction",
+  "syntaxVariable",
+  "syntaxString",
+  "syntaxNumber",
+  "syntaxType",
+  "syntaxOperator",
+  "syntaxPunctuation",
+  "thinkingOff",
+  "thinkingMinimal",
+  "thinkingLow",
+  "thinkingMedium",
+  "thinkingHigh",
+  "thinkingXhigh",
+  "bashMode",
+];
+
+const THEME_BG_NAMES = [
+  "selectedBg",
+  "userMessageBg",
+  "customMessageBg",
+  "toolPendingBg",
+  "toolSuccessBg",
+  "toolErrorBg",
+];
+
+/** Real `Theme` (numeric 256-color indices, no disk access) for exercising `createResultLine`, which requires the real class rather than a `{fg, bold}` stub. */
+function plainTheme(): Theme {
+  const fgColors = Object.fromEntries(THEME_COLOR_NAMES.map((name) => [name, 7]));
+  const bgColors = Object.fromEntries(THEME_BG_NAMES.map((name) => [name, 0]));
+  return new Theme(fgColors as never, bgColors as never, "256color");
+}
 
 describe("formatSessionTokens", () => {
   const theme = { fg: (c: string, s: string) => `<${c}>${s}</${c}>`, bold: (s: string) => s };
@@ -54,15 +120,14 @@ describe("formatSessionTokens", () => {
 
 describe("renderRunningAgentStatus", () => {
   it("renders running status as separate component lines", () => {
-    const theme = { fg: (_c: string, s: string) => s };
     const component = renderRunningAgentStatus(
       "⠋",
       "thinking: xhigh · 4 tool uses",
       "thinking…",
-      theme,
+      plainTheme(),
     );
 
-    expect(component.render(120).map((line) => line.trimEnd())).toEqual([
+    expect(component.render(120).map((line) => stripTerminalSequences(line).trimEnd())).toEqual([
       "⠋ thinking: xhigh · 4 tool uses",
       "  ⎿  thinking…",
     ]);

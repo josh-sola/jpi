@@ -24,7 +24,6 @@ const config: AgentConfig = {
 const theme = {
   fg: (color: string, text: string) => `<${color}>${text}</${color}>`,
   bold: (text: string) => `*${text}*`,
-  getBgAnsi: (color: string) => `<${color}>`,
   getColorMode: () => "truecolor" as const,
 };
 
@@ -40,7 +39,12 @@ interface RegisteredTool {
   renderCall(
     args: Record<string, unknown>,
     activeTheme: typeof theme,
-    context: { isPartial: boolean; isError: boolean },
+    context: {
+      executionStarted: boolean;
+      isPartial: boolean;
+      isError: boolean;
+      lastComponent?: unknown;
+    },
   ): RenderedComponent;
 }
 
@@ -112,41 +116,52 @@ describe("custom agent color runtime surfaces", () => {
     try {
       const tool = tools.get("Agent");
       if (!tool) throw new Error("Agent tool was not registered");
-      const render = (context: { isPartial: boolean; isError: boolean }) =>
+      const render = (context: {
+        executionStarted: boolean;
+        isPartial: boolean;
+        isError: boolean;
+      }) =>
         tool
-          .renderCall({ subagent_type: TYPE, description: "Review this change" }, theme, context)
+          .renderCall({ subagent_type: TYPE, description: "Review this change" }, theme, {
+            ...context,
+            lastComponent: undefined,
+          })
           .render(120)
           .join("\n");
-      const output = render({ isPartial: false, isError: false });
+      const output = render({ executionStarted: true, isPartial: false, isError: false });
 
       expect(output).toContain(DISPLAY_NAME);
       expect(output).toContain(PURPLE_BACKGROUND);
-      // The row tint is opened by the line itself and restored after the badge, so the
-      // line reads the same whether or not the caller paints one (HTML export does not).
-      expect(output.indexOf("<toolSuccessBg>")).toBeLessThan(output.indexOf(PURPLE_BACKGROUND));
-      expect(output.split("<toolSuccessBg>")).toHaveLength(3); // opened once, restored after the badge
-      // Left open on purpose: Box pads to width and then wraps, so a reset here would
-      // leave the padding untinted. Nothing after the badge may close the background.
-      expect(output).not.toContain("\u001b[49m");
-      expect(render({ isPartial: true, isError: false })).toContain("<toolPendingBg>");
-      expect(render({ isPartial: false, isError: true })).toContain("<toolErrorBg>");
+      expect(output).toContain("(<muted>Review this change</muted>)");
+      // The bullet carries pending/running/success/error state, like every other tool.
+      expect(output).toContain("<success>⏺ </success>");
+      expect(render({ executionStarted: false, isPartial: false, isError: false })).toContain(
+        "<muted>⏺ </muted>",
+      );
+      expect(render({ executionStarted: true, isPartial: true, isError: false })).toContain(
+        "<muted>⏺ </muted>",
+      );
+      expect(render({ executionStarted: true, isPartial: false, isError: true })).toContain(
+        "<error>⏺ </error>",
+      );
 
       const missingType = tool
         .renderCall({ description: "Review this change" }, theme, {
+          executionStarted: true,
           isPartial: false,
           isError: false,
+          lastComponent: undefined,
         })
         .render(120)
         .join("\n");
       expect(missingType).toContain("<toolTitle>*Agent*</toolTitle>");
       expect(missingType).not.toContain(PURPLE_BACKGROUND);
 
-      // An agent without a color must render the pre-badge line byte for byte:
-      // no badge, and no row background of our own for HTML export to pick up.
+      // An agent without a color renders no badge — just the fallback-styled name.
       registerAgents(new Map([[TYPE, { ...config, color: undefined }]]));
-      const uncolored = render({ isPartial: false, isError: false });
+      const uncolored = render({ executionStarted: true, isPartial: false, isError: false });
       expect(uncolored.trimEnd()).toBe(
-        `▸ <toolTitle>*${DISPLAY_NAME}*</toolTitle>  <muted>Review this change</muted>`,
+        `<success>⏺ </success><toolTitle>*${DISPLAY_NAME}*</toolTitle>(<muted>Review this change</muted>)`,
       );
     } finally {
       await handlers.get("session_shutdown")?.({}, { hasUI: false, ui: {} });

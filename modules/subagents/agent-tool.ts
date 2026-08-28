@@ -6,11 +6,21 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { defineTool, type ExtensionContext, getAgentDir } from "@earendil-works/pi-coding-agent";
-import { Container, Text } from "@earendil-works/pi-tui";
+import {
+  defineTool,
+  type ExtensionContext,
+  getAgentDir,
+  type Theme as PiTheme,
+} from "@earendil-works/pi-coding-agent";
+import { type Component, Container, Text, truncateToWidth } from "@earendil-works/pi-tui";
 import { Type } from "@sinclair/typebox";
-import { errorMessage } from "../../src/core/index.ts";
-import { hasAgentBadge, renderAgentName } from "./agent-color.ts";
+import {
+  bulletState,
+  type BulletState,
+  createResultLine,
+  errorMessage,
+} from "../../src/core/index.ts";
+import { renderAgentName } from "./agent-color.ts";
 import { isTopLevelAgent } from "./agent-manager.ts";
 import { getDefaultMaxTurns, normalizeMaxTurns, SUBAGENT_TOOL_NAMES } from "./agent-runner.ts";
 import {
@@ -55,7 +65,6 @@ import {
   formatTurns,
   getDisplayName,
   SPINNER,
-  type Theme,
   type UICtx,
 } from "./ui/agent-widget.ts";
 import { getLifetimeCost, getLifetimeTotal, type LifetimeUsage } from "./usage.ts";
@@ -135,14 +144,58 @@ export function renderRunningAgentStatus(
   frame: string,
   statsText: string,
   activity: string,
-  theme: Pick<Theme, "fg">,
+  theme: PiTheme,
 ): Container {
   const container = new Container();
   container.addChild(
     new Text(theme.fg("accent", frame) + (statsText ? " " + statsText : ""), 0, 0),
   );
-  container.addChild(new Text(theme.fg("dim", `  ⎿  ${activity}`), 0, 0));
+  container.addChild(createResultLine(activity, theme));
   return container;
+}
+
+/**
+ * `⏺ <name>(desc)` header for the Agent tool call line. Not `createToolHeader`:
+ * that bolds and width-fits `name` as plain text, which corrupts a badged
+ * agent name (already-styled ANSI, e.g. from `renderAgentName`) — both by
+ * double-bolding over its own color codes and by measuring/clipping raw
+ * string length instead of visible width. This mirrors its one-line, clip-
+ * don't-wrap contract via `truncateToWidth`, which is ANSI-aware, instead.
+ */
+class AgentCallHeader implements Component {
+  #state: BulletState = "pending";
+  #name = "";
+  #desc = "";
+  #theme: PiTheme | undefined;
+
+  update(state: BulletState, name: string, desc: string, theme: PiTheme): void {
+    this.#state = state;
+    this.#name = name;
+    this.#desc = desc;
+    this.#theme = theme;
+  }
+
+  invalidate(): void {}
+
+  render(width: number): string[] {
+    if (!this.#theme) return [""];
+    const bulletColor =
+      this.#state === "success" ? "success" : this.#state === "error" ? "error" : "muted";
+    const line = `${this.#theme.fg(bulletColor, "⏺ ")}${this.#name}(${this.#theme.fg("muted", this.#desc)})`;
+    return [truncateToWidth(line, width)];
+  }
+}
+
+function createAgentCallHeader(
+  state: BulletState,
+  name: string,
+  desc: string,
+  theme: PiTheme,
+  reuse?: Component,
+): Component {
+  const header = reuse instanceof AgentCallHeader ? reuse : new AgentCallHeader();
+  header.update(state, name, desc, theme);
+  return header;
 }
 
 /**
@@ -904,6 +957,12 @@ Terse command-style prompts produce shallow, generic work.
   const agentTool = defineTool({
     name: SUBAGENT_TOOL_NAMES.AGENT,
     label: "Agent",
+    // Unset defaults to "default": pi wraps the whole tool in a Box(1,1)
+    // painted with the tool*Bg tokens regardless of custom renderCall/
+    // renderResult (ToolExecutionComponent.getRenderShell()). With the jpi
+    // theme those tokens are "", so the tint is invisible, but the Box still
+    // pads a blank line above/below and indents the content — this opts out.
+    renderShell: "self",
     description: agentToolDescription,
     promptSnippet: "Launch autonomous sub-agents for complex multi-step tasks",
     promptGuidelines: [
@@ -975,30 +1034,12 @@ Terse command-style prompts produce shallow, generic work.
     // ---- Custom rendering: Claude Code style ----
 
     renderCall(args, theme, context) {
-      // A badge closes its own background, which would clear the tool block's row tint
-      // for the rest of the line, so the badge restores it. The tint is opened here too:
-      // the TUI's Box paints it, but HTML export takes it from CSS, and restoring a
-      // background the line never opened is what banded the export before. The line is
-      // deliberately left open — Box.applyBackgroundToLine pads to width and *then*
-      // wraps, so closing here would leave that padding untinted, and HTML export closes
-      // any open span per line anyway. No badge means no tint, so an uncolored agent
-      // renders exactly the line it always did.
-      const rowBackground = hasAgentBadge(args.subagent_type)
-        ? theme.getBgAnsi(
-            context.isPartial ? "toolPendingBg" : context.isError ? "toolErrorBg" : "toolSuccessBg",
-          )
-        : "";
-      const desc = args.description ?? "";
       const name = renderAgentName(args.subagent_type, theme, {
         fallbackColor: "toolTitle",
-        restoreBackground: rowBackground,
         bold: true,
       });
-      return new Text(
-        rowBackground + "▸ " + name + (desc ? "  " + theme.fg("muted", desc) : ""),
-        0,
-        0,
-      );
+      const desc = args.description ?? "";
+      return createAgentCallHeader(bulletState(context), name, desc, theme, context.lastComponent);
     },
 
     renderResult(result, { expanded, isPartial }, theme, renderContext) {
@@ -1039,11 +1080,7 @@ Terse command-style prompts produce shallow, generic work.
 
       // ---- Background agent launched ----
       if (details.status === "background") {
-        return new Text(
-          theme.fg("dim", `  ⎿  Running in background (ID: ${details.agentId})`),
-          0,
-          0,
-        );
+        return createResultLine(`Running in background (ID: ${details.agentId})`, theme);
       }
 
       // ---- Completed / Steered ----
@@ -1052,35 +1089,39 @@ Terse command-style prompts produce shallow, generic work.
         const isSteered = details.status === "steered";
         const icon = isSteered ? theme.fg("warning", "✓") : theme.fg("success", "✓");
         const s = stats(details);
-        let line = icon + (s ? " " + s : "");
-        line += " " + theme.fg("dim", "·") + " " + theme.fg("dim", duration);
+        let statusLine = icon + (s ? " " + s : "");
+        statusLine += " " + theme.fg("dim", "·") + " " + theme.fg("dim", duration);
+
+        const container = new Container();
+        container.addChild(new Text(statusLine, 0, 0));
 
         if (expanded) {
           const resultText = result.content[0]?.type === "text" ? result.content[0].text : "";
           if (resultText) {
             const lines = resultText.split("\n").slice(0, 50);
-            for (const l of lines) {
-              line += "\n" + theme.fg("dim", `  ${l}`);
-            }
+            const detailLines = lines.map((l) => theme.fg("dim", `  ${l}`));
             if (resultText.split("\n").length > 50) {
-              line +=
-                "\n" +
-                theme.fg("muted", "  ... (use get_subagent_result with verbose for full output)");
+              detailLines.push(
+                theme.fg("muted", "  ... (use get_subagent_result with verbose for full output)"),
+              );
             }
+            container.addChild(new Text(detailLines.join("\n"), 0, 0));
           }
         } else {
           const doneText = isSteered ? "Wrapped up (turn limit)" : "Done";
-          line += "\n" + theme.fg("dim", `  ⎿  ${doneText}`);
+          container.addChild(createResultLine(doneText, theme));
         }
-        return new Text(line, 0, 0);
+        return container;
       }
 
       // ---- Stopped (user-initiated abort) ----
       if (details.status === "stopped") {
         const s = stats(details);
-        let line = theme.fg("dim", "■") + (s ? " " + s : "");
-        line += "\n" + theme.fg("dim", "  ⎿  Stopped");
-        return new Text(line, 0, 0);
+        const statusLine = theme.fg("dim", "■") + (s ? " " + s : "");
+        const container = new Container();
+        container.addChild(new Text(statusLine, 0, 0));
+        container.addChild(createResultLine("Stopped", theme));
+        return container;
       }
 
       // Anything left ("queued", or a status added later) has no rendering of
@@ -1091,15 +1132,19 @@ Terse command-style prompts produce shallow, generic work.
 
       // ---- Error / Aborted (hard max_turns) ----
       const s = stats(details);
-      let line = theme.fg("error", "✗") + (s ? " " + s : "");
+      const statusLine = theme.fg("error", "✗") + (s ? " " + s : "");
+      const container = new Container();
+      container.addChild(new Text(statusLine, 0, 0));
 
       if (details.status === "error") {
-        line += "\n" + theme.fg("error", `  ⎿  Error: ${details.error ?? "unknown"}`);
+        container.addChild(
+          createResultLine(`Error: ${details.error ?? "unknown"}`, theme, "error"),
+        );
       } else {
-        line += "\n" + theme.fg("warning", "  ⎿  Aborted (max turns exceeded)");
+        container.addChild(createResultLine("Aborted (max turns exceeded)", theme, "warning"));
       }
 
-      return new Text(line, 0, 0);
+      return container;
     },
 
     // ---- Execute ----
