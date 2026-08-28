@@ -32,7 +32,7 @@
     "muted": "inactive",
     "dim": "subtle",
     "text": "text",
-    "thinkingText": "spinnerBlue",
+    "thinkingText": "promptBorder",
 
     "selectedBg": "selectionBg",
     "userMessageBg": "userMsgBg",
