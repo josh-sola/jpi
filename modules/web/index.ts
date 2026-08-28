@@ -2,10 +2,11 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 import { createWebFetchTool, type WebFetchToolOptions } from "./fetch.ts";
 import { createKetchRunner, type KetchRunner } from "./ketch.ts";
-import { createWebSearchTool } from "./search.ts";
+import { createWebSearchTool, DEFAULT_WEB_SEARCH_BACKEND } from "./search.ts";
 
 export type WebExtensionOptions = {
   runner?: KetchRunner;
+  backend?: string;
 } & Partial<Pick<WebFetchToolOptions, "createSessionId" | "now">>;
 
 export function registerWebTools(pi: ExtensionAPI, options: WebExtensionOptions = {}) {
@@ -15,7 +16,7 @@ export function registerWebTools(pi: ExtensionAPI, options: WebExtensionOptions 
       exec: (command, args, execOptions) => pi.exec(command, args, execOptions),
     });
 
-  pi.registerTool(createWebSearchTool(runner));
+  pi.registerTool(createWebSearchTool(runner, options.backend ?? DEFAULT_WEB_SEARCH_BACKEND));
   pi.registerTool(
     createWebFetchTool({
       runner,

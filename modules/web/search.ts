@@ -20,6 +20,7 @@ function firstNonEmptyLine(text: string): string | undefined {
 }
 
 const WEB_SEARCH_TIMEOUT_MS = 30_000;
+export const DEFAULT_WEB_SEARCH_BACKEND = "ddg";
 const MAX_SEARCH_URL_CHARS = 8_192;
 const MAX_SEARCH_TITLE_CHARS = 500;
 const MAX_SEARCH_DESCRIPTION_CHARS = 1_000;
@@ -93,10 +94,11 @@ function formatSearchResults(results: WebSearchResult[]): string {
 export async function executeWebSearch(
   input: WebSearchInput,
   runner: KetchRunner,
+  backend: string,
   signal?: AbortSignal,
 ): Promise<AgentToolResult<WebSearchDetails>> {
   const rawResults = await runner.runJson(
-    ["search", "--backend", "ddg", "--limit", "5", "--json", "--", input.query],
+    ["search", "--backend", backend, "--limit", "5", "--json", "--", input.query],
     { timeoutMs: WEB_SEARCH_TIMEOUT_MS, signal },
   );
 
@@ -125,19 +127,20 @@ export async function executeWebSearch(
 
 export function createWebSearchTool(
   runner: KetchRunner,
+  backend: string,
 ): ToolDefinition<WebSearchParameters, WebSearchDetails> {
   return {
     name: "web_search",
     label: "Web Search",
-    description: "Search DuckDuckGo with ketch and return up to five compact web results.",
-    promptSnippet: "Search DuckDuckGo for web pages when you do not know the exact URL",
+    description: "Search the web with ketch and return up to five compact web results.",
+    promptSnippet: "Search the web for pages when you do not know the exact URL",
     promptGuidelines: [
       "Use web_search when current or external information is needed and you do not know the URL.",
       "Use web_fetch on a web_search result when page content is needed to answer the user.",
     ],
     parameters: webSearchParameters,
     async execute(_toolCallId: string, params: WebSearchInput, signal?: AbortSignal) {
-      return executeWebSearch(params, runner, signal);
+      return executeWebSearch(params, runner, backend, signal);
     },
     renderShell: "self",
     renderCall(args, theme, context) {

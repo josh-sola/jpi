@@ -163,4 +163,5 @@ title {
 // web_search and web_fetch, backed by the ketch CLI
 web {
   enabled #true
+  backend "ddg"
 }

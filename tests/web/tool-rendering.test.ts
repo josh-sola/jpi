@@ -108,13 +108,13 @@ function context(overrides: Record<string, unknown> = {}): any {
 // --- web_search ---
 
 test("web_search renders a ⏺ WebSearch(<query>) header", () => {
-  const tool = createWebSearchTool({ runJson: async () => [] });
+  const tool = createWebSearchTool({ runJson: async () => [] }, "ddg");
   const header = tool.renderCall!({ query: "weather in nyc" }, testTheme(), context());
   assert.deepEqual(plainLines(header), ["⏺ WebSearch(weather in nyc)"]);
 });
 
 test("web_search summarizes the collapsed result as a result count", () => {
-  const tool = createWebSearchTool({ runJson: async () => [] });
+  const tool = createWebSearchTool({ runJson: async () => [] }, "ddg");
   const details: WebSearchDetails = {
     query: "weather",
     results: [
@@ -138,7 +138,7 @@ test("web_search summarizes the collapsed result as a result count", () => {
 });
 
 test("web_search shows the first error line on the ⎿ line when the result is an error", () => {
-  const tool = createWebSearchTool({ runJson: async () => [] });
+  const tool = createWebSearchTool({ runJson: async () => [] }, "ddg");
   const result = { content: [{ type: "text", text: "Ketch returned malformed search output." }] };
   const rendered = tool.renderResult!(
     result as any,
@@ -150,7 +150,7 @@ test("web_search shows the first error line on the ⎿ line when the result is a
 });
 
 test("a reviewed web_search result renders the ⛨ reviewed annotation as its last line", () => {
-  const tool = decorated(createWebSearchTool({ runJson: async () => [] }));
+  const tool = decorated(createWebSearchTool({ runJson: async () => [] }, "ddg"));
   recordReviewAnnotation("call-reviewed-search", { durationMs: 600 });
   const details: WebSearchDetails = { query: "weather", results: [] };
   const result = { content: [{ type: "text", text: "No web results found." }], details };
