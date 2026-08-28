@@ -47,7 +47,7 @@ import {
   formatStatuses,
   renderFooter,
   type WidthHelpers,
-} from "../../modules/status/render.ts";
+} from "../../modules/status/ui/render.ts";
 import { FooterStats } from "../../modules/status/stats.ts";
 
 /** Builds the same Config the loader would, for tests that exercise config loading directly. */

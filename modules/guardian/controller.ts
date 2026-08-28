@@ -378,32 +378,31 @@ export class AutoReviewController {
   async handleCommand(rawArgs: string, ctx: ReviewCommandContext): Promise<void> {
     const command = rawArgs.trim().toLowerCase() || "status";
 
-    if (command === "status") {
-      await this.notifyStatus(ctx);
+    // Every recognized subcommand mutates (or doesn't) then reports the
+    // resulting status the same way; only the mutation differs per command.
+    const mutations: Record<string, () => void | Promise<void>> = {
+      status: () => {},
+      on: () => {
+        this.sessionEnabledOverride = true;
+        this.resetBreakers();
+      },
+      off: () => {
+        this.sessionEnabledOverride = false;
+        this.resetBreakers();
+      },
+      reload: async () => {
+        await this.reloadConfig();
+      },
+    };
+
+    const mutate = mutations[command];
+    if (!mutate) {
+      ctx.ui.notify(`Usage: /${COMMAND_NAME} [status|on|off|reload]`, "warning");
       return;
     }
 
-    if (command === "on") {
-      this.sessionEnabledOverride = true;
-      this.resetBreakers();
-      await this.notifyStatus(ctx);
-      return;
-    }
-
-    if (command === "off") {
-      this.sessionEnabledOverride = false;
-      this.resetBreakers();
-      await this.notifyStatus(ctx);
-      return;
-    }
-
-    if (command === "reload") {
-      await this.reloadConfig();
-      await this.notifyStatus(ctx);
-      return;
-    }
-
-    ctx.ui.notify(`Usage: /${COMMAND_NAME} [status|on|off|reload]`, "warning");
+    await mutate();
+    await this.notifyStatus(ctx);
   }
 
   rememberUsage(toolCallId: string, usage: Usage | undefined): void {
