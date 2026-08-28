@@ -20,7 +20,7 @@ import { isAbsolute } from "node:path";
 import type { Model } from "@earendil-works/pi-ai";
 import type { AgentSession, ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { errorMessage } from "../../src/core/index.ts";
-import { abortable } from "./abortable.ts";
+import { abortable, queuePendingSteer } from "./abortable.ts";
 import { resumeAgent, runAgent, type ToolActivity } from "./agent-runner.ts";
 import { assignHandle, handleBase } from "./mention.ts";
 import { describeModel } from "./model-resolver.ts";
@@ -1463,8 +1463,7 @@ export class AgentManager {
     if (record.session) {
       record.session.steer(message).catch(() => {});
     } else {
-      if (!record.pendingSteers) record.pendingSteers = [];
-      record.pendingSteers.push(message);
+      queuePendingSteer(record, message);
     }
     return true;
   }
