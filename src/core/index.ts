@@ -21,6 +21,7 @@ export {
   TASKS_SCHEMA,
 } from "./bus-contracts.ts";
 export { Config, type ConfigLoadResult, type ConfigSaveResult } from "./config.ts";
+export { writeJsonAtomic } from "./durable-write.ts";
 export { type DurationParts, splitDuration, truncateEnd, truncateMiddle } from "./format.ts";
 export { memoriesRoot } from "./memories-dir.ts";
 export { injectEnabled, type JpiModule, type ModuleContext, type WithEnabled } from "./module.ts";
