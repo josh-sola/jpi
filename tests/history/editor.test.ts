@@ -3,6 +3,7 @@ import { test } from "vite-plus/test";
 
 import type { KeybindingsManager } from "@earendil-works/pi-coding-agent";
 import type { EditorTheme, TUI } from "@earendil-works/pi-tui";
+import { visibleWidth } from "@earendil-works/pi-tui";
 
 import { HistoryEditor, spliceGhostText } from "../../modules/history/editor.ts";
 
@@ -23,6 +24,53 @@ function historyOf(editor: HistoryEditor): string[] {
 
 function ghostOf(editor: HistoryEditor): string | undefined {
   return (editor as unknown as { ghost: string | undefined }).ghost;
+}
+
+function undo(editor: HistoryEditor): void {
+  (editor as unknown as { undo: () => void }).undo();
+}
+
+const EDITOR_RECT = { x: 0, y: 0, width: 20, height: 5 };
+
+interface FakeMouseTui {
+  tui: TUI;
+  raw: {
+    terminal: { rows: number };
+    requestRender: () => void;
+    hasOverlay: () => boolean;
+    handleViewportInput: (data: string) => unknown;
+    currentLayout: unknown;
+  };
+}
+
+/** A tui with every surface installMouseSupport feature-detects, so mouse:true actually installs. */
+function newMouseCapableTui(): FakeMouseTui {
+  const raw = {
+    terminal: { rows: 40 },
+    requestRender: () => {},
+    hasOverlay: () => false,
+    handleViewportInput: (_data: string) => undefined,
+    currentLayout: undefined as unknown,
+  };
+  return { tui: raw as unknown as TUI, raw };
+}
+
+function mountEditorBox(fake: FakeMouseTui, editor: HistoryEditor): void {
+  fake.raw.currentLayout = {
+    root: { component: editor, rect: EDITOR_RECT, clip: EDITOR_RECT, children: [] },
+  };
+}
+
+function press(col: number, row: number): string {
+  return `\x1b[<0;${col + 1};${row + 1}M`;
+}
+
+function drag(col: number, row: number): string {
+  return `\x1b[<32;${col + 1};${row + 1}M`;
+}
+
+function release(col: number, row: number): string {
+  return `\x1b[<0;${col + 1};${row + 1}m`;
 }
 
 test("seedHistory seeds oldest first, then replays pre-seed submissions so they stay newest", () => {
@@ -174,4 +222,109 @@ test("spliceGhostText falls back to a line below the editor when no line carries
     "a line with no cursor marker on it",
     "  [dim]run the tests  (tab to accept)[/dim]",
   ]);
+});
+
+test("mouse:false never installs, even against a fully mouse-capable tui", () => {
+  const fake = newMouseCapableTui();
+  const original = fake.raw.handleViewportInput;
+  const theme = { borderColor: (text: string) => text } as unknown as EditorTheme;
+  const keybindings = { matches: () => false } as unknown as KeybindingsManager;
+
+  new HistoryEditor(fake.tui, theme, keybindings, { mouse: false });
+
+  assert.equal(fake.raw.handleViewportInput, original);
+});
+
+test("mouse:true installs nothing on a feature-detect miss (no currentLayout)", () => {
+  const raw = {
+    terminal: { rows: 40 },
+    requestRender: () => {},
+    hasOverlay: () => false,
+    handleViewportInput: (_data: string) => undefined,
+  };
+  const original = raw.handleViewportInput;
+  const tui = raw as unknown as TUI;
+  const theme = { borderColor: (text: string) => text } as unknown as EditorTheme;
+  const keybindings = { matches: () => false } as unknown as KeybindingsManager;
+
+  new HistoryEditor(tui, theme, keybindings, { mouse: true });
+
+  assert.equal(raw.handleViewportInput, original);
+});
+
+test("a click inside the editor's rendered box moves the cursor", () => {
+  const fake = newMouseCapableTui();
+  const theme = { borderColor: (text: string) => text } as unknown as EditorTheme;
+  const keybindings = { matches: () => false } as unknown as KeybindingsManager;
+  const editor = new HistoryEditor(fake.tui, theme, keybindings, { mouse: true });
+  for (const char of "hello world") editor.handleInput(char);
+  mountEditorBox(fake, editor);
+
+  fake.raw.handleViewportInput(press(3, 1));
+
+  assert.deepEqual(editor.getCursor(), { line: 0, col: 3 });
+});
+
+test("backspace with an active selection deletes the range as one undo step and lands the cursor at the start", () => {
+  const fake = newMouseCapableTui();
+  const theme = { borderColor: (text: string) => text } as unknown as EditorTheme;
+  const BACKSPACE = "<backspace>";
+  const keybindings = {
+    matches: (data: string, action: string) =>
+      action === "tui.editor.deleteCharBackward" && data === BACKSPACE,
+  } as unknown as KeybindingsManager;
+  const editor = new HistoryEditor(fake.tui, theme, keybindings, { mouse: true });
+  for (const char of "hello world") editor.handleInput(char);
+  mountEditorBox(fake, editor);
+
+  fake.raw.handleViewportInput(press(0, 1));
+  fake.raw.handleViewportInput(drag(6, 1));
+  fake.raw.handleViewportInput(release(6, 1));
+
+  editor.handleInput(BACKSPACE);
+
+  assert.equal(editor.getText(), "world");
+  assert.deepEqual(editor.getCursor(), { line: 0, col: 0 });
+
+  undo(editor);
+
+  assert.equal(editor.getText(), "hello world");
+});
+
+test("typing after a drag clears the selection instead of deleting it", () => {
+  const fake = newMouseCapableTui();
+  const theme = { borderColor: (text: string) => text } as unknown as EditorTheme;
+  const keybindings = { matches: () => false } as unknown as KeybindingsManager;
+  const editor = new HistoryEditor(fake.tui, theme, keybindings, { mouse: true });
+  for (const char of "hello world") editor.handleInput(char);
+  mountEditorBox(fake, editor);
+
+  fake.raw.handleViewportInput(press(0, 1));
+  fake.raw.handleViewportInput(drag(6, 1));
+  fake.raw.handleViewportInput(release(6, 1));
+
+  editor.handleInput("x");
+
+  assert.equal(editor.getText(), "hello xworld");
+});
+
+test("render highlights an active selection in inverse video without changing row width", () => {
+  const fake = newMouseCapableTui();
+  const theme = { borderColor: (text: string) => text } as unknown as EditorTheme;
+  const keybindings = { matches: () => false } as unknown as KeybindingsManager;
+  const editor = new HistoryEditor(fake.tui, theme, keybindings, { mouse: true });
+  editor.focused = true;
+  for (const char of "hello world") editor.handleInput(char);
+  mountEditorBox(fake, editor);
+
+  const before = editor.render(20);
+
+  fake.raw.handleViewportInput(press(0, 1));
+  fake.raw.handleViewportInput(drag(6, 1));
+  fake.raw.handleViewportInput(release(6, 1));
+
+  const after = editor.render(20);
+
+  assert.equal(visibleWidth(after[1]!), visibleWidth(before[1]!));
+  assert.ok(after[1]!.includes("\x1b[7mhello \x1b[0m"));
 });

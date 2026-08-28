@@ -78,7 +78,7 @@ export function registerHistory(pi: ExtensionAPI, ctx: ModuleContext<typeof hist
     const dim = (text: string) => sessionCtx.ui.theme.fg("dim", text);
 
     sessionCtx.ui.setEditorComponent((tui, theme, keybindings) => {
-      const instance = new HistoryEditor(tui, theme, keybindings);
+      const instance = new HistoryEditor(tui, theme, keybindings, { mouse: value.mouse });
       if (suggestState) instance.dim = dim;
       instance.onHistorySearch = () => {
         void openPicker(sessionCtx).catch(() => {});

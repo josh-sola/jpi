@@ -51,3 +51,22 @@ test("history config falls back to the default for a nonsense max-size", async (
     assert.equal(value.maxSize, 1000);
   }
 });
+
+test("history config defaults mouse to true when the section is absent", async (t) => {
+  const config = makeConfig(await tempEnv(t));
+
+  const { value, issues } = await config.load();
+
+  assert.deepEqual(issues, []);
+  assert.equal(value.mouse, true);
+});
+
+test("history config honors mouse #false", async (t) => {
+  const config = makeConfig(await tempEnv(t));
+  await writeFile(config.path, ["history {", "  mouse #false", "}"].join("\n"), "utf8");
+
+  const { value, issues } = await config.load();
+
+  assert.deepEqual(issues, []);
+  assert.equal(value.mouse, false);
+});
