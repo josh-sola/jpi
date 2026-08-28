@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Store } from "../../src/core/index.ts";
-import { afterAll, test } from "vite-plus/test";
+import { afterAll, test, vi } from "vite-plus/test";
 
 import {
   createBgCommand,
@@ -209,6 +209,35 @@ test("OutputBuffer: an empty buffer reports no lines", () => {
   assert.deepEqual(new OutputBuffer().getLines(), []);
 });
 
+test("OutputBuffer: getVersion bumps on seed and append, so a caller's cache never goes stale", () => {
+  const buffer = new OutputBuffer();
+  const v0 = buffer.getVersion();
+
+  buffer.seed("first\n");
+  const v1 = buffer.getVersion();
+  assert.notEqual(v1, v0);
+
+  buffer.append("more\n", "stdout");
+  const v2 = buffer.getVersion();
+  assert.notEqual(v2, v1);
+
+  // A partial chunk with no newline still changes getLines()'s pending tail.
+  buffer.append("partial", "stdout");
+  const v3 = buffer.getVersion();
+  assert.notEqual(v3, v2);
+});
+
+test("OutputBuffer: getVersion is unchanged by a no-op seed or append", () => {
+  const buffer = new OutputBuffer();
+  buffer.seed("first\n");
+  const before = buffer.getVersion();
+
+  buffer.seed(""); // seed only ever runs once in practice, but a no-op call must not fake a change
+  buffer.append("", "stdout");
+
+  assert.equal(buffer.getVersion(), before);
+});
+
 test("OutputBuffer: trims old lines once the buffer grows well past MAX_BUFFER_LINES, keeping the most recent", () => {
   const buffer = new OutputBuffer();
   // Trimming batches (a fixed margin past the cap) rather than shifting on
@@ -309,4 +338,78 @@ test("createBgCommand: an unambiguous id prefix opens the view directly, skippin
   await command.handler(task.id.slice(0, 4), ctx as never);
 
   assert.equal(customCalls.length, 1);
+});
+
+// -- LogViewer.buildBodyLines caching ----------------------------------------
+
+/**
+ * Opens a real `LogViewer` the way `/bg` does — `LogViewer` itself isn't
+ * exported, so this drives it through `createBgCommand`'s `ctx.ui.custom`
+ * factory instead of constructing one directly.
+ */
+async function makeLogViewer(t: {
+  onTestFinished: (fn: () => Promise<void> | void) => void;
+}): Promise<any> {
+  const deps = makeDeps();
+  const command = createBgCommand(deps);
+  const cwd = await withTempCwd(t);
+  const task = await deps.registry.start({ cwd, sessionId: "s1" }, "exit 0");
+  await waitForStatus(deps.registry, task.id);
+
+  let factory: ((...args: unknown[]) => unknown) | undefined;
+  const ctx = {
+    hasUI: true,
+    mode: "tui",
+    ui: {
+      notify: () => undefined,
+      select: async (_title: string, options: string[]) => options[0],
+      custom: async (f: unknown) => {
+        factory = f as (...args: unknown[]) => unknown;
+        return undefined;
+      },
+    },
+  };
+  await command.handler(task.id, ctx as never);
+  if (!factory) throw new Error("createBgCommand did not open a log view");
+
+  const tui = { terminal: { rows: 30, columns: 80 }, requestRender: () => undefined };
+  const theme = { fg: (_c: string, text: string) => text, bold: (text: string) => text };
+  const keybindings = { matches: () => false };
+  return factory(tui, theme, keybindings, () => undefined);
+}
+
+test("LogViewer.buildBodyLines: unchanged width and buffer reuse the cached body", async (t) => {
+  const viewer = await makeLogViewer(t);
+  const getLinesSpy = vi.spyOn(OutputBuffer.prototype, "getLines");
+
+  viewer.buildBodyLines(80);
+  assert.equal(getLinesSpy.mock.calls.length, 1);
+
+  viewer.buildBodyLines(80);
+  assert.equal(getLinesSpy.mock.calls.length, 1); // cache hit, no re-wrap
+
+  getLinesSpy.mockRestore();
+});
+
+test("LogViewer.buildBodyLines: a width change invalidates the cache", async (t) => {
+  const viewer = await makeLogViewer(t);
+  const getLinesSpy = vi.spyOn(OutputBuffer.prototype, "getLines");
+
+  viewer.buildBodyLines(80);
+  viewer.buildBodyLines(60);
+
+  assert.equal(getLinesSpy.mock.calls.length, 2);
+  getLinesSpy.mockRestore();
+});
+
+test("LogViewer.buildBodyLines: new output invalidates the cache", async (t) => {
+  const viewer = await makeLogViewer(t);
+  const getLinesSpy = vi.spyOn(OutputBuffer.prototype, "getLines");
+
+  viewer.buildBodyLines(80);
+  viewer.buffer.append("more output\n", "stdout");
+  viewer.buildBodyLines(80);
+
+  assert.equal(getLinesSpy.mock.calls.length, 2);
+  getLinesSpy.mockRestore();
 });

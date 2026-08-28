@@ -1174,4 +1174,126 @@ describe("ConversationViewer", () => {
       }
     });
   });
+
+  describe("buildContentLines caching", () => {
+    function userMessages(n: number) {
+      return Array.from({ length: n }, (_, i) => ({ role: "user", content: `message ${i}` }));
+    }
+
+    describe("literal ('off') path: settled-prefix cache", () => {
+      // Every message but the current last one is cached; only a message
+      // count change (a new message arrives) should force a full rebuild.
+      function offViewer(messages: any[]) {
+        return new ConversationViewer(
+          mockTui(40, 80),
+          mockSession(messages),
+          mockRecord({ status: "completed" }),
+          undefined,
+          ansiTheme(),
+          vi.fn(),
+          undefined,
+          undefined,
+          undefined,
+          false,
+          () => "off",
+        );
+      }
+
+      it("unchanged width and message count reuse the cached prefix, rebuilding only the tail", () => {
+        const viewer = offViewer(userMessages(5));
+        const spy = vi.spyOn(viewer as any, "appendRawMessage");
+
+        (viewer as any).buildContentLines(80);
+        spy.mockClear();
+        (viewer as any).buildContentLines(80);
+
+        expect(spy.mock.calls.length).toBe(1); // only the last message is rebuilt
+        spy.mockRestore();
+      });
+
+      it("a width change invalidates the cached prefix", () => {
+        const viewer = offViewer(userMessages(5));
+        const spy = vi.spyOn(viewer as any, "appendRawMessage");
+
+        (viewer as any).buildContentLines(80);
+        spy.mockClear();
+        (viewer as any).buildContentLines(60);
+
+        expect(spy.mock.calls.length).toBe(5); // full rebuild: 4-message prefix + tail
+        spy.mockRestore();
+      });
+
+      it("a new message invalidates the cached prefix", () => {
+        const messages = userMessages(5);
+        const viewer = offViewer(messages);
+        const spy = vi.spyOn(viewer as any, "appendRawMessage");
+
+        (viewer as any).buildContentLines(80);
+        messages.push({ role: "user", content: "message 5" });
+        spy.mockClear();
+        (viewer as any).buildContentLines(80);
+
+        expect(spy.mock.calls.length).toBe(6); // full rebuild over all 6 messages
+        spy.mockRestore();
+      });
+    });
+
+    describe("handleInput → render handoff", () => {
+      // A scroll key builds the transcript once (to size maxScroll); the
+      // render() call the TUI makes right after should reuse that build
+      // instead of doing it again.
+      function enrichedViewer() {
+        const messages = [
+          { role: "assistant", content: [{ type: "text", text: "hi" }] },
+          { role: "user", content: "there" },
+          { role: "assistant", content: [{ type: "text", text: "again" }] },
+        ];
+        const viewer = new ConversationViewer(
+          mockTui(40, 80),
+          mockSession(messages),
+          mockRecord({ status: "completed" }),
+          undefined,
+          ansiTheme(),
+          vi.fn(),
+        );
+        viewer.render(80); // establishes lastInnerW
+        return viewer;
+      }
+
+      it("a scroll key's build is reused by the render that immediately follows", () => {
+        const viewer = enrichedViewer();
+        const spy = vi.spyOn(viewer as any, "buildEnrichedLines");
+
+        viewer.handleInput("j");
+        expect(spy.mock.calls.length).toBe(1);
+        viewer.render(80);
+        expect(spy.mock.calls.length).toBe(1); // reused, not rebuilt
+
+        spy.mockRestore();
+      });
+
+      it("a render at a different width does not reuse a scroll key's build", () => {
+        const viewer = enrichedViewer();
+        const spy = vi.spyOn(viewer as any, "buildEnrichedLines");
+
+        viewer.handleInput("j");
+        expect(spy.mock.calls.length).toBe(1);
+        viewer.render(60);
+        expect(spy.mock.calls.length).toBe(2);
+
+        spy.mockRestore();
+      });
+
+      it("a render with no preceding scroll key always rebuilds", () => {
+        const viewer = enrichedViewer();
+        const spy = vi.spyOn(viewer as any, "buildEnrichedLines");
+
+        viewer.render(80);
+        viewer.render(80);
+
+        expect(spy.mock.calls.length).toBe(2); // no handleInput in between, no reuse
+        spy.mockRestore();
+      });
+    });
+  });
 });
