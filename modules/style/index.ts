@@ -41,12 +41,10 @@ import {
   displayPath,
   extractResultText,
   isWithinRoot,
-  markReviewAnnotationConsumer,
   memoriesRoot,
   plural,
   scratchpadRoot,
   truncateEnd,
-  withReviewAnnotation,
 } from "../../src/core/index.ts";
 
 // Local mirror of pi's ToolRenderContext: pi-coding-agent 0.84.3's root barrel
@@ -136,13 +134,8 @@ function makeResultRenderer(summarize: (text: string) => string) {
   ): Component {
     if (options.isPartial) return new Container();
     const text = extractResultText(result.content);
-    if (context.isError)
-      return withReviewAnnotation(renderErrorResult(text, options.expanded, theme), theme, context);
-    return withReviewAnnotation(
-      renderCollapsibleResult(summarize(text), text, options.expanded, theme),
-      theme,
-      context,
-    );
+    if (context.isError) return renderErrorResult(text, options.expanded, theme);
+    return renderCollapsibleResult(summarize(text), text, options.expanded, theme);
   };
 }
 
@@ -240,8 +233,6 @@ export interface StyleToolsOptions {
 }
 
 export function registerStyleTools(pi: ExtensionAPI, options: StyleToolsOptions = {}): void {
-  markReviewAnnotationConsumer(["read", "bash", "edit", "write", "grep", "find", "ls"]);
-
   const cwd = process.cwd();
   const memoriesRootDir = memoriesRoot(options.env, options.homeDirectory);
   const scratchpadRootDir = scratchpadRoot(options.scratchpadTempRoot);
@@ -262,12 +253,7 @@ export function registerStyleTools(pi: ExtensionAPI, options: StyleToolsOptions 
     renderResult(result, options, theme, context) {
       if (options.isPartial) return new Container();
       const text = extractResultText(result.content);
-      if (context.isError)
-        return withReviewAnnotation(
-          renderErrorResult(text, options.expanded, theme),
-          theme,
-          context,
-        );
+      if (context.isError) return renderErrorResult(text, options.expanded, theme);
 
       const rawPath = asString((context.args as { path?: unknown }).path);
       const n = countReadLines(text);
@@ -283,7 +269,7 @@ export function registerStyleTools(pi: ExtensionAPI, options: StyleToolsOptions 
         const notice = content === text ? "" : text.slice(content.length).replace(/^\n+/, "");
         if (notice) container.addChild(new Text(theme.fg("warning", notice), 0, 0));
       }
-      return withReviewAnnotation(container, theme, context);
+      return container;
     },
   });
 
@@ -318,12 +304,7 @@ export function registerStyleTools(pi: ExtensionAPI, options: StyleToolsOptions 
     renderResult(result, options, theme, context) {
       if (options.isPartial) return new Container();
       const text = extractResultText(result.content);
-      if (context.isError)
-        return withReviewAnnotation(
-          renderErrorResult(text, options.expanded, theme),
-          theme,
-          context,
-        );
+      if (context.isError) return renderErrorResult(text, options.expanded, theme);
 
       const rawPath = asString((context.args as { path?: unknown }).path);
       const diff = (result.details as EditToolDetails | undefined)?.diff;
@@ -331,7 +312,7 @@ export function registerStyleTools(pi: ExtensionAPI, options: StyleToolsOptions 
       const container = new Container();
       if (!diff) {
         container.addChild(createResultLine("Updated", theme, "dim"));
-        return withReviewAnnotation(container, theme, context);
+        return container;
       }
 
       const { additions, removals } = countDiffStats(diff);
@@ -347,7 +328,7 @@ export function registerStyleTools(pi: ExtensionAPI, options: StyleToolsOptions 
       if (showsInlineBody(diffLineCount, options.expanded)) {
         container.addChild(renderDiffBody(diff, rawPath));
       }
-      return withReviewAnnotation(container, theme, context);
+      return container;
     },
   });
 
@@ -367,12 +348,7 @@ export function registerStyleTools(pi: ExtensionAPI, options: StyleToolsOptions 
     renderResult(result, options, theme, context) {
       if (options.isPartial) return new Container();
       const text = extractResultText(result.content);
-      if (context.isError)
-        return withReviewAnnotation(
-          renderErrorResult(text, options.expanded, theme),
-          theme,
-          context,
-        );
+      if (context.isError) return renderErrorResult(text, options.expanded, theme);
 
       const writeArgs = context.args as { path?: unknown; content?: unknown };
       const rawPath = asString(writeArgs.path);
@@ -395,7 +371,7 @@ export function registerStyleTools(pi: ExtensionAPI, options: StyleToolsOptions 
       if (showsInlineBody(lines, options.expanded)) {
         container.addChild(renderContentBody(rawPath, content, 1));
       }
-      return withReviewAnnotation(container, theme, context);
+      return container;
     },
   });
 

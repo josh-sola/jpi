@@ -39,7 +39,6 @@ export {
   relativizePath,
   ToolHeader,
   ToolResultLine,
-  withReviewAnnotation,
   type BulletState,
 } from "./render.ts";
 export {
@@ -60,3 +59,4 @@ export {
   type StoreRemoveResult,
   type StoreTextReadResult,
 } from "./store.ts";
+export { decorateToolRegistration } from "./tool-registration.ts";

@@ -11,7 +11,7 @@ import { afterAll, test } from "vite-plus/test";
 import { Theme } from "@earendil-works/pi-coding-agent";
 import { stripTerminalSequences } from "@earendil-works/pi-tui";
 
-import { recordReviewAnnotation, Store } from "../../src/core/index.ts";
+import { decorateToolRegistration, recordReviewAnnotation, Store } from "../../src/core/index.ts";
 import { DetachRegistry } from "../../modules/background/detach.ts";
 import { MonitorManager } from "../../modules/background/monitor.ts";
 import { BackgroundTaskRegistry } from "../../modules/background/registry.ts";
@@ -125,13 +125,18 @@ function setUp() {
     sendNotification: () => undefined,
     logger: { error: () => undefined },
   });
-  const tools = new Map(createBackgroundTools({ registry, monitors }).map((t) => [t.name, t]));
-  const runTool = createRunTool({
-    registry,
-    detach: new DetachRegistry(),
-    defaultTimeoutSeconds: undefined,
-  });
-  return { tools, runTool };
+  const registered = new Map<string, any>();
+  const fakePi = { registerTool: (t: any) => registered.set(t.name, t) } as any;
+  const pi = decorateToolRegistration(fakePi);
+  for (const tool of createBackgroundTools({ registry, monitors })) pi.registerTool(tool);
+  pi.registerTool(
+    createRunTool({
+      registry,
+      detach: new DetachRegistry(),
+      defaultTimeoutSeconds: undefined,
+    }),
+  );
+  return { tools: registered, runTool: registered.get("run") };
 }
 
 test("bg_status renders a literal ⏺ Background(status) header", () => {

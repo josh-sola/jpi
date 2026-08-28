@@ -8,9 +8,17 @@ import { test } from "vite-plus/test";
 import { Theme } from "@earendil-works/pi-coding-agent";
 import { stripTerminalSequences } from "@earendil-works/pi-tui";
 
-import { recordReviewAnnotation } from "../../src/core/index.ts";
+import { decorateToolRegistration, recordReviewAnnotation } from "../../src/core/index.ts";
 import { createWebSearchTool, type WebSearchDetails } from "../../modules/web/search.ts";
 import { createWebFetchTool } from "../../modules/web/fetch.ts";
+
+/** Routes a tool definition through the real registerTool decorator, mirroring the loader. */
+function decorated(tool: any): any {
+  let registered: any;
+  const fakePi = { registerTool: (t: any) => (registered = t) } as any;
+  decorateToolRegistration(fakePi).registerTool(tool);
+  return registered;
+}
 
 const THEME_COLOR_NAMES = [
   "accent",
@@ -142,7 +150,7 @@ test("web_search shows the first error line on the ⎿ line when the result is a
 });
 
 test("a reviewed web_search result renders the ⛨ reviewed annotation as its last line", () => {
-  const tool = createWebSearchTool({ runJson: async () => [] });
+  const tool = decorated(createWebSearchTool({ runJson: async () => [] }));
   recordReviewAnnotation("call-reviewed-search", { durationMs: 600 });
   const details: WebSearchDetails = { query: "weather", results: [] };
   const result = { content: [{ type: "text", text: "No web results found." }], details };

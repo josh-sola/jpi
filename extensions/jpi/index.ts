@@ -3,6 +3,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Config } from "../../src/core/config.ts";
 import { errorMessage } from "../../src/core/errors.ts";
 import { injectEnabled, type JpiModule } from "../../src/core/module.ts";
+import { decorateToolRegistration } from "../../src/core/tool-registration.ts";
 import backgroundModule from "../../modules/background/module.ts";
 import guardianModule from "../../modules/guardian/module.ts";
 import historyModule from "../../modules/history/module.ts";
@@ -47,6 +48,7 @@ export async function loadModules(
 ): Promise<LoadModulesResult> {
   const issues: string[] = [];
   const failures: string[] = [];
+  const decoratedPi = decorateToolRegistration(pi);
 
   for (const mod of modules) {
     const config = new Config(mod.section, injectEnabled(mod.name, mod.schema));
@@ -56,7 +58,7 @@ export async function loadModules(
     if (!value.enabled) continue;
 
     try {
-      await mod.setup(pi, { config, value, issues: loadIssues });
+      await mod.setup(decoratedPi, { config, value, issues: loadIssues });
     } catch (error) {
       failures.push(`${mod.name}: ${errorMessage(error)}`);
     }

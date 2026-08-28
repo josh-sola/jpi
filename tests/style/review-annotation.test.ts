@@ -10,7 +10,7 @@ import { test } from "vite-plus/test";
 import { initTheme, Theme } from "@earendil-works/pi-coding-agent";
 import { stripTerminalSequences } from "@earendil-works/pi-tui";
 
-import { recordReviewAnnotation } from "../../src/core/index.ts";
+import { decorateToolRegistration, recordReviewAnnotation } from "../../src/core/index.ts";
 import { registerStyleTools } from "../../modules/style/index.ts";
 
 initTheme();
@@ -84,8 +84,8 @@ function plainLines(component: { render(width: number): string[] }, width = 120)
 
 function bootStyleTools(): Map<string, any> {
   const tools = new Map<string, any>();
-  const pi = { registerTool: (tool: any) => tools.set(tool.name, tool) } as any;
-  registerStyleTools(pi);
+  const fakePi = { registerTool: (tool: any) => tools.set(tool.name, tool) } as any;
+  registerStyleTools(decorateToolRegistration(fakePi));
   return tools;
 }
 

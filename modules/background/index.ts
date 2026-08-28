@@ -3,13 +3,7 @@ import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { isKeyRelease, matchesKey, type KeyId } from "@earendil-works/pi-tui";
 
-import {
-  getAgentDirectory,
-  markReviewAnnotationConsumer,
-  Store,
-  type Config,
-  type WithEnabled,
-} from "../../src/core/index.ts";
+import { getAgentDirectory, Store, type Config, type WithEnabled } from "../../src/core/index.ts";
 import { createBackgroundBus } from "./bus.ts";
 import { backgroundSchema } from "./config.ts";
 import { DetachRegistry } from "./detach.ts";
@@ -92,7 +86,6 @@ export function registerBackground(
   const detach = new DetachRegistry();
   let terminalInputUnsub: (() => void) | undefined;
 
-  markReviewAnnotationConsumer(["bg_status", "bg_logs", "bg_kill", "bg_monitor"]);
   for (const tool of createBackgroundTools({ registry, monitors })) pi.registerTool(tool);
   pi.registerCommand("bg", createBgCommand({ registry, monitors }));
 
@@ -112,7 +105,6 @@ export function registerBackground(
     chip.start(ctx);
 
     if (value.runEnabled) {
-      markReviewAnnotationConsumer(["run"]);
       pi.registerTool(
         createRunTool({
           registry,

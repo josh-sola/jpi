@@ -10,7 +10,6 @@ import {
   isRecord,
   plural,
   truncateEnd,
-  withReviewAnnotation,
 } from "../../src/core/index.ts";
 import type { KetchRunner } from "./ketch.ts";
 import { boundedText } from "./text.ts";
@@ -158,7 +157,7 @@ export function createWebSearchTool(
         const preview = truncateEnd(firstNonEmptyLine(text) ?? "Error", 100);
         container.addChild(createResultLine(preview, theme, "error"));
         if (options.expanded) container.addChild(new Text(theme.fg("error", text), 0, 0));
-        return withReviewAnnotation(container, theme, context);
+        return container;
       }
 
       const details = result.details as WebSearchDetails | undefined;
@@ -169,7 +168,7 @@ export function createWebSearchTool(
       if (options.expanded && text) {
         container.addChild(new Text(theme.fg("toolOutput", text), 0, 0));
       }
-      return withReviewAnnotation(container, theme, context);
+      return container;
     },
   };
 }

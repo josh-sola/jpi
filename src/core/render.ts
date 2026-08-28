@@ -10,13 +10,7 @@ import { homedir } from "node:os";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 
 import type { Theme, ThemeColor } from "@earendil-works/pi-coding-agent";
-import { Container, type Component, Text } from "@earendil-works/pi-tui";
-
-import {
-  formatReviewDuration,
-  getReviewAnnotation,
-  onReviewAnnotation,
-} from "./review-annotations.ts";
+import type { Component } from "@earendil-works/pi-tui";
 
 export type BulletState = "pending" | "running" | "success" | "error";
 
@@ -221,30 +215,4 @@ export function createResultLine(
   const line = reuse instanceof ToolResultLine ? reuse : new ToolResultLine();
   line.update(summary, theme, color);
   return line;
-}
-
-/**
- * Appends guardian's "⛨ reviewed · <duration>" line under a finished result
- * when that call was reviewed, aligned with the `⎿` line's two-space indent.
- * When the annotation hasn't landed yet, subscribes to repaint once it does.
- */
-export function withReviewAnnotation(
-  component: Component,
-  theme: Theme,
-  context: { toolCallId: string; invalidate(): void },
-): Component {
-  if (!(component instanceof Container)) return component;
-  const annotation = getReviewAnnotation(context.toolCallId);
-  if (annotation) {
-    component.addChild(
-      new Text(
-        `  ${theme.fg("dim", `⛨ reviewed · ${formatReviewDuration(annotation.durationMs)}`)}`,
-        0,
-        0,
-      ),
-    );
-  } else {
-    onReviewAnnotation(context.toolCallId, () => context.invalidate());
-  }
-  return component;
 }
