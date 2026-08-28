@@ -29,9 +29,10 @@ The script, in order:
 4. Installs the 5 packages listed in the table below via `pi install`.
    Re-running this step is safe: `pi install` updates an already-installed
    package rather than failing.
-5. Seeds `jpi.kdl`, `mcp.json`, and `JPI-SYSTEM.md` into the Pi agent
-   directory (`$PI_CODING_AGENT_DIR`, default `~/.pi/agent`) — but only for
-   files that do not already exist there.
+5. Seeds `jpi.kdl` and `mcp.json` into the Pi agent directory
+   (`$PI_CODING_AGENT_DIR`, default `~/.pi/agent`) — but only for files that
+   do not already exist there. (`JPI-SYSTEM.md` is not seeded here; the
+   prompt module creates it on first agent start.)
 6. Merges the UI and behavior defaults from `templates/settings-defaults.json`
    into `settings.json`, without touching any key already set there.
 7. Prints next steps for the human (see part 4 below).
@@ -49,7 +50,8 @@ After `setup.sh` finishes, confirm:
   `jpi-tasks`, `jpi-scratchpad`, `jpi-style`, `jpi-history`).
 - `$AGENT_DIR/jpi.kdl` exists.
 - `$AGENT_DIR/mcp.json` exists.
-- `$AGENT_DIR/JPI-SYSTEM.md` exists.
+- `$AGENT_DIR/JPI-SYSTEM.md` is NOT expected yet — the prompt module creates
+  it the first time a pi session starts.
 - `$AGENT_DIR/settings.json` has a `packages` array containing the 5
   package sources from the table below.
 
