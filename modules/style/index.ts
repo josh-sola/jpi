@@ -49,8 +49,9 @@ import {
 } from "../../src/core/index.ts";
 
 // Local mirror of pi's ToolRenderContext: pi-coding-agent 0.84.3's root barrel
-// does not re-export it. Delete once upstream exports it.
-interface ToolRenderContext<TState = any, TArgs = any> {
+// does not re-export it. Delete once upstream exports it. Exported so other
+// style modules (mcp-style.ts) that need the same shape don't redeclare it.
+export interface ToolRenderContext<TState = any, TArgs = any> {
   args: TArgs;
   toolCallId: string;
   invalidate: () => void;
@@ -82,7 +83,7 @@ import {
 const INLINE_BODY_LINE_LIMIT = 100;
 
 /** `  ⎿  summary`, plus the full output beneath it when expanded. */
-function renderCollapsibleResult(
+export function renderCollapsibleResult(
   summary: string,
   fullText: string,
   expanded: boolean,
@@ -106,7 +107,7 @@ function renderCollapsibleResult(
 }
 
 /** Error text stays visible even when the result is collapsed. */
-function renderErrorResult(text: string, expanded: boolean, theme: Theme): Component {
+export function renderErrorResult(text: string, expanded: boolean, theme: Theme): Component {
   const preview = truncateEnd(firstNonEmptyLine(text) ?? "Error", 100);
   const container = new Container();
   container.addChild(createResultLine(preview, theme, "error"));

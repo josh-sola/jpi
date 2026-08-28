@@ -62,4 +62,8 @@ export {
   type StoreRemoveResult,
   type StoreTextReadResult,
 } from "./store.ts";
-export { decorateToolRegistration } from "./tool-registration.ts";
+export {
+  decorateToolRegistration,
+  type RenderResult,
+  withReviewAnnotation,
+} from "./tool-registration.ts";

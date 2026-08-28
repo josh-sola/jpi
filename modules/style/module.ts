@@ -1,5 +1,6 @@
 import type { JpiModule } from "../../src/core/module.ts";
 import { registerStyleTools } from "./index.ts";
+import { patchMcpToolRendering } from "./mcp-style.ts";
 import { disableThinkingItalics } from "./thinking-style.ts";
 import { removeUserMessagePadding } from "./user-message-style.ts";
 
@@ -10,6 +11,7 @@ const styleModule: JpiModule = {
     registerStyleTools(pi);
     disableThinkingItalics();
     removeUserMessagePadding();
+    patchMcpToolRendering();
   },
 };
 
