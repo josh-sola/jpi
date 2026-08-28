@@ -65,7 +65,10 @@ export interface AgentConfig {
   promptMode: "replace" | "append";
   /** Default for spawn: fork parent conversation. undefined = caller decides. */
   inheritContext?: boolean | undefined;
-  /** Default for spawn: run in background. undefined = caller decides. */
+  /**
+   * Default for a NESTED spawn of this agent: run in background. undefined =
+   * caller decides. Ignored for a top-level spawn, which is always background.
+   */
   runInBackground?: boolean | undefined;
   /** Default for spawn: no extension tools. undefined = caller decides. */
   isolated?: boolean | undefined;
@@ -175,21 +178,12 @@ export interface AgentRecord {
   abortController?: AbortController;
   promise?: Promise<string>;
   /**
-   * A caller is awaiting this agent inline (`spawnAndWait`) — what
-   * `maxConcurrentForeground` bounds. Distinct from `isBackground === false`,
-   * which says only that the agent has an inline result surface: a detached
-   * cross-extension RPC spawn is foreground by that measure and yet blocks
-   * nobody, so it takes no slot.
+   * A caller is awaiting this agent inline (`spawnAndWait`). Distinct from
+   * `isBackground === false`, which says only that the agent has an inline
+   * result surface: a detached cross-extension RPC spawn is foreground by
+   * that measure and yet blocks nobody waiting on it.
    */
   blocking?: boolean | undefined;
-  /**
-   * Present only while the record is "queued": resolves when it leaves the
-   * queue, started or aborted. `spawnAndWait` waits on this because a queued
-   * record has no `promise` yet. Always resolves, never rejects — a rejection
-   * would escape into the caller's tool `execute` and take down pi's whole
-   * Promise.all tool batch.
-   */
-  startGate?: Promise<void> | undefined;
   groupId?: string;
   joinMode?: JoinMode;
   /** Set when result was already consumed via get_subagent_result — suppresses completion notification. */
@@ -213,13 +207,6 @@ export interface AgentRecord {
   sessionFile?: string | undefined;
   /** Cleanup function for the output file stream subscription. */
   outputCleanup?: (() => void) | undefined;
-  /**
-   * Removes whatever parent-abort-signal listener is currently wired to kill
-   * this agent on Esc. `detachBlocking` (ctrl+b) must call this before it lets
-   * the caller's wait end, or a later Esc would still kill an agent the user
-   * just moved to the background.
-   */
-  detachAbortListener?: (() => void) | undefined;
   /**
    * Lifetime usage breakdown, accumulated via `message_end` events. Survives
    * compaction. Total = input + output + cacheWrite (cacheRead deliberately

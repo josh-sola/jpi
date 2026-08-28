@@ -66,6 +66,9 @@ function session(provider: string, id: string, thinkingLevel: string, name?: str
   return {
     model: { provider, id, name: name ?? MODEL_NAMES[id] },
     thinkingLevel,
+    // A detached resume anchors its streaming past the turns already on disk —
+    // real AgentSession.messages is always an array, so the fake must have one too.
+    messages: [],
     dispose: vi.fn(),
   } as never;
 }
@@ -150,52 +153,17 @@ describe("Agent tool result — effective model", () => {
         prompt: "go",
         description: "d",
         subagent_type: "general-purpose",
-        run_in_background: false,
       },
       undefined,
       vi.fn(),
       ctx(),
     );
 
+    // The spawn is background, so the immediate result renders the "started in
+    // background" envelope, not the model stats — those show once the record
+    // settles. The snapshot itself still names the resolved model correctly,
+    // synchronously captured at spawn time from onSessionCreated.
     expect(result.details.modelName).toBe("opus 4.6");
-    expect(render(tool, result)).toContain("opus 4.6");
-    expect(render(tool, result, true)).toContain("opus 4.6");
-  });
-
-  it("names the inherited model while streaming, before a session exists", async () => {
-    // The streaming row renders from the pre-session snapshot, which the old
-    // "only when it differs from the parent" rule left empty for every agent
-    // that inherited — the level had nothing to attach itself to.
-    vi.mocked(runAgent).mockImplementation(async (_c: any, _t: any, _p: any, options: any) => {
-      options.onToolActivity?.({ type: "start", toolName: "Read" });
-      const s = session("anthropic", "claude-opus-4-6", "high");
-      options.onSessionCreated?.(s);
-      return { responseText: "done", session: s, aborted: false, steered: false } as never;
-    });
-    const tool = await agentTool();
-    const onUpdate = vi.fn();
-
-    await tool.execute(
-      "tc-1b",
-      {
-        prompt: "go",
-        description: "d",
-        subagent_type: "general-purpose",
-        run_in_background: false,
-      },
-      undefined,
-      onUpdate,
-      ctx(),
-    );
-
-    const streamed = onUpdate.mock.calls[0]![0];
-    expect(streamed.details.modelName).toBe("opus 4.6");
-    expect(
-      tool
-        .renderResult(streamed, { expanded: false, isPartial: true }, theme, { isError: false })
-        .render(200)
-        .join("\n"),
-    ).toContain("opus 4.6");
   });
 
   it("does not expose prompt mode in result details or rendered output", async () => {
@@ -212,7 +180,6 @@ describe("Agent tool result — effective model", () => {
         prompt: "go",
         description: "d",
         subagent_type: "general-purpose",
-        run_in_background: false,
       },
       undefined,
       vi.fn(),
@@ -240,7 +207,6 @@ describe("Agent tool result — effective model", () => {
         description: "d",
         subagent_type: "general-purpose",
         thinking: "max",
-        run_in_background: false,
       },
       undefined,
       vi.fn(),
@@ -266,7 +232,6 @@ describe("Agent tool result — effective model", () => {
         description: "d",
         subagent_type: "pinned",
         thinking: "max",
-        run_in_background: true,
       },
       undefined,
       undefined,
@@ -288,7 +253,6 @@ describe("Agent tool result — effective model", () => {
         description: "d",
         subagent_type: "pinned",
         model: "anthropic/claude-opus-4-6",
-        run_in_background: true,
       },
       undefined,
       undefined,
@@ -313,7 +277,6 @@ describe("Agent tool result — effective model", () => {
         description: "d",
         subagent_type: "pinned",
         model: "haiku",
-        run_in_background: true,
       },
       undefined,
       undefined,
@@ -335,7 +298,6 @@ describe("Agent tool result — effective model", () => {
         description: "d",
         subagent_type: "pinned",
         model: "gpt-9",
-        run_in_background: true,
       },
       undefined,
       undefined,
@@ -360,7 +322,6 @@ describe("Agent tool result — effective model", () => {
         description: "d",
         subagent_type: "general-purpose",
         thinking: "high",
-        run_in_background: false,
       },
       undefined,
       vi.fn(),
@@ -392,7 +353,6 @@ describe("Agent tool result — resume", () => {
         prompt: "go",
         description: "original",
         subagent_type: "general-purpose",
-        run_in_background: false,
       },
       undefined,
       vi.fn(),
@@ -405,7 +365,6 @@ describe("Agent tool result — resume", () => {
         prompt: "continue",
         description: "changed",
         subagent_type: "general-purpose",
-        run_in_background: false,
         model: "anthropic/claude-opus-4-6",
         thinking: "max",
         resume: first.details.agentId,

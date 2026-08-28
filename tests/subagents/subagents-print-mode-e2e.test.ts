@@ -58,7 +58,6 @@ describe.skipIf(LIVE)("subagents print-mode e2e (scripted faux, real pi-mono)", 
           subagent_type: "general-purpose",
           description: "greet",
           prompt: "Say hello.",
-          run_in_background: true,
         }),
         parentFinal: "done",
         subagent: "CHILD_GREETING_OK",
@@ -81,7 +80,7 @@ describe.skipIf(LIVE)("subagents print-mode e2e (scripted faux, real pi-mono)", 
     expect(invocation?.thinking).not.toBe("");
   });
 
-  it("spawns a FOREGROUND subagent and routes its real output back to the parent", async () => {
+  it("spawns a subagent in the background and its real output lands on the record", async () => {
     run = await runPrintMode({
       prompt: "Delegate the greeting to a subagent.",
       respond: routeBySession({
@@ -89,35 +88,25 @@ describe.skipIf(LIVE)("subagents print-mode e2e (scripted faux, real pi-mono)", 
           subagent_type: "general-purpose",
           description: "greet",
           prompt: "Say hello.",
-          run_in_background: false,
         }),
-        // NON-circular: the parent's final answer echoes whatever the child's
-        // result actually was in context. If the child output didn't reach the
-        // parent, this returns CHILD_MISSING and the responseText assertion fails.
-        parentFinal: (ctx: Context) => {
-          const childOut = [...ctx.messages]
-            .reverse()
-            .find(
-              (m) => m.role === "toolResult" && (m as { toolName?: string }).toolName === "Agent",
-            );
-          const text = ((childOut?.content ?? []) as Array<{ text?: string }>)
-            .map((b) => b.text ?? "")
-            .join("");
-          return `Parent relays: ${text.includes("CHILD_GREETING_OK") ? "CHILD_GREETING_OK" : "CHILD_MISSING"}`;
-        },
+        parentFinal: "done",
         subagent: "CHILD_GREETING_OK",
       }),
     });
+    await run.manager?.waitForAll();
 
-    // The child actually ran: its output reached the parent via the Agent tool
-    // result (real record.result), and the parent's final answer was derived
-    // from that result — not a value the test hard-coded into the parent.
+    // The spawn returns a background envelope, not the child's output.
     const toolResults = agentToolResults(run.parentSession);
     expect(toolResults.length).toBe(1);
-    expect(toolResults[0]).toContain("CHILD_GREETING_OK");
-    expect(run.responseText).toContain("CHILD_GREETING_OK");
-    expect(run.responseText).not.toContain("CHILD_MISSING");
-    // Parent t1 (Agent call) + child t1 (reply) + parent t2 (final) = 3 calls.
+    expect(toolResults[0]).toMatch(/background/i);
+
+    // The child actually ran: its real output — not a value the test hard-coded
+    // into the parent — landed on the manager's own record for it.
+    const id = /Agent ID: (\S+)/.exec(toolResults[0] ?? "")?.[1];
+    expect(id).toBeTruthy();
+    const record = run.manager?.getRecord(id as string) as { result?: string };
+    expect(record?.result).toContain("CHILD_GREETING_OK");
+    // Parent t1 (Agent call) + child t1 (reply) + parent t2 (post-hold nudge) = 3 calls.
     expect(run.modelCalls).toBeGreaterThanOrEqual(3);
   });
 
@@ -144,7 +133,6 @@ describe.skipIf(LIVE)("subagents print-mode e2e (scripted faux, real pi-mono)", 
         : agentCall({
             description: "bg work",
             prompt: "Do background work.",
-            run_in_background: true,
           });
     };
 
@@ -189,19 +177,23 @@ describe.skipIf(LIVE)("subagents print-mode e2e (scripted faux, real pi-mono)", 
           subagent_type: "agents-spy",
           description: "echo workspace",
           prompt: "Report what you were told.",
-          run_in_background: false,
         }),
         parentFinal: "Reported.",
         subagent: (ctx: Context) =>
           `child saw: ${ctx.systemPrompt?.includes(MARKER) ? MARKER : "MISSING"}`,
       }),
     });
+    await run.manager?.waitForAll();
 
     const toolResults = agentToolResults(run.parentSession);
     expect(toolResults.length).toBe(1);
-    expect(toolResults[0]).toContain(MARKER);
-    expect(toolResults[0]).not.toContain("MISSING");
     expect(toolResults[0]).not.toMatch(/Unknown agent type/i);
+
+    const id = /Agent ID: (\S+)/.exec(toolResults[0] ?? "")?.[1];
+    expect(id).toBeTruthy();
+    const record = run.manager?.getRecord(id as string) as { result?: string };
+    expect(record?.result).toContain(MARKER);
+    expect(record?.result).not.toContain("MISSING");
   });
 
   it("a colored agent's name badge never reaches print-mode text", async () => {
@@ -224,16 +216,21 @@ describe.skipIf(LIVE)("subagents print-mode e2e (scripted faux, real pi-mono)", 
           subagent_type: "painted",
           description: "paint",
           prompt: "Report in.",
-          run_in_background: false,
         }),
         parentFinal: "Done.",
         subagent: "Painted Agent reporting in.",
       }),
     });
+    await run.manager?.waitForAll();
 
-    const result = agentToolResults(run.parentSession)[0];
-    expect(result).toContain("Painted Agent reporting in."); // the escape check below is not vacuous
-    expect(result).not.toContain("\u001b");
+    const envelope = agentToolResults(run.parentSession)[0];
+    expect(envelope).not.toContain("\u001b");
+    const id = /Agent ID: (\S+)/.exec(envelope ?? "")?.[1];
+    expect(id).toBeTruthy();
+    const record = run.manager?.getRecord(id as string) as { result?: string };
+    // The escape check below is not vacuous: the real child text is here.
+    expect(record?.result).toContain("Painted Agent reporting in.");
+    expect(record?.result).not.toContain("\u001b");
     expect(conversationText(run.parentSession)).not.toContain("\u001b");
   });
 
@@ -285,37 +282,36 @@ describe.runIf(LIVE)("subagents print-mode e2e (live LLM, opt-in)", () => {
   });
 
   it(
-    "FOREGROUND spawn — real model spawns a subagent and reports its output",
+    "spawn — real model spawns a subagent and reports its output once the background hold delivers it",
     async () => {
       run = await runPrintMode({
         prompt:
-          "Use the Agent tool to spawn a general-purpose subagent (run_in_background: false) " +
-          "whose only task is to reply with the exact word PONG, then tell me what it replied.",
+          "Use the Agent tool to spawn a general-purpose subagent whose only task is to reply " +
+          "with the exact word PONG. Wait for it to complete, then tell me what it replied.",
         timeoutMs: LIVE_TIMEOUT,
       });
       expect(run.modelCalls).toBe(0); // live mode doesn't use the faux counter
       expect(invokedToolNames(run.parentSession)).toContain("Agent");
-      // The child actually ran and its output came back through the tool result.
-      expect(agentToolResults(run.parentSession).join("\n")).toMatch(/PONG/i);
+      // Every spawn is detached, so the child's own output never lands directly
+      // in the tool result — it reaches the model only once the background hold
+      // delivers it as a follow-up turn, which is what this exercises.
+      expect(agentToolResults(run.parentSession).join("\n")).toMatch(/background/i);
       expect(run.responseText).toMatch(/PONG/i);
     },
     LIVE_VITEST_TIMEOUT,
   );
 
   it(
-    "BACKGROUND spawn + get_subagent_result — model backgrounds work then retrieves it",
+    "spawn + get_subagent_result — model backgrounds work then retrieves it",
     async () => {
       run = await runPrintMode({
         prompt:
-          "Spawn a general-purpose subagent IN THE BACKGROUND (run_in_background: true) whose " +
-          "only task is to reply with the exact word BGPONG. After it finishes, use the " +
-          "get_subagent_result tool to fetch its result, then tell me exactly what it said.",
+          "Spawn a general-purpose subagent whose only task is to reply with the exact word " +
+          "BGPONG. After it finishes, use the get_subagent_result tool to fetch its result, " +
+          "then tell me exactly what it said.",
         timeoutMs: LIVE_TIMEOUT,
       });
-      const calls = agentToolCalls(run.parentSession);
-      // The model used the background feature…
-      expect(calls.some((c) => c.run_in_background === true)).toBe(true);
-      // …and the spawn returned the "started in background" envelope…
+      // The spawn returned the "started in background" envelope…
       expect(agentToolResults(run.parentSession).join("\n")).toMatch(/background/i);
       // …and the background child genuinely ran (its result surfaced somewhere:
       // via get_subagent_result and/or the held final answer).
@@ -353,11 +349,12 @@ describe.runIf(LIVE)("subagents print-mode e2e (live LLM, opt-in)", () => {
         prompt: [
           "You are smoke-testing your own Agent toolset. Do these steps IN ORDER, then print a",
           "final report with one PASS/FAIL line per step:",
-          "1) FOREGROUND: spawn a general-purpose subagent (run_in_background: false) whose only",
-          "   task is to reply with the exact token FG_OK. Confirm you got FG_OK back.",
-          "2) BACKGROUND: spawn a general-purpose subagent with run_in_background: true whose only",
-          "   task is to reply with the exact token BG_OK. After it finishes, call get_subagent_result",
-          "   to retrieve its output. Confirm you got BG_OK.",
+          "1) Spawn a general-purpose subagent whose only task is to reply with the exact token",
+          "   STEP1_OK. After it finishes, call get_subagent_result to retrieve its output.",
+          "   Confirm you got STEP1_OK.",
+          "2) Spawn a SECOND general-purpose subagent whose only task is to reply with the exact",
+          "   token STEP2_OK. After it finishes, call get_subagent_result to retrieve its output.",
+          "   Confirm you got STEP2_OK.",
           "3) EXPLORE: spawn a subagent with subagent_type 'Explore' to summarize the current",
           "   working directory in one line.",
           "Finish with: 'SELF-SMOKE COMPLETE' followed by the PASS/FAIL lines.",
@@ -369,29 +366,28 @@ describe.runIf(LIVE)("subagents print-mode e2e (live LLM, opt-in)", () => {
       const tools = invokedToolNames(run.parentSession);
 
       // Each capability was actually exercised at the tool layer (not just narrated):
-      // — a foreground spawn (run_in_background not true on at least one Agent call)
-      expect(calls.some((c) => c.run_in_background !== true)).toBe(true);
-      // — a background spawn
-      expect(calls.some((c) => c.run_in_background === true)).toBe(true);
+      // — two independent spawns (every spawn is background, so there is no
+      //   foreground/background split left to distinguish them by)
+      expect(calls.length).toBeGreaterThanOrEqual(2);
       // — the result-retrieval tool was called
       expect(tools).toContain("get_subagent_result");
       // — the Explore type was dispatched
       expect(calls.some((c) => String(c.subagent_type ?? "").toLowerCase() === "explore")).toBe(
         true,
       );
-      // — and the real child outputs materialized in the conversation (the
-      //   foreground tool result + the get_subagent_result result). We check the
-      //   whole transcript, not the final message: the agent's closing report
-      //   tends to summarize ("Step 1 PASS") rather than re-echo the raw tokens.
+      // — and the real child outputs materialized in the conversation (via
+      //   get_subagent_result and/or the held final answer). We check the whole
+      //   transcript, not the final message: the agent's closing report tends to
+      //   summarize ("Step 1 PASS") rather than re-echo the raw tokens.
       const transcript = conversationText(run.parentSession);
-      expect(transcript).toMatch(/FG_OK/i);
-      expect(transcript).toMatch(/BG_OK/i);
+      expect(transcript).toMatch(/STEP1_OK/i);
+      expect(transcript).toMatch(/STEP2_OK/i);
       // The agent ran the whole script to completion and self-reported. Checked
-      // against the transcript, not `responseText`: step 2's background agent
-      // completes asynchronously, so its completion nudge can land AFTER the
-      // final report and draw one more turn out of the model ("Acknowledged, all
-      // three steps PASS"). The report is then the second-to-last message and a
-      // last-message assertion fails a run that did everything right.
+      // against the transcript, not `responseText`: a background agent's
+      // completion nudge can land AFTER the final report and draw one more turn
+      // out of the model ("Acknowledged, all three steps PASS"). The report is
+      // then the second-to-last message and a last-message assertion fails a run
+      // that did everything right.
       expect(transcript).toMatch(/SELF-SMOKE COMPLETE/i);
       expect(run.responseText.length).toBeGreaterThan(0);
     },

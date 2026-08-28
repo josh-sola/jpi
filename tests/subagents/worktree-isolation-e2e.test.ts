@@ -94,15 +94,12 @@ function respondSpawning(isolation: "worktree" | undefined): (context: Context) 
       }
       return CHILD_MARKER;
     }
-    // Parent: spawn once, then echo the tool result so a lost one fails loudly.
+    // Parent: background, so it never sees the child's real answer inline
+    // — just acknowledge once spawned, and read the real output off the record.
     if (toolResultNames(context).includes("Agent")) {
-      return `parent saw: ${agentResultText(context)}`;
+      return "acknowledged";
     }
     return agentCall({
-      // Foreground: this test reads the child's marker out of the parent's
-      // inline Agent tool result, which a background spawn replaces with a
-      // "started in background" receipt.
-      run_in_background: false,
       description: "worktree work",
       prompt: CHILD_PROMPT,
       ...(isolation ? { isolation } : {}),
@@ -140,17 +137,26 @@ describe("worktree isolation e2e (real git, real pi-mono, faux model)", () => {
       respond: respondSpawning("worktree"),
       live: false,
     });
+    await run.manager?.waitForAll();
 
     // The child's own tools resolved against the copy — the main checkout never
     // saw the file. This is the guarantee; everything below is its bookkeeping.
     expect(existsSync(join(repo, MARKER_FILE))).toBe(false);
 
-    const result = agentResultText(run.parentSession);
-    expect(result).toContain(CHILD_MARKER);
+    // The spawn is background, so the parent's own tool result is only the
+    // envelope — the child's real answer (and the worktree note agent-manager
+    // appends to it) lands on the record instead.
+    const envelope = agentResultText(run.parentSession);
+    const id = /Agent ID: (\S+)/.exec(envelope)?.[1];
+    expect(id).toBeTruthy();
+    const record = run.manager?.getRecord(id as string) as { result?: string };
+    expect(record?.result).toContain(CHILD_MARKER);
 
     // The result names the kept worktree's path — the only artifact, since
     // nothing was committed and no branch was made.
-    const wtPath = /Uncommitted changes left in the worktree at `([^`]+)`/.exec(result)?.[1];
+    const wtPath = /Uncommitted changes left in the worktree at `([^`]+)`/.exec(
+      record?.result ?? "",
+    )?.[1];
     expect(wtPath).toBeTruthy();
     expect(git(repo, "branch", "--list", "pi-agent-*")).toBe("");
 
@@ -201,9 +207,15 @@ describe("worktree isolation e2e (real git, real pi-mono, faux model)", () => {
         live: false,
         isolateGlobals: false,
       });
+      await run.manager?.waitForAll();
 
-      const result = agentResultText(run.parentSession);
-      expect(result).toContain(CHILD_MARKER);
+      // The spawn is background, so the parent's own tool result is only the
+      // envelope — the child's real answer lands on the record instead.
+      const envelope = agentResultText(run.parentSession);
+      const id = /Agent ID: (\S+)/.exec(envelope)?.[1];
+      expect(id).toBeTruthy();
+      const record = run.manager?.getRecord(id as string) as { result?: string };
+      expect(record?.result).toContain(CHILD_MARKER);
 
       // Ran in the main checkout: the file is right there, and no branch was made.
       expect(existsSync(join(repo, MARKER_FILE))).toBe(true);
@@ -212,7 +224,7 @@ describe("worktree isolation e2e (real git, real pi-mono, faux model)", () => {
 
       // Silent by design — no per-result note, which is why the tool description
       // drops the isolation bullet alongside the parameter (see index.ts).
-      expect(result).not.toContain("Uncommitted changes left in the worktree");
+      expect(record?.result).not.toContain("Uncommitted changes left in the worktree");
     } finally {
       if (prevAgentDir == null) delete process.env.PI_CODING_AGENT_DIR;
       else process.env.PI_CODING_AGENT_DIR = prevAgentDir;

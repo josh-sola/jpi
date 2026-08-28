@@ -1,5 +1,6 @@
 /**
- * Agent tool wiring for `resume` + `run_in_background` (#214).
+ * Agent tool wiring for `resume` (#214). Every top-level resume is detached,
+ * exactly like every top-level spawn.
  *
  * The manager-level mechanics live in agent-manager.test.ts; what this file
  * pins down is what the TOOL hands the manager, which is where a detached
@@ -145,7 +146,6 @@ describe("Agent tool — background resume wiring", () => {
         prompt: "first task",
         description: "First task",
         subagent_type: type,
-        run_in_background: true,
       },
       undefined,
       undefined,
@@ -181,7 +181,6 @@ describe("Agent tool — background resume wiring", () => {
         description: "Keep going",
         subagent_type: "general-purpose",
         resume: id,
-        run_in_background: true,
       },
       toolAbort.signal,
       undefined,
@@ -217,7 +216,6 @@ describe("Agent tool — background resume wiring", () => {
         description: "Keep going",
         subagent_type: "general-purpose",
         resume: id,
-        run_in_background: true,
       },
       undefined,
       undefined,
@@ -257,7 +255,6 @@ describe("Agent tool — background resume wiring", () => {
         description: "Different description",
         subagent_type: "explorer",
         resume: id,
-        run_in_background: true,
       },
       undefined,
       undefined,
@@ -291,7 +288,6 @@ describe("Agent tool — background resume wiring", () => {
       description: "Keep going",
       subagent_type: "general-purpose",
       resume: id,
-      run_in_background: true,
     };
     await tools.get("Agent").execute("resume-1", params, undefined, undefined, ctx);
     const second = await tools.get("Agent").execute("resume-2", params, undefined, undefined, ctx);
@@ -304,15 +300,16 @@ describe("Agent tool — background resume wiring", () => {
     await lifecycle.get("session_shutdown")?.({}, ctx);
   });
 
-  // Resume follows the same default as a fresh spawn — background — so
-  // foreground is now the explicit case rather than the implicit one.
-  it("still resumes in the foreground when run_in_background is false", async () => {
+  // `run_in_background` is not a schema field, so a caller passing it
+  // anyway gets an unknown extra property that the tool never reads — resume
+  // still detaches, exactly like an unqualified resume.
+  it("run_in_background: false is not a schema field — the resume still detaches", async () => {
     const { pi, tools, lifecycle } = makePi();
     await subagentsExtension(pi);
     const ctx = makeCtx(cwd);
     const id = await spawnSettled(tools, ctx);
 
-    vi.mocked(resumeAgent).mockResolvedValue({ text: "inline answer" } as any);
+    vi.mocked(resumeAgent).mockImplementation(() => new Promise(() => {}));
     const res = await tools.get("Agent").execute(
       "resume-call",
       {
@@ -327,9 +324,9 @@ describe("Agent tool — background resume wiring", () => {
       ctx,
     );
 
-    // Foreground resume returns the answer inline — no background handoff text.
-    expect(resultText(res)).toContain("inline answer");
-    expect(resultText(res)).not.toContain("You will be notified");
+    // Still detaches: an ID and the background handoff text, not an inline answer.
+    expect(resultText(res)).toContain("Agent ID:");
+    expect(resultText(res)).toContain("You will be notified");
 
     await lifecycle.get("session_shutdown")?.({}, ctx);
   });

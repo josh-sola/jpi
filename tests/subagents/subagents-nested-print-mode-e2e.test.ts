@@ -22,6 +22,7 @@ import { registerAgents } from "../../modules/subagents/agent-types.ts";
 import { loadCustomAgents } from "../../modules/subagents/custom-agents.ts";
 import {
   agentCall,
+  agentToolResults,
   type FauxResponder,
   type PrintModeRun,
   runPrintMode,
@@ -158,15 +159,21 @@ describe("PR #164 nested agents through the real print-mode boundary", () => {
             subagent_type: "plain",
             description: "plain child",
             prompt: "plain-child",
-            run_in_background: false,
           });
         }
         return lastToolResult(ctx, "Agent");
       },
       { prompt: "root-default" },
     ));
+    await run.manager?.waitForAll();
 
-    expect(run.responseText).toContain("PLAIN_CHILD_RESULT");
+    // The root's spawn is background, so its own answer never carries the
+    // child's text directly — read the real child output off its record.
+    const envelope = agentToolResults(run.parentSession)[0];
+    const id = /Agent ID: (\S+)/.exec(envelope ?? "")?.[1];
+    expect(id).toBeTruthy();
+    const record = run.manager?.getRecord(id as string) as { result?: string };
+    expect(record?.result).toContain("PLAIN_CHILD_RESULT");
     expect(observed.get("plain-child")).toBeDefined();
     expect(nestedToolsIn(observed.get("plain-child"))).toEqual([]);
   });
@@ -207,15 +214,22 @@ describe("PR #164 nested agents through the real print-mode boundary", () => {
             subagent_type: "level_one",
             description: "recursive chain",
             prompt: "level_one-child",
-            run_in_background: false,
           });
         }
         return lastToolResult(ctx, "Agent");
       },
       { prompt: "root-depth", maxModelCalls: 24 },
     ));
+    await run.manager?.waitForAll();
 
-    expect(run.responseText).toContain("AT_CAP tools=none");
+    // The root's spawn is background — read level_one's real answer (which
+    // it derived from its own nested, still-inline delegation to level_two)
+    // off its record instead of the root's own final response text.
+    const envelope = agentToolResults(run.parentSession)[0];
+    const id = /Agent ID: (\S+)/.exec(envelope ?? "")?.[1];
+    expect(id).toBeTruthy();
+    const record = run.manager?.getRecord(id as string) as { result?: string };
+    expect(record?.result).toContain("AT_CAP tools=none");
     expect(observed.get("level_one-child")).toEqual(expect.arrayContaining(NESTED_TOOLS));
     expect(nestedToolsIn(observed.get("level_two-child"))).toEqual([]);
     expect(observed.has("level_three-child")).toBe(false);
@@ -252,7 +266,6 @@ describe("PR #164 nested agents through the real print-mode boundary", () => {
             subagent_type: "background_delegator",
             description: "background nested work",
             prompt: "background-delegator-child",
-            run_in_background: true,
           });
         }
         if (toolResults(ctx, "get_subagent_result").length === 0) {
@@ -371,7 +384,6 @@ describe("PR #164 nested agents through the real print-mode boundary", () => {
               subagent_type: "owner",
               description: "nested record owner",
               prompt: "owner-child",
-              run_in_background: true,
             });
           }
           if (agents.length === 1) {
@@ -380,7 +392,6 @@ describe("PR #164 nested agents through the real print-mode boundary", () => {
               subagent_type: "probe",
               description: "foreign ownership probe",
               prompt: "probe-child",
-              run_in_background: true,
             });
           }
           const results = toolResults(ctx, "get_subagent_result");

@@ -301,7 +301,7 @@ describe("attributing the spawn to the real session", () => {
     expect(tool.execute.mock.calls[0][0]).toBeUndefined();
   });
 
-  it("forwards the parameters the clone chose", async () => {
+  it("forwards the parameters the clone chose, unmodified", async () => {
     const tool = agentTool();
     cloneSession(callsAgent({ subagent_type: "Plan", prompt: "sketch the migration" }));
 
@@ -310,36 +310,37 @@ describe("attributing the spawn to the real session", () => {
     expect(tool.execute.mock.calls[0][1]).toEqual({
       subagent_type: "Plan",
       prompt: "sketch the migration",
-      run_in_background: true,
     });
   });
 
-  it("forces the spawn into the background — a foreground result goes nowhere", async () => {
-    // `run_in_background` defaults to false, and a foreground agent returns its
-    // answer as the TOOL RESULT: AgentManager marks the record `resultConsumed`
-    // precisely so the completion notification is skipped as redundant. Here
-    // that tool result lands in the throwaway clone, which is disposed moments
-    // later — so the agent runs to completion, shows up in the widget and the
-    // fleet, and its answer reaches nobody. The main conversation is not part
-    // of the clone's turn, so background delivery is the only way back.
+  it("spawns in the background — the top-level Agent tool always does, nothing here has to force it", async () => {
+    // A foreground result would have returned as the TOOL RESULT, landing in
+    // the throwaway clone that is disposed moments later — reaching nobody.
+    // The top-level Agent tool has no foreground
+    // path at all, so the clone's call needs no special-casing to stay safe.
     const tool = agentTool();
     cloneSession(callsAgent({ subagent_type: "Explore", prompt: "go" }));
 
     await runMentionClone(opts({ agentTool: tool }));
 
-    expect(tool.execute.mock.calls[0][1]).toMatchObject({ run_in_background: true });
+    expect(tool.execute.mock.calls[0][1]).toEqual({ subagent_type: "Explore", prompt: "go" });
   });
 
-  it("overrides a clone that explicitly asked for a foreground run", async () => {
-    // Nothing tells the clone's model that its own turn is discarded, so an
-    // explicit `false` is a reasonable thing for it to emit. It must not decide
-    // this one.
+  it("passes through a clone-supplied run_in_background unmodified — the schema no longer has the field", async () => {
+    // Nothing tells the clone's model that its own turn is discarded, so it
+    // may emit `run_in_background: false` on its own. That's harmless:
+    // the top-level tool doesn't declare the field, so it's an inert extra
+    // property and the spawn backgrounds regardless.
     const tool = agentTool();
     cloneSession(callsAgent({ subagent_type: "Explore", prompt: "go", run_in_background: false }));
 
     await runMentionClone(opts({ agentTool: tool }));
 
-    expect(tool.execute.mock.calls[0][1]).toMatchObject({ run_in_background: true });
+    expect(tool.execute.mock.calls[0][1]).toEqual({
+      subagent_type: "Explore",
+      prompt: "go",
+      run_in_background: false,
+    });
   });
 
   it("refuses a second spawn from the same mention", async () => {
