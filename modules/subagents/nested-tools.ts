@@ -8,7 +8,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import { errorMessage } from "../../src/core/index.ts";
-import { abortable } from "./abortable.ts";
+import { awaitAgentSettled, queuePendingSteer } from "./abortable.ts";
 import {
   buildAgentRegistry,
   getAgentConfigIn,
@@ -397,10 +397,7 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
       // stays unconsumed. Queued records have no promise until the manager starts
       // them, so poll — abortably — until they leave the queue, then await.
       if (params.wait && (record.status === "queued" || record.status === "running")) {
-        while (record.status === "queued") {
-          await abortable(new Promise<void>((resolve) => setTimeout(resolve, 250)), signal);
-        }
-        if (record.promise) await abortable(record.promise, signal);
+        await awaitAgentSettled(record, signal);
       }
       return textResult(formatRecord(record, "fetched"), record.status === "error");
     },
@@ -425,8 +422,7 @@ export function createNestedSubagentTools(context: NestedToolContext): ToolDefin
       // Session not ready yet — queue the steer. The manager flushes pending
       // steers when the session is created (same contract as the top-level tool).
       if (!record.session) {
-        if (!record.pendingSteers) record.pendingSteers = [];
-        record.pendingSteers.push(params.message);
+        queuePendingSteer(record, params.message);
         return textResult(`Steering message queued for nested agent ${params.agent_id}.`);
       }
       try {
