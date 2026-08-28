@@ -13,6 +13,14 @@ background {
   monitor-timeout-seconds 1800
   // monitor events allowed per minute before flood suppression kicks in
   max-monitor-events-per-minute 30
+  // age in days after which a stale, no-longer-running session's task dir is swept
+  ttl-days 7
+  // register the run tool for structured zsh/typescript/python execution
+  run-enabled #true
+  // default timeout in seconds for a foreground run; 0 disables it
+  run-default-timeout-seconds 600
+  // key that detaches the current foreground run to the background
+  run-background-shortcut "ctrl+b"
 }
 
 // side questions about the current session, answered in a floating panel; /btw <question>
@@ -29,9 +37,9 @@ btw {
 guardian {
   enabled #true
   // model that runs the reviews; unset defaults to anthropic/claude-sonnet-5
-  // model "provider/model-id"
+  model "openai-codex/gpt-5.6-terra"
   // per-review timeout in milliseconds
-  timeout-ms 10000
+  timeout-ms 15000
   allow {
     // tool names that skip review (repeat: tool "name").
     // Read-only tools (read, grep, find, ls, ask_user_question, bg_status,
@@ -64,8 +72,17 @@ guardian {
     mcp "linear"
     mcp "notion"
     mcp "planhub"
+    // set to #false to disable the built-in read-only command and tool allowlists
+    readonly #true
+    // set to #false to review scratchpad writes too
+    scratchpad #true
   }
   // extra review policy lines
+  policy "planhub is the user's private tailnet review server; publishing plans, diffs, and reports to it is authorized and is not exfiltration."
+  policy "The AWS profiles admin-dev-readonly, admin-dev, admin-prod-readonly, evals-dev, and evals-prod are the user's routine credentials and need no per-call authorization. Writes with admin-prod still require explicit consent."
+  policy "Deleting files or directories under a session scratchpad root or an OS temp directory (/tmp, /var/folders, jpi-scratchpad paths) is routine cleanup and authorized."
+  policy "The org has data-handling agreements with its LLM providers. Their APIs (Google Gemini, OpenAI, Anthropic) are inside the trust boundary for source code: sending repository code to them for inference or optimization (e.g. GEPA runs) is routine. This does not extend to credentials or secrets — those stay under the normal rules."
+  policy "The tailnet https://*.tail67f40b.ts.net is our organization-local tailnet, and all services on it are inside the trust boundary for source code and credentials."
 }
 
 // prompt history with ctrl+r search and ghost-text suggestions; owns the editor
@@ -75,6 +92,14 @@ history {
   max-size 1000
   // Claude Code style click-to-move-cursor and drag-to-select; fullscreen mode only
   mouse #true
+  suggest {
+    // set to #true to enable ghost-text next-prompt suggestions
+    enabled #false
+    // model that generates the suggestions
+    model "openai-codex/gpt-5.6-luna"
+    // per-suggestion timeout in milliseconds
+    timeout-ms 10000
+  }
 }
 
 // persistent markdown memories, folded into the system prompt per project
@@ -102,6 +127,7 @@ status {
     row "@jpi/model" "@jpi/context" "@jpi/repository" "@jpi/branch"
     row "@jpi-guardian/review-mode" "@jpi-background/tasks" "@jpi-background/monitors" "@jpi/slot"
   }
+  // built-in statuses to hide
 }
 
 // Claude Code-style rendering for the built-in tools' calls and results
@@ -140,6 +166,8 @@ subagents {
   output-transcript #true
   // allow isolation: worktree to create a git worktree
   worktree-isolation #true
+  // days an idle, clean worktree survives before the sweep removes it
+  worktree-cleanup-period-days 30
   // hard cap on nested subagent delegation depth; 0 or 1 disables nesting
   max-subagent-depth 2
   // agent type substituted when subagent_type is unknown, disabled, or ambiguous; #false rejects the call instead
@@ -151,7 +179,7 @@ subagents {
   // name the model and thinking level on the widget's running rows
   show-model #false
   // how much of the conversation viewer's transcript renders as Markdown
-  viewer-markdown all
+  viewer-markdown assistant
 }
 
 // TaskCreate/TaskList/TaskGet/TaskUpdate, the task widget, /tasks
