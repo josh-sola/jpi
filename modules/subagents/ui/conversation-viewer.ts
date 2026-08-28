@@ -189,6 +189,25 @@ export class ConversationViewer implements Component {
   private readonly toolCallComponents = new Map<string, ToolExecutionComponent>();
   /** Call ids whose result has already been applied, so a re-render doesn't rebuild the box's renderer on every scroll key. */
   private readonly appliedToolResults = new Set<string>();
+  /**
+   * One-shot handoff from `handleInput` to the `render()` call that follows in
+   * the same tick: a scroll key builds the transcript once just to size
+   * `maxScroll`, and this lets that exact build satisfy the paint too instead
+   * of building it again. Consumed (and cleared) by the very next
+   * `buildContentLines` call, whichever caller that turns out to be, so it
+   * never has the chance to serve stale content across two calls that aren't
+   * back-to-back in the same keystroke.
+   */
+  private pendingContentLines: { width: number; lines: string[] } | undefined;
+  /**
+   * Settled prefix for the literal ("off") path: every message except the
+   * current last one. Only a new message changes `prefixCount`, so a message
+   * that keeps mutating while it stays last (streaming text, a growing bash
+   * output) is always rebuilt fresh here, never served stale.
+   */
+  private rawPrefixCache:
+    | { width: number; prefixCount: number; lines: string[]; needsSeparator: boolean }
+    | undefined;
 
   constructor(
     private tui: TUI,
@@ -282,7 +301,9 @@ export class ConversationViewer implements Component {
     }
     if (this.stopArmed) this.stopArmed = false;
 
-    const totalLines = this.buildContentLines(this.lastInnerW).length;
+    const contentLines = this.buildContentLines(this.lastInnerW);
+    this.pendingContentLines = { width: this.lastInnerW, lines: contentLines };
+    const totalLines = contentLines.length;
     const viewportHeight = this.viewportHeight();
     const maxScroll = Math.max(0, totalLines - viewportHeight);
 
@@ -459,7 +480,8 @@ export class ConversationViewer implements Component {
   }
 
   invalidate(): void {
-    /* no cached state to clear */
+    this.pendingContentLines = undefined;
+    this.rawPrefixCache = undefined;
   }
 
   dispose(): void {
@@ -498,6 +520,12 @@ export class ConversationViewer implements Component {
   private buildContentLines(width: number): string[] {
     if (width <= 0) return [];
 
+    const pending = this.pendingContentLines;
+    this.pendingContentLines = undefined;
+    if (pending && pending.width === width) {
+      return pending.lines;
+    }
+
     const th = this.theme;
     const messages = this.session.messages;
 
@@ -507,7 +535,7 @@ export class ConversationViewer implements Component {
 
     let lines: string[];
     if (this.markdownMode() === "off") {
-      lines = this.buildRawLines(messages, width);
+      lines = this.buildRawLinesCached(messages, width);
     } else {
       try {
         lines = this.buildEnrichedLines(messages, width);
@@ -532,60 +560,101 @@ export class ConversationViewer implements Component {
 
   /** Literal fallback for markdown mode `off` — the escape hatch to unformatted source. */
   private buildRawLines(messages: AgentSession["messages"], width: number): string[] {
-    const th = this.theme;
     const lines: string[] = [];
     let needsSeparator = false;
     for (const msg of messages) {
-      if (msg.role === "user") {
-        const text = typeof msg.content === "string" ? msg.content : extractText(msg.content);
-        if (!text.trim()) continue;
-        if (needsSeparator) lines.push(th.fg("dim", "───"));
-        lines.push(th.fg("accent", "[User]"));
-        for (const line of wrapTextWithAnsi(text.trim(), width)) {
-          lines.push(line);
-        }
-      } else if (msg.role === "assistant") {
-        const textParts: string[] = [];
-        const toolCalls: string[] = [];
-        for (const c of msg.content) {
-          if (c.type === "text" && c.text) textParts.push(c.text);
-          else if (c.type === "toolCall") {
-            toolCalls.push((c as any).name ?? (c as any).toolName ?? "unknown");
-          }
-        }
-        if (needsSeparator) lines.push(th.fg("dim", "───"));
-        lines.push(th.bold("[Assistant]"));
-        if (textParts.length > 0) {
-          const text = textParts.join("\n").trim();
-          lines.push(...this.rawLines(text, width, false));
-        }
-        for (const name of toolCalls) {
-          lines.push(truncateToWidth(th.fg("muted", `  [Tool: ${name}]`), width));
-        }
-      } else if (msg.role === "toolResult") {
-        const { text, elided } = capResult(extractText(msg.content).trim());
-        if (!text) continue;
-        if (needsSeparator) lines.push(th.fg("dim", "───"));
-        lines.push(th.fg("dim", "[Result]"));
-        lines.push(...this.rawLines(text, width, true));
-        if (elided) lines.push(truncateToWidth(th.fg("dim", truncationNote(elided)), width));
-      } else if ((msg as any).role === "bashExecution") {
-        const bash = msg as any;
-        if (needsSeparator) lines.push(th.fg("dim", "───"));
-        lines.push(truncateToWidth(th.fg("muted", `  $ ${bash.command}`), width));
-        if (bash.output?.trim()) {
-          // Same cap as a tool result, never Markdown: command output is the one
-          // thing here that is definitionally not authored as Markdown.
-          const { text, elided } = capResult(bash.output.trim());
-          lines.push(...this.rawLines(text, width, true));
-          if (elided) lines.push(truncateToWidth(th.fg("dim", truncationNote(elided)), width));
-        }
-      } else {
-        continue;
-      }
-      needsSeparator = true;
+      needsSeparator = this.appendRawMessage(lines, msg, width, needsSeparator);
     }
     return lines;
+  }
+
+  /**
+   * `buildRawLines`, but the settled prefix (every message except the current
+   * last one) is cached and only rebuilt when a new message changes its
+   * length. The last message is always appended fresh, since it's the one
+   * that can still be mutating (a growing bash output, streaming text) while
+   * it stays last.
+   */
+  private buildRawLinesCached(messages: AgentSession["messages"], width: number): string[] {
+    const prefixCount = messages.length - 1;
+    const cache = this.rawPrefixCache;
+    let prefixLines: string[];
+    let needsSeparator: boolean;
+    if (cache && cache.width === width && cache.prefixCount === prefixCount) {
+      prefixLines = cache.lines;
+      needsSeparator = cache.needsSeparator;
+    } else {
+      prefixLines = [];
+      needsSeparator = false;
+      for (let i = 0; i < prefixCount; i++) {
+        needsSeparator = this.appendRawMessage(prefixLines, messages[i]!, width, needsSeparator);
+      }
+      this.rawPrefixCache = { width, prefixCount, lines: prefixLines, needsSeparator };
+    }
+
+    const lines = prefixLines.slice();
+    if (messages.length > 0) {
+      this.appendRawMessage(lines, messages[messages.length - 1]!, width, needsSeparator);
+    }
+    return lines;
+  }
+
+  /** Appends one message's literal-mode lines to `lines`; returns the updated separator flag. */
+  private appendRawMessage(
+    lines: string[],
+    msg: AgentSession["messages"][number],
+    width: number,
+    needsSeparator: boolean,
+  ): boolean {
+    const th = this.theme;
+    if (msg.role === "user") {
+      const text = typeof msg.content === "string" ? msg.content : extractText(msg.content);
+      if (!text.trim()) return needsSeparator;
+      if (needsSeparator) lines.push(th.fg("dim", "───"));
+      lines.push(th.fg("accent", "[User]"));
+      for (const line of wrapTextWithAnsi(text.trim(), width)) {
+        lines.push(line);
+      }
+    } else if (msg.role === "assistant") {
+      const textParts: string[] = [];
+      const toolCalls: string[] = [];
+      for (const c of msg.content) {
+        if (c.type === "text" && c.text) textParts.push(c.text);
+        else if (c.type === "toolCall") {
+          toolCalls.push((c as any).name ?? (c as any).toolName ?? "unknown");
+        }
+      }
+      if (needsSeparator) lines.push(th.fg("dim", "───"));
+      lines.push(th.bold("[Assistant]"));
+      if (textParts.length > 0) {
+        const text = textParts.join("\n").trim();
+        lines.push(...this.rawLines(text, width, false));
+      }
+      for (const name of toolCalls) {
+        lines.push(truncateToWidth(th.fg("muted", `  [Tool: ${name}]`), width));
+      }
+    } else if (msg.role === "toolResult") {
+      const { text, elided } = capResult(extractText(msg.content).trim());
+      if (!text) return needsSeparator;
+      if (needsSeparator) lines.push(th.fg("dim", "───"));
+      lines.push(th.fg("dim", "[Result]"));
+      lines.push(...this.rawLines(text, width, true));
+      if (elided) lines.push(truncateToWidth(th.fg("dim", truncationNote(elided)), width));
+    } else if ((msg as any).role === "bashExecution") {
+      const bash = msg as any;
+      if (needsSeparator) lines.push(th.fg("dim", "───"));
+      lines.push(truncateToWidth(th.fg("muted", `  $ ${bash.command}`), width));
+      if (bash.output?.trim()) {
+        // Same cap as a tool result, never Markdown: command output is the one
+        // thing here that is definitionally not authored as Markdown.
+        const { text, elided } = capResult(bash.output.trim());
+        lines.push(...this.rawLines(text, width, true));
+        if (elided) lines.push(truncateToWidth(th.fg("dim", truncationNote(elided)), width));
+      }
+    } else {
+      return needsSeparator;
+    }
+    return true;
   }
 
   /**

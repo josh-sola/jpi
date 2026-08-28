@@ -126,10 +126,13 @@ export class OutputBuffer {
   private lines: OutputLine[] = [];
   private pendingText = "";
   private pendingSource: OutputLineSource = "seed";
+  /** Bumped on every mutation, so a caller can cache its own rendering of `getLines()`. */
+  private version = 0;
 
   /** Load the on-disk backlog as untagged history. Call at most once, before any append(). */
   seed(text: string): void {
     if (text.length === 0) return;
+    this.version++;
     const parts = text.split("\n");
     const trailing = parts.pop() ?? "";
     for (const part of parts) this.pushLine(part, "seed");
@@ -139,6 +142,7 @@ export class OutputBuffer {
 
   append(chunk: string, source: "stdout" | "stderr"): void {
     if (chunk.length === 0) return;
+    this.version++;
     const parts = chunk.split("\n");
     const first = parts.shift() ?? "";
     this.pendingText += first;
@@ -163,6 +167,11 @@ export class OutputBuffer {
     if (this.pendingText.length === 0) return this.lines;
     return [...this.lines, { text: this.pendingText, source: this.pendingSource }];
   }
+
+  /** Bumped by `seed()` and `append()` — the only two mutators — whenever `getLines()`'s result could change. */
+  getVersion(): number {
+    return this.version;
+  }
 }
 
 /** SGR-dim + theme error color: the file records bytes, not stream source, so only live stderr chunks get this treatment. */
@@ -185,6 +194,8 @@ class LogViewer implements Component {
   private unsubscribeOutput: (() => void) | undefined;
   private unsubscribeChange: (() => void) | undefined;
   private tickTimer: NodeJS.Timeout | undefined;
+  /** Cache for `buildBodyLines`, valid as long as the buffer hasn't mutated since. */
+  private bodyLinesCache: { width: number; version: number; lines: string[] } | undefined;
 
   constructor(
     private readonly tui: TUI,
@@ -252,6 +263,12 @@ class LogViewer implements Component {
   }
 
   private buildBodyLines(width: number): string[] {
+    const version = this.buffer.getVersion();
+    const cache = this.bodyLinesCache;
+    if (cache && cache.width === width && cache.version === version) {
+      return cache.lines;
+    }
+
     const out: string[] = [];
     for (const entry of this.buffer.getLines()) {
       const wrapped = wrapTextWithAnsi(entry.text, width);
@@ -260,6 +277,7 @@ class LogViewer implements Component {
       if (rendered.length === 0) out.push("");
       else out.push(...rendered);
     }
+    this.bodyLinesCache = { width, version, lines: out };
     return out;
   }
 
@@ -372,7 +390,7 @@ class LogViewer implements Component {
   }
 
   invalidate(): void {
-    /* no cached state to clear */
+    this.bodyLinesCache = undefined;
   }
 
   private close(): void {
