@@ -15,6 +15,16 @@ background {
   max-monitor-events-per-minute 30
 }
 
+// side questions about the current session, answered in a floating panel; /btw <question>
+btw {
+  enabled #true
+  // model that answers side questions; empty = the session's active model
+  model ""
+  timeout-ms 60000
+  // prior btw exchanges replayed with each ask
+  max-exchanges 20
+}
+
 // auto-review gate for risky tool calls; /guardian pauses it for a session
 guardian {
   enabled #true

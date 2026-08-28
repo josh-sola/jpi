@@ -12,6 +12,7 @@ import {
   visibleWidth,
 } from "@earendil-works/pi-tui";
 
+import { BorderBox } from "../../src/core/index.ts";
 import type { PromptEntry } from "./store.ts";
 
 const MAX_VISIBLE = 12;
@@ -253,54 +254,6 @@ class InputLine implements Component {
   render(width: number): string[] {
     const [first = "", ...rest] = this.input.render(Math.max(0, width - INPUT_GLYPH_WIDTH));
     return [`${this.glyph}${first}`, ...rest];
-  }
-}
-
-const BORDER_SIDE_WIDTH = 2; // "│ " / " │"
-const BORDER_TOTAL_WIDTH = BORDER_SIDE_WIDTH * 2;
-
-/**
- * Hand-drawn rounded border around the whole panel: neither OverlayOptions
- * nor Box supports one. Renders children at `width - 4` (border column plus
- * one padding space per side) and pads every inner line flush to that width
- * before closing the right edge, so the panel stays opaque over whatever the
- * overlay covers.
- */
-export class BorderBox implements Component {
-  constructor(
-    private readonly theme: Theme,
-    private readonly children: readonly Component[],
-    private readonly dividerAfterIndex?: number,
-  ) {}
-
-  invalidate(): void {
-    for (const child of this.children) child.invalidate?.();
-  }
-
-  render(width: number): string[] {
-    const safeWidth = Math.max(0, width);
-    const innerWidth = Math.max(0, safeWidth - BORDER_TOTAL_WIDTH);
-    const horizontal = "─".repeat(Math.max(0, safeWidth - 2));
-
-    const lines: string[] = [this.theme.fg("border", `╭${horizontal}╮`)];
-
-    this.children.forEach((child, index) => {
-      for (const line of child.render(innerWidth)) {
-        lines.push(this.wrapInnerLine(line, innerWidth));
-      }
-      if (index === this.dividerAfterIndex) {
-        lines.push(this.theme.fg("border", `├${horizontal}┤`));
-      }
-    });
-
-    lines.push(this.theme.fg("border", `╰${horizontal}╯`));
-    return lines;
-  }
-
-  private wrapInnerLine(line: string, innerWidth: number): string {
-    const padCount = Math.max(0, innerWidth - visibleWidth(line));
-    const padded = padCount > 0 ? `${line}${" ".repeat(padCount)}` : line;
-    return `${this.theme.fg("border", "│ ")}${padded}${this.theme.fg("border", " │")}`;
   }
 }
 

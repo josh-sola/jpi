@@ -5,7 +5,6 @@ import { Theme } from "@earendil-works/pi-coding-agent";
 import { stripTerminalSequences } from "@earendil-works/pi-tui";
 
 import {
-  BorderBox,
   formatPromptRow,
   formatRelativeTime,
   matchIndices,
@@ -13,6 +12,7 @@ import {
   renderPromptRow,
 } from "../../modules/history/picker.ts";
 import type { PromptEntry } from "../../modules/history/store.ts";
+import { BorderBox } from "../../src/core/index.ts";
 
 function entry(text: string, timestamp: string, cwd = "/repo/project"): PromptEntry {
   return { text, timestamp, cwd };

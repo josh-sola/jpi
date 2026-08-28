@@ -67,8 +67,11 @@ export function mockPi() {
 
 export type MockPi = ReturnType<typeof mockPi>;
 
-/** Minimal mock ExtensionContext. */
-export function mockCtx(cwd = process.cwd()) {
+/** Minimal mock ExtensionContext. Pass `modelRegistry` to stub `find`/`complete`/etc. for callers that drive a model call. */
+export function mockCtx(
+  cwd = process.cwd(),
+  overrides: { modelRegistry?: Record<string, unknown> } = {},
+) {
   return {
     // Task paths resolve against the session workspace, not the host process cwd.
     cwd,
@@ -79,6 +82,7 @@ export function mockCtx(cwd = process.cwd()) {
       setStatus: vi.fn(),
       notify: vi.fn(),
     },
+    ...overrides,
   };
 }
 
@@ -89,10 +93,16 @@ export function mockCtx(cwd = process.cwd()) {
  * persisting (`pi --no-session`, `SessionManager.inMemory()`) reports a session ID
  * but no file. Pass `{ persisted: false }` for the latter.
  */
-export function mockSessionCtx(sessionId: string, opts?: { persisted?: boolean; cwd?: string }) {
+export function mockSessionCtx(
+  sessionId: string,
+  opts?: { persisted?: boolean; cwd?: string; modelRegistry?: Record<string, unknown> },
+) {
   const sessionFile = opts?.persisted === false ? undefined : `/sessions/${sessionId}.jsonl`;
   return {
-    ...mockCtx(opts?.cwd),
+    ...mockCtx(
+      opts?.cwd,
+      opts?.modelRegistry !== undefined ? { modelRegistry: opts.modelRegistry } : {},
+    ),
     sessionManager: {
       getSessionId: vi.fn(() => sessionId),
       getSessionFile: vi.fn(() => sessionFile),

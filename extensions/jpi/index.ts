@@ -5,6 +5,7 @@ import { errorMessage } from "../../src/core/errors.ts";
 import { injectEnabled, type JpiModule } from "../../src/core/module.ts";
 import { decorateToolRegistration } from "../../src/core/tool-registration.ts";
 import backgroundModule from "../../modules/background/module.ts";
+import btwModule from "../../modules/btw/module.ts";
 import guardianModule from "../../modules/guardian/module.ts";
 import historyModule from "../../modules/history/module.ts";
 import memoryModule from "../../modules/memory/module.ts";
@@ -33,6 +34,7 @@ const MODULES: readonly JpiModule[] = [
   subagentsModule,
   tasksModule,
   scratchpadModule,
+  btwModule,
   styleModule,
   historyModule,
 ];
