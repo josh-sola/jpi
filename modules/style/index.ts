@@ -16,6 +16,7 @@ import type {
   EditToolDetails,
   ExtensionAPI,
   Theme,
+  ToolDefinition,
   ToolRenderResultOptions,
 } from "@earendil-works/pi-coding-agent";
 import {
@@ -137,6 +138,30 @@ function makeResultRenderer(summarize: (text: string) => string) {
     if (context.isError) return renderErrorResult(text, options.expanded, theme);
     return renderCollapsibleResult(summarize(text), text, options.expanded, theme);
   };
+}
+
+/** Registers a tool whose call/result rendering is just a header plus a one-line summary. */
+function registerSimpleTool(
+  pi: ExtensionAPI,
+  definition: ToolDefinition<any, any, any>,
+  displayName: string,
+  argFor: (args: any, context: ToolRenderContext) => string,
+  summarize: (text: string) => string,
+): void {
+  pi.registerTool({
+    ...definition,
+    renderShell: "self",
+    renderCall(args, theme, context) {
+      return createToolHeader(
+        bulletState(context),
+        displayName,
+        argFor(args, context),
+        theme,
+        context.lastComponent,
+      );
+    },
+    renderResult: makeResultRenderer(summarize),
+  });
 }
 
 const DISPLAY_NAMES = {
@@ -273,20 +298,13 @@ export function registerStyleTools(pi: ExtensionAPI, options: StyleToolsOptions 
     },
   });
 
-  pi.registerTool({
-    ...createBashToolDefinition(cwd),
-    renderShell: "self",
-    renderCall(args, theme, context) {
-      return createToolHeader(
-        bulletState(context),
-        DISPLAY_NAMES.bash,
-        truncateCommand(asString(args.command)),
-        theme,
-        context.lastComponent,
-      );
-    },
-    renderResult: makeResultRenderer((text) => summarizeBashOutput(text)),
-  });
+  registerSimpleTool(
+    pi,
+    createBashToolDefinition(cwd),
+    DISPLAY_NAMES.bash,
+    (args) => truncateCommand(asString(args.command)),
+    (text) => summarizeBashOutput(text),
+  );
 
   pi.registerTool({
     ...createEditToolDefinition(cwd),
@@ -375,57 +393,36 @@ export function registerStyleTools(pi: ExtensionAPI, options: StyleToolsOptions 
     },
   });
 
-  pi.registerTool({
-    ...createGrepToolDefinition(cwd),
-    renderShell: "self",
-    renderCall(args, theme, context) {
-      return createToolHeader(
-        bulletState(context),
-        DISPLAY_NAMES.grep,
-        truncateEnd(asString(args.pattern), 80),
-        theme,
-        context.lastComponent,
-      );
-    },
-    renderResult: makeResultRenderer((text) => {
+  registerSimpleTool(
+    pi,
+    createGrepToolDefinition(cwd),
+    DISPLAY_NAMES.grep,
+    (args) => truncateEnd(asString(args.pattern), 80),
+    (text) => {
       const n = countGrepMatches(text);
       return `Found ${n} ${plural(n, "match", "matches")}`;
-    }),
-  });
-
-  pi.registerTool({
-    ...createFindToolDefinition(cwd),
-    renderShell: "self",
-    renderCall(args, theme, context) {
-      return createToolHeader(
-        bulletState(context),
-        DISPLAY_NAMES.find,
-        truncateEnd(asString(args.pattern), 80),
-        theme,
-        context.lastComponent,
-      );
     },
-    renderResult: makeResultRenderer((text) => {
+  );
+
+  registerSimpleTool(
+    pi,
+    createFindToolDefinition(cwd),
+    DISPLAY_NAMES.find,
+    (args) => truncateEnd(asString(args.pattern), 80),
+    (text) => {
       const n = countFindResults(text);
       return `Found ${n} ${plural(n, "file")}`;
-    }),
-  });
-
-  pi.registerTool({
-    ...createLsToolDefinition(cwd),
-    renderShell: "self",
-    renderCall(args, theme, context) {
-      return createToolHeader(
-        bulletState(context),
-        DISPLAY_NAMES.ls,
-        displayPath(asString(args.path) || ".", context.cwd),
-        theme,
-        context.lastComponent,
-      );
     },
-    renderResult: makeResultRenderer((text) => {
+  );
+
+  registerSimpleTool(
+    pi,
+    createLsToolDefinition(cwd),
+    DISPLAY_NAMES.ls,
+    (args, context) => displayPath(asString(args.path) || ".", context.cwd),
+    (text) => {
       const n = countLsEntries(text);
       return `Listed ${n} ${plural(n, "path")}`;
-    }),
-  });
+    },
+  );
 }
