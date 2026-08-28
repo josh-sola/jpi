@@ -574,7 +574,7 @@ export class FleetList {
 
     if (start > 0) lines.push(rightAlign("", theme.fg("dim", `↑ ${start} more`), width));
     for (let a = start; a < start + visible; a++) {
-      const row = rows[a];
+      const row = rows[a]!;
       lines.push(this.renderAgentRow(a + 1, sel, row.record, width, theme, row.depth));
     }
     if (hiddenBelow > 0)

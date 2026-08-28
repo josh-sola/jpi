@@ -107,7 +107,7 @@ describe("AgentManager — record GC", () => {
     expect(emit).toHaveBeenCalledWith({ type: "session_shutdown", reason: "quit" });
     // After dispose() the runner is invalidated and every ctx getter throws, so an
     // emit that landed afterwards would be worse than none.
-    expect(emit.mock.invocationCallOrder[0]).toBeLessThan(dispose.mock.invocationCallOrder[0]);
+    expect(emit.mock.invocationCallOrder[0]!).toBeLessThan(dispose.mock.invocationCallOrder[0]!);
   });
 
   it("never evicts a running agent, however old its timestamp looks", async () => {

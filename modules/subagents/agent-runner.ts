@@ -549,7 +549,7 @@ function collectResponseText(session: AgentSession) {
  */
 function getLastAssistantText(session: AgentSession, startIndex = 0): string {
   for (let i = session.messages.length - 1; i >= startIndex; i--) {
-    const msg = session.messages[i];
+    const msg = session.messages[i]!;
     if (msg.role !== "assistant") continue;
     const text = extractText(msg.content).trim();
     if (text) return text;
@@ -573,7 +573,7 @@ function getLastAssistantText(session: AgentSession, startIndex = 0): string {
  */
 function finalTurnError(session: AgentSession, startIndex = 0): string | undefined {
   for (let i = session.messages.length - 1; i >= startIndex; i--) {
-    const msg = session.messages[i];
+    const msg = session.messages[i]!;
     if (msg.role !== "assistant") continue;
     if (msg.stopReason === "error") {
       return (

@@ -160,7 +160,7 @@ test("write hides a body over 100 lines unless expanded", () => {
     ),
   );
   assert.equal(collapsed.length, 1);
-  assert.ok(collapsed[0].includes("Wrote 120 lines to big.txt"));
+  assert.ok(collapsed[0]!.includes("Wrote 120 lines to big.txt"));
 
   const expanded = plainLines(
     write.renderResult(
@@ -231,9 +231,10 @@ test("read shows numbered, highlighted content starting at the requested offset 
     context({ args }),
   );
   const lines = plainLines(result);
+  assert.equal(lines.length, 3);
   assert.equal(lines[0], "  ⎿  Read 2 lines");
-  assert.ok(lines[1].startsWith("    10  "));
-  assert.ok(lines[2].startsWith("    11  "));
+  assert.ok(lines[1]!.startsWith("    10  "));
+  assert.ok(lines[2]!.startsWith("    11  "));
 });
 
 test("read collapsed shows only the summary line", () => {

@@ -118,7 +118,7 @@ describe("TaskStore (in-memory)", () => {
 
     expect(count).toBe(1);
     expect(store.list()).toHaveLength(1);
-    expect(store.list()[0].id).toBe("2");
+    expect(store.list()[0]!.id).toBe("2");
   });
 
   it("returns not found for update on non-existent task", async () => {
@@ -211,7 +211,7 @@ describe("TaskStore (file-backed)", () => {
     const tasks = store2.list();
 
     expect(tasks).toHaveLength(1);
-    expect(tasks[0].subject).toBe("Persistent task");
+    expect(tasks[0]!.subject).toBe("Persistent task");
   });
 
   it("converges two instances sharing one key: neither mutation clobbers the other", async () => {

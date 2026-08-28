@@ -176,7 +176,7 @@ export class TaskWidget {
     if (pending.length > 0) parts.push(`${pending.length} open`);
     const statusText = `${tasks.length} tasks (${parts.join(", ")})`;
 
-    const spinnerFrame = GLYPHS.spinner[this.widgetFrame % GLYPHS.spinner.length];
+    const spinnerFrame = GLYPHS.spinner[this.widgetFrame % GLYPHS.spinner.length]!;
     const lines: string[] = [
       truncate(theme.fg("accent", GLYPHS.header) + " " + theme.fg("accent", statusText)),
     ];

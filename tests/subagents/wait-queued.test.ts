@@ -93,7 +93,8 @@ async function spawnBackground(tools: Map<string, any>): Promise<{ id: string; q
     undefined,
     ctx(),
   );
-  const id = /Agent ID: (\S+)/.exec(textOf(r))![1];
+  const id = /Agent ID: (\S+)/.exec(textOf(r))?.[1];
+  if (!id) throw new Error(`No agent ID in: ${textOf(r)}`);
   return { id, queued: textOf(r).includes("queued in background") };
 }
 

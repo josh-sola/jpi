@@ -122,7 +122,7 @@ export function streamToOutputFile(
   const flush = () => {
     const messages = session.messages;
     while (writtenCount < messages.length) {
-      const msg = messages[writtenCount];
+      const msg = messages[writtenCount]!;
       const entry = {
         isSidechain: true,
         agentId,

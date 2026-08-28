@@ -87,13 +87,14 @@ test("tasks:v1 is a replace-set: each payload wholly replaces the previous runni
 test("jpi-background and the legacy provider union: either one running keeps the title active", async () => {
   const { scheduler, events, titles, context, extension } = harness();
   await extension.onSessionStart({}, context);
-  events.emit(RESPONSE_CHANNEL, statusResponse(requests(events)[0], ["completed"]));
+  events.emit(RESPONSE_CHANNEL, statusResponse(requests(events)[0]!, ["completed"]));
   assert.equal(titles.length, 0);
 
   events.emit(TASKS_CHANNEL, tasksPayload(["t1"]));
   assert.equal(titles.at(-1), "⠋ tree");
 
   const poll = scheduler.active("interval", 1_000)[0];
+  assert.ok(poll);
   scheduler.fire(poll);
   events.emit(RESPONSE_CHANNEL, statusResponse(requests(events).at(-1)!, ["running"]));
   assert.equal(titles.at(-1), "⠋ tree");

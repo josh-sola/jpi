@@ -39,18 +39,19 @@ test("background status polling and terminal refresh use the documented protocol
     operation: "status",
     payload: {},
   });
-  events.emit(RESPONSE_CHANNEL, statusResponse(requests(events)[0], ["running", "completed"]));
+  events.emit(RESPONSE_CHANNEL, statusResponse(requests(events)[0]!, ["running", "completed"]));
   assert.equal(titles.at(-1), "⠋ tree");
 
   extension.onAgentStart({}, context);
   events.emit(TERMINAL_CHANNEL, { task: { id: "done" } });
   assert.equal(requests(events).length, 2);
-  events.emit(RESPONSE_CHANNEL, statusResponse(requests(events)[1], ["completed"]));
+  events.emit(RESPONSE_CHANNEL, statusResponse(requests(events)[1]!, ["completed"]));
   assert.notEqual(titles.at(-1)?.startsWith("⏹"), true);
   extension.onAgentSettled({}, context);
   assert.equal(titles.at(-1), "⏹ tree");
 
   const poll = scheduler.active("interval", 1_000)[0];
+  assert.ok(poll);
   scheduler.fire(poll);
   assert.equal(requests(events).length, 3);
   events.emit(RESPONSE_CHANNEL, statusResponse({ request_id: "not-matching" }, ["running"]));

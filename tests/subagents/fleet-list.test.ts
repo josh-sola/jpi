@@ -257,8 +257,8 @@ describe("FleetList navigation", () => {
     expect(parentIdx).toBeGreaterThanOrEqual(0);
     // Directly under its parent, and visually indented under it.
     expect(childIdx).toBe(parentIdx + 1);
-    expect(plain(lines[childIdx])).toMatch(/^\s+└─/);
-    expect(plain(lines[parentIdx])).not.toMatch(/└─/);
+    expect(plain(lines[childIdx]!)).toMatch(/^\s+└─/);
+    expect(plain(lines[parentIdx]!)).not.toMatch(/└─/);
   });
 
   it("activates on ↓ at an empty prompt, consuming the key", () => {

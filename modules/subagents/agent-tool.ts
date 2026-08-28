@@ -1028,7 +1028,7 @@ Terse command-style prompts produce shallow, generic work.
 
       // ---- While running (streaming) ----
       if (isPartial || details.status === "running") {
-        const frame = SPINNER[details.spinnerFrame ?? 0];
+        const frame = SPINNER[details.spinnerFrame ?? 0]!;
         const s = stats(details);
         return renderRunningAgentStatus(frame, s, details.activity ?? "thinking…", theme);
       }

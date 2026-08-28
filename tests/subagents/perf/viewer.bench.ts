@@ -71,7 +71,7 @@ describe("ConversationViewer.render — cold cache (first frame)", () => {
   const SAMPLES = { 50: 40, 500: 12 } as Record<number, number>;
 
   for (const n of [50, 500]) {
-    const iterations = SAMPLES[n];
+    const iterations = SAMPLES[n]!;
     const pool = Array.from({ length: iterations + WARMUP }, () =>
       mountViewer(ConversationViewer, makeSession(n)),
     );

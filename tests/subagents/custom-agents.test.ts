@@ -458,7 +458,7 @@ Wildcard plus ext.`,
       ["all-lower", "all"],
       ["all-upper", "ALL"],
       ["all-mixed", "All"],
-    ]) {
+    ] as const) {
       writeAgent(name, `---\ntools: ${value}\n---\n\nAlias.`);
       const agent = loadCustomAgents(tmpDir).get(name)!;
       expect(agent.builtinToolNames).toEqual(BUILTIN_TOOL_NAMES);

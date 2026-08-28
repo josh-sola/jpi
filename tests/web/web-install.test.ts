@@ -103,6 +103,7 @@ function makeOps({
       calls.runs.push({ command, args, options });
       if (command === "tar") {
         const extractDir = args[args.indexOf("-C") + 1];
+        if (extractDir === undefined) throw new Error("tar call missing -C argument");
         const executablePath = join(extractDir, executableName);
         await nodeOps.mkdir(extractDir, { recursive: true });
         await nodeOps.writeFile(executablePath, "binary");
@@ -334,8 +335,8 @@ test("installer verifies, extracts, checks version, moves atomically, and cleans
   const tarCall = calls.runs.find((call) => call.command === "tar");
   assert.ok(tarCall);
   assert.deepEqual([tarCall.args[0], tarCall.args[2]], ["-xzf", "-C"]);
-  assert.equal(tarCall.args[1].endsWith(target.artifact.fileName), true);
-  assert.equal(tarCall.args[3].endsWith(join("extract")), true);
+  assert.equal(tarCall.args[1]!.endsWith(target.artifact.fileName), true);
+  assert.equal(tarCall.args[3]!.endsWith(join("extract")), true);
 
   assert.equal(calls.chmods.length, 1);
   assert.equal(calls.chmods[0]!.mode, 0o755);

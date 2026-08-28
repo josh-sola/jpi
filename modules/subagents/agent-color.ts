@@ -75,10 +75,10 @@ function parseHex(hex: string): Rgb {
   };
 }
 
-/** Index of the entry in `values` closest to `value`. */
+/** Index of the entry in `values` closest to `value`. Always an in-bounds index of `values`. */
 function nearest(values: readonly number[], value: number): number {
   return values.reduce(
-    (best, v, i) => (Math.abs(value - v) < Math.abs(value - values[best]) ? i : best),
+    (best, v, i) => (Math.abs(value - v) < Math.abs(value - values[best]!) ? i : best),
     0,
   );
 }
@@ -89,12 +89,15 @@ function nearest(values: readonly number[], value: number): number {
  * contrast is judged against the latter.
  */
 function rgbTo256({ r, g, b }: Rgb): { index: number; rgb: Rgb } {
-  const [rIndex, gIndex, bIndex] = [r, g, b].map((channel) => nearest(CUBE_VALUES, channel));
+  const rIndex = nearest(CUBE_VALUES, r);
+  const gIndex = nearest(CUBE_VALUES, g);
+  const bIndex = nearest(CUBE_VALUES, b);
   const distance = ({ r: cr, g: cg, b: cb }: Rgb) =>
     0.299 * (r - cr) ** 2 + 0.587 * (g - cg) ** 2 + 0.114 * (b - cb) ** 2;
   const grayIndex = nearest(GRAY_VALUES, Math.round(0.299 * r + 0.587 * g + 0.114 * b));
-  const gray = { r: GRAY_VALUES[grayIndex], g: GRAY_VALUES[grayIndex], b: GRAY_VALUES[grayIndex] };
-  const cube = { r: CUBE_VALUES[rIndex], g: CUBE_VALUES[gIndex], b: CUBE_VALUES[bIndex] };
+  const grayValue = GRAY_VALUES[grayIndex]!;
+  const gray = { r: grayValue, g: grayValue, b: grayValue };
+  const cube = { r: CUBE_VALUES[rIndex]!, g: CUBE_VALUES[gIndex]!, b: CUBE_VALUES[bIndex]! };
   // Only near-neutral colors may take the gray ramp; anything else keeps its tint.
   if (Math.max(r, g, b) - Math.min(r, g, b) < 10 && distance(gray) < distance(cube)) {
     return { index: 232 + grayIndex, rgb: gray };

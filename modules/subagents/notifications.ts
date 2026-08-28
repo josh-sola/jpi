@@ -195,7 +195,7 @@ export function wireNotifications(rt: SubagentsRuntime): void {
         : `${unconsumed.length} agent(s) finished`;
 
       const [first, ...rest] = unconsumed;
-      const details = buildNotificationDetails(first, 300, rt.agentActivity.get(first.id));
+      const details = buildNotificationDetails(first!, 300, rt.agentActivity.get(first!.id));
       if (rest.length > 0) {
         details.others = rest.map((r) =>
           buildNotificationDetails(r, 300, rt.agentActivity.get(r.id)),

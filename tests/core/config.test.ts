@@ -140,7 +140,7 @@ test("corrupt KDL reports an issue with location, falls back to defaults, and le
 
   const { value, issues } = await config.load();
   assert.equal(issues.length, 1);
-  assert.match(issues[0], /^could not parse jpi\.kdl: .*\d+:\d+/);
+  assert.match(issues[0]!, /^could not parse jpi\.kdl: .*\d+:\d+/);
   assert.equal(value.model, "anthropic/claude-sonnet-5");
 
   const textAfter = await readFile(config.path, "utf8");
@@ -158,7 +158,7 @@ test("unknown keys are reported as an issue but the rest of the section still de
 
   const { value, issues } = await config.load();
   assert.equal(issues.length, 1);
-  assert.match(issues[0], /unknown node "mystery-field"/);
+  assert.match(issues[0]!, /unknown node "mystery-field"/);
   assert.equal(value.model, "custom-model");
 });
 
@@ -173,7 +173,7 @@ test("a type-violating value reports an issue and falls back to full defaults, n
 
   const { value, issues } = await config.load();
   assert.equal(issues.length, 1);
-  assert.match(issues[0], /guardian\.timeoutMs: .*expected number/);
+  assert.match(issues[0]!, /guardian\.timeoutMs: .*expected number/);
   // model was valid but the whole section still falls back to schema defaults.
   assert.equal(value.model, "anthropic/claude-sonnet-5");
   assert.equal(value.timeoutMs, 10000);
@@ -195,7 +195,7 @@ test.skipIf(runningAsRoot)(
       const config = new Config("guardian", schema, { PI_CODING_AGENT_DIR: directory });
       const { value, issues } = await config.load();
       assert.equal(issues.length, 1);
-      assert.match(issues[0], /^could not read jpi\.kdl: /);
+      assert.match(issues[0]!, /^could not read jpi\.kdl: /);
       assert.equal(value.model, "anthropic/claude-sonnet-5");
     } finally {
       await chmod(directory, 0o700);
@@ -217,7 +217,7 @@ test.skipIf(runningAsRoot)(
     try {
       const { value, issues } = await config.load();
       assert.equal(issues.length, 1);
-      assert.match(issues[0], /^could not write jpi\.kdl: /);
+      assert.match(issues[0]!, /^could not write jpi\.kdl: /);
       assert.equal(value.model, "anthropic/claude-sonnet-5");
     } finally {
       await chmod(config.path, 0o600);

@@ -99,13 +99,13 @@ function ansiTheme() {
 }
 
 function assertAllLinesFit(lines: string[], width: number) {
-  for (let i = 0; i < lines.length; i++) {
-    const vw = visibleWidth(lines[i]);
+  lines.forEach((line, i) => {
+    const vw = visibleWidth(line);
     expect(
       vw,
-      `line ${i} exceeds width (${vw} > ${width}): ${JSON.stringify(lines[i])}`,
+      `line ${i} exceeds width (${vw} > ${width}): ${JSON.stringify(line)}`,
     ).toBeLessThanOrEqual(width);
-  }
+  });
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────
@@ -676,7 +676,7 @@ describe("ConversationViewer", () => {
         vi.fn(),
       );
       const lines = viewer.render(80);
-      const footer = strip(lines[lines.length - 2]);
+      const footer = strip(lines[lines.length - 2]!);
 
       expect(footer).toContain("Enter steer");
       expect(footer).toContain("x stop");
@@ -754,7 +754,7 @@ describe("ConversationViewer", () => {
         );
 
       const before = elided();
-      msg.content[0].text += "row\n".repeat(1000);
+      msg.content[0]!.text += "row\n".repeat(1000);
       const after = elided();
 
       expect(before).toBeGreaterThan(0);
@@ -819,7 +819,7 @@ describe("ConversationViewer", () => {
       expect(strip(viewer.render(80).join("\n"))).toContain("One");
       const afterFirst = updateSpy.mock.calls.length;
 
-      messages[0].content[0].text = "# Two";
+      messages[0]!.content[0]!.text = "# Two";
       const out = strip(viewer.render(80).join("\n"));
 
       expect(out).toContain("Two");

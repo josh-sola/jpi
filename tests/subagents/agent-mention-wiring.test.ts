@@ -132,7 +132,7 @@ async function spawnBackground(
       undefined,
       ctx(),
     );
-  return /Agent ID: (\S+)/.exec(textOf(r))![1];
+  return /Agent ID: (\S+)/.exec(textOf(r))![1]!;
 }
 
 const send = (lifecycle: Map<string, any>, text: string, source = "interactive") =>
@@ -482,7 +482,7 @@ describe("mentioning an agent that has never run", () => {
 
     await send(lifecycle, "@explore go");
 
-    const opts = vi.mocked(runAgent).mock.calls[0][3] as any;
+    const opts = vi.mocked(runAgent).mock.calls[0]![3] as any;
     expect(opts.model).toBeUndefined();
     expect(opts.thinkingLevel).toBeUndefined();
     expect(opts.maxTurns).toBeUndefined();
@@ -539,7 +539,7 @@ describe("mentioning an agent that has never run", () => {
 
     await send(lifecycle, "@explore go");
 
-    const opts = vi.mocked(runAgent).mock.calls[0][3] as any;
+    const opts = vi.mocked(runAgent).mock.calls[0]![3] as any;
     expect(opts.onToolActivity).toBeTypeOf("function");
     expect(opts.onTurnEnd).toBeTypeOf("function");
     expect(opts.onSessionCreated).toBeTypeOf("function");
@@ -551,7 +551,7 @@ describe("mentioning an agent that has never run", () => {
 
     await send(lifecycle, "@explore go");
     const record = (globalThis as any)[Symbol.for("pi-subagents:manager")].getRecord(
-      vi.mocked(runAgent).mock.calls[0][3].agentId,
+      vi.mocked(runAgent).mock.calls[0]![3].agentId,
     );
 
     expect(record.isBackground).toBe(true);
@@ -1121,7 +1121,7 @@ describe("resuming an evicted agent by name", () => {
     await flush();
 
     const manager = (globalThis as any)[Symbol.for("pi-subagents:manager")];
-    const resumedId = (vi.mocked(runAgent).mock.calls[0][3] as any).agentId;
+    const resumedId = (vi.mocked(runAgent).mock.calls[0]![3] as any).agentId;
     expect(manager.getRecord(resumedId).handle).toBe("explore");
   });
 
@@ -1167,7 +1167,7 @@ describe("resuming an evicted agent by name", () => {
       ctx(),
     );
     await flush();
-    await evict(/Agent ID: (\S+)/.exec(textOf(spawned))![1]);
+    await evict(/Agent ID: (\S+)/.exec(textOf(spawned))![1]!);
     await flush();
     vi.mocked(runAgent).mockClear();
     heldRun(fakeSession());
@@ -1176,7 +1176,7 @@ describe("resuming an evicted agent by name", () => {
     await flush();
 
     const manager = (globalThis as any)[Symbol.for("pi-subagents:manager")];
-    const resumedId = (vi.mocked(runAgent).mock.calls[0][3] as any).agentId;
+    const resumedId = (vi.mocked(runAgent).mock.calls[0]![3] as any).agentId;
     expect(manager.getRecord(resumedId)).toMatchObject({ handle: "explore", alias: "auth-audit" });
   });
 
@@ -1310,7 +1310,7 @@ describe("resuming an evicted agent by name", () => {
 
     // runAgent receives the new record's id, which is the only handle a test
     // has on an agent the dispatcher spawned without returning anything.
-    const resumedId = (vi.mocked(runAgent).mock.calls[0][3] as any).agentId;
+    const resumedId = (vi.mocked(runAgent).mock.calls[0]![3] as any).agentId;
     const manager = (globalThis as any)[Symbol.for("pi-subagents:manager")];
     expect(manager.getRecord(resumedId).description).toBe("find flaky tests");
   });

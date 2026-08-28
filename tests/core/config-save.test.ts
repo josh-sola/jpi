@@ -112,7 +112,7 @@ test("saving an unsupported nested key returns an issue and writes nothing", asy
 
   const { issues } = await config.save({ allow: { tool: ["web_search"] } } as never);
   assert.equal(issues.length, 1);
-  assert.match(issues[0], /guardian\.allow: not a top-level scalar field/);
+  assert.match(issues[0]!, /guardian\.allow: not a top-level scalar field/);
 
   const after = await readFile(config.path, "utf8");
   assert.equal(after, original);
@@ -126,7 +126,7 @@ test("saving an invalid value returns an issue and writes nothing", async () => 
 
   const { issues } = await config.save({ timeoutMs: -5 });
   assert.equal(issues.length, 1);
-  assert.match(issues[0], /^guardian\.timeoutMs: /);
+  assert.match(issues[0]!, /^guardian\.timeoutMs: /);
 
   const after = await readFile(config.path, "utf8");
   assert.equal(after, original);

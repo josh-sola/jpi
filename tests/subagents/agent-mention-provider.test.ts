@@ -226,7 +226,7 @@ describe("agent suggestions", () => {
       for (const line of ["@e", "@ex", "@exp"]) await suggest(provider, line);
 
       expect(warn).toHaveBeenCalledTimes(1);
-      expect(warn.mock.calls[0][0]).toContain("[jpi-subagents]");
+      expect(warn.mock.calls[0]![0]).toContain("[jpi-subagents]");
     } finally {
       warn.mockRestore();
     }
@@ -324,7 +324,7 @@ describe("agents that have never run", () => {
     const result = await suggest(provider, "@ex");
 
     expect(agentRows(result).map((i) => i.value)).toEqual(["@explore"]);
-    expect(agentRows(result)[0].description).toBe("send message · running · find flaky tests");
+    expect(agentRows(result)[0]!.description).toBe("send message · running · find flaky tests");
   });
 
   it("still offers the type once its only instance has finished, as a resume", async () => {
@@ -334,7 +334,7 @@ describe("agents that have never run", () => {
       () => true,
     );
 
-    expect((await suggest(provider, "@ex"))?.items[0].description).toBe(
+    expect((await suggest(provider, "@ex"))?.items[0]!.description).toBe(
       "resume · completed · find flaky tests",
     );
   });
@@ -426,7 +426,7 @@ describe("composing with another extension's provider", () => {
     return {
       triggerCharacters: ["#"],
       getSuggestions: vi.fn(async (lines: string[], line: number, col: number, opts: any) =>
-        /(^|\s)#\w*$/.test(lines[line].slice(0, col))
+        /(^|\s)#\w*$/.test(lines[line]!.slice(0, col))
           ? { items: [{ value: "#general", label: "#general" }], prefix: "#" }
           : current.getSuggestions(lines, line, col, opts),
       ),
@@ -521,7 +521,7 @@ describe("against pi's real provider", () => {
     const p = provider();
     const suggestions = (await suggest(p, "@ex"))!;
 
-    expect(p.applyCompletion(["@ex"], 0, 3, suggestions.items[0], suggestions.prefix)).toEqual({
+    expect(p.applyCompletion(["@ex"], 0, 3, suggestions.items[0]!, suggestions.prefix)).toEqual({
       lines: ["@explore "],
       cursorLine: 0,
       cursorCol: 9,
@@ -532,11 +532,13 @@ describe("against pi's real provider", () => {
     const p = provider();
     const suggestions = (await suggest(p, "ask @ex"))!;
 
-    expect(p.applyCompletion(["ask @ex"], 0, 7, suggestions.items[0], suggestions.prefix)).toEqual({
-      lines: ["ask @explore "],
-      cursorLine: 0,
-      cursorCol: 13,
-    });
+    expect(p.applyCompletion(["ask @ex"], 0, 7, suggestions.items[0]!, suggestions.prefix)).toEqual(
+      {
+        lines: ["ask @explore "],
+        cursorLine: 0,
+        cursorCol: 13,
+      },
+    );
   });
 
   it("keeps text after the cursor intact", async () => {
@@ -544,7 +546,7 @@ describe("against pi's real provider", () => {
     const suggestions = (await suggest(p, "@ex"))!;
 
     expect(
-      p.applyCompletion(["@ex please"], 0, 3, suggestions.items[0], suggestions.prefix).lines,
+      p.applyCompletion(["@ex please"], 0, 3, suggestions.items[0]!, suggestions.prefix).lines,
     ).toEqual(["@explore  please"]);
   });
 
@@ -677,7 +679,7 @@ describe("named agents and evicted ones", () => {
       () => true,
     );
 
-    expect((await suggest(provider, "@"))!.items[0].description).toBe(
+    expect((await suggest(provider, "@"))!.items[0]!.description).toBe(
       "send message · running · find flaky tests",
     );
   });
@@ -750,7 +752,7 @@ describe("named agents and evicted ones", () => {
     ]);
 
     expect(roster).toHaveLength(1);
-    expect(roster[0].kind).toBe("tombstone");
+    expect(roster[0]!.kind).toBe("tombstone");
   });
 });
 
@@ -780,7 +782,7 @@ describe("rows carry the display name, not the raw type", () => {
       () => true,
     );
 
-    expect((await suggest(provider, "@"))!.items[0].description).toBe(
+    expect((await suggest(provider, "@"))!.items[0]!.description).toBe(
       "send message · Auth Auditor · running · audit the auth flow",
     );
   });
@@ -792,7 +794,7 @@ describe("rows carry the display name, not the raw type", () => {
       () => true,
     );
 
-    expect((await suggest(provider, "@"))!.items[0].description).toBe(
+    expect((await suggest(provider, "@"))!.items[0]!.description).toBe(
       "resume · Auth Auditor · audit the RPC path",
     );
   });
@@ -806,6 +808,6 @@ describe("rows carry the display name, not the raw type", () => {
       () => true,
     );
 
-    expect((await suggest(provider, "@"))!.items[0].description).toContain("· Explore ·");
+    expect((await suggest(provider, "@"))!.items[0]!.description).toContain("· Explore ·");
   });
 });

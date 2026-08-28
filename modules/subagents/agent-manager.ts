@@ -1049,7 +1049,8 @@ export class AgentManager {
     for (;;) {
       const i = this.queue.findIndex((e) => this.poolHasRoom(e.pool));
       if (i === -1) return;
-      const [next] = this.queue.splice(i, 1);
+      const next = this.queue[i]!;
+      this.queue.splice(i, 1);
       const record = this.agents.get(next.id);
       // Stale entries (aborted while queued) are not started — but are still
       // released, since nothing else will.

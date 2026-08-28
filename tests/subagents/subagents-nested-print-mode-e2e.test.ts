@@ -256,7 +256,7 @@ describe("PR #164 nested agents through the real print-mode boundary", () => {
           });
         }
         if (toolResults(ctx, "get_subagent_result").length === 0) {
-          const id = agents[0].match(/Agent ID: ([^\s]+)/)?.[1];
+          const id = agents[0]!.match(/Agent ID: ([^\s]+)/)?.[1];
           if (!id) throw new Error(`No background agent ID in: ${agents[0]}`);
           return toolCall(
             "get_subagent_result",
@@ -335,7 +335,7 @@ describe("PR #164 nested agents through the real print-mode boundary", () => {
                 run_in_background: true,
               });
             }
-            const id = agents[0].match(/Agent ID: ([^\s]+)/)?.[1];
+            const id = agents[0]!.match(/Agent ID: ([^\s]+)/)?.[1];
             if (!id) throw new Error(`No nested ID in: ${agents[0]}`);
             nestedId = id;
             ownerHolding();
@@ -386,7 +386,7 @@ describe("PR #164 nested agents through the real print-mode boundary", () => {
           const results = toolResults(ctx, "get_subagent_result");
           if (results.length === 0) {
             // Poll the probe (second background agent) for the denial outcome.
-            const probeSpawn = agents[1];
+            const probeSpawn = agents[1]!;
             const probeId = probeSpawn.match(/Agent ID: ([^\s]+)/)?.[1];
             if (!probeId) throw new Error(`No probe ID in: ${probeSpawn}`);
             return toolCall(

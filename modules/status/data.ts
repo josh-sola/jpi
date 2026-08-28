@@ -99,8 +99,8 @@ function parseOrigin(origin: string): ParsedOrigin {
   let path: string | undefined;
   const scpMatch = /^[^@\s]+@([^:\s]+):(.+)$/.exec(trimmed);
   if (scpMatch) {
-    host = scpMatch[1];
-    path = scpMatch[2];
+    host = scpMatch[1]!;
+    path = scpMatch[2]!;
   } else {
     try {
       const parsed = new URL(trimmed);

@@ -111,7 +111,7 @@ test("one module's setup throwing is collected as a failure and does not stop la
   const { failures } = await loadModules(fakePi, modules);
   assert.equal(secondCalled, true);
   assert.equal(failures.length, 1);
-  assert.match(failures[0], /^first: boom$/);
+  assert.match(failures[0]!, /^first: boom$/);
 });
 
 test("issues from Config.load are collected prefixed with the module name", async (t) => {
@@ -127,7 +127,7 @@ test("issues from Config.load are collected prefixed with the module name", asyn
 
   const { issues } = await loadModules(fakePi, [mod]);
   assert.equal(issues.length, 1);
-  assert.match(issues[0], /^widget: widget\.color: /);
+  assert.match(issues[0]!, /^widget: widget\.color: /);
 });
 
 test("injectEnabled throws when a module schema declares its own enabled field", () => {

@@ -65,7 +65,7 @@ test("startup defers the idle title until after worktree lookup and rename is sy
   assert.deepEqual(ctx.titles, []);
   const startup = scheduler.active("timeout", 0);
   assert.equal(startup.length, 1);
-  scheduler.fire(startup[0]);
+  scheduler.fire(startup[0]!);
   assert.equal(ctx.titles.at(-1), "⏹ Friendly tree");
 
   sessionName = "Renamed\nSession";
