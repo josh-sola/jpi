@@ -29,6 +29,7 @@ export type { BeforeAgentStartEvent, EventBus, Notifier, NotifyLevel } from "./p
 export { projectSlug } from "./project-slug.ts";
 export {
   asString,
+  BorderBox,
   bulletState,
   countLines,
   createResultLine,
@@ -38,6 +39,7 @@ export {
   isWithinRoot,
   plural,
   relativizePath,
+  resolveMarkdownTheme,
   ToolHeader,
   ToolResultLine,
   type BulletState,

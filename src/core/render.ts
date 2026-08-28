@@ -9,8 +9,13 @@
 import { homedir } from "node:os";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 
-import type { Theme, ThemeColor } from "@earendil-works/pi-coding-agent";
-import type { Component } from "@earendil-works/pi-tui";
+import { getMarkdownTheme, type Theme, type ThemeColor } from "@earendil-works/pi-coding-agent";
+import {
+  type Component,
+  type MarkdownTheme,
+  truncateToWidth,
+  visibleWidth,
+} from "@earendil-works/pi-tui";
 
 export type BulletState = "pending" | "running" | "success" | "error";
 
@@ -215,4 +220,111 @@ export function createResultLine(
   const line = reuse instanceof ToolResultLine ? reuse : new ToolResultLine();
   line.update(summary, theme, color);
   return line;
+}
+
+const BORDER_SIDE_WIDTH = 2; // "│ " / " │"
+const BORDER_TOTAL_WIDTH = BORDER_SIDE_WIDTH * 2;
+
+/**
+ * Hand-drawn rounded border around a panel: neither OverlayOptions nor Box
+ * supports one. Renders children at `width - 4` (border column plus one
+ * padding space per side) and pads every inner line flush to that width
+ * before closing the right edge, so the panel stays opaque over whatever the
+ * overlay covers. An optional title interrupts the top rule with `╭── title ──╮`.
+ */
+export class BorderBox implements Component {
+  constructor(
+    private readonly theme: Theme,
+    private readonly children: readonly Component[],
+    private readonly dividerAfterIndex?: number,
+    private readonly title?: string,
+  ) {}
+
+  invalidate(): void {
+    for (const child of this.children) child.invalidate?.();
+  }
+
+  render(width: number): string[] {
+    const safeWidth = Math.max(0, width);
+    const innerWidth = Math.max(0, safeWidth - BORDER_TOTAL_WIDTH);
+    const horizontal = "─".repeat(Math.max(0, safeWidth - 2));
+
+    const lines: string[] = [this.renderTopLine(safeWidth, horizontal)];
+
+    this.children.forEach((child, index) => {
+      for (const line of child.render(innerWidth)) {
+        lines.push(this.wrapInnerLine(line, innerWidth));
+      }
+      if (index === this.dividerAfterIndex) {
+        lines.push(this.theme.fg("border", `├${horizontal}┤`));
+      }
+    });
+
+    lines.push(this.theme.fg("border", `╰${horizontal}╯`));
+    return lines;
+  }
+
+  private renderTopLine(width: number, plainHorizontal: string): string {
+    if (!this.title) return this.theme.fg("border", `╭${plainHorizontal}╮`);
+
+    const innerWidth = Math.max(0, width - 2);
+    const titleText = truncateToWidth(` ${this.title} `, innerWidth);
+    const leftLen = Math.floor((innerWidth - visibleWidth(titleText)) / 2);
+    const left = "─".repeat(Math.max(0, leftLen));
+    const right = "─".repeat(Math.max(0, innerWidth - visibleWidth(titleText) - leftLen));
+    return `${this.theme.fg("border", `╭${left}`)}${this.theme.fg("accent", titleText)}${this.theme.fg("border", `${right}╮`)}`;
+  }
+
+  private wrapInnerLine(line: string, innerWidth: number): string {
+    const padCount = Math.max(0, innerWidth - visibleWidth(line));
+    const padded = padCount > 0 ? `${line}${" ".repeat(padCount)}` : line;
+    return `${this.theme.fg("border", "│ ")}${padded}${this.theme.fg("border", " │")}`;
+  }
+}
+
+/**
+ * Pi's own Markdown theme when this process has one, else a theme built from
+ * `theme`. Preferring pi's buys syntax-highlighted code fences and keeps
+ * rendering consistent with pi's own chat.
+ *
+ * `getMarkdownTheme()` has to be *probed* rather than try/caught around the
+ * call: it returns arrow functions that read pi's global theme lazily, so an
+ * uninitialized theme throws inside `render()` — long after this returns —
+ * which is the case in tests and any embedded session that never called
+ * `initTheme()`.
+ */
+export function resolveMarkdownTheme(theme: Theme): MarkdownTheme {
+  try {
+    const piTheme = getMarkdownTheme();
+    piTheme.heading("probe");
+    return piTheme;
+  } catch {
+    return fallbackMarkdownTheme(theme);
+  }
+}
+
+/**
+ * `Theme` carries only `fg` and `bold`, so the three remaining inline styles
+ * are written as raw SGR codes. Rendering them as plain text instead would
+ * silently drop `*emphasis*`'s markers with nothing in their place, turning a
+ * formatting change into a content change.
+ */
+function fallbackMarkdownTheme(theme: Theme): MarkdownTheme {
+  const sgr = (on: number, off: number) => (text: string) => `\x1b[${on}m${text}\x1b[${off}m`;
+  return {
+    heading: (text) => theme.bold(theme.fg("accent", text)),
+    link: (text) => theme.fg("accent", text),
+    linkUrl: (text) => theme.fg("muted", text),
+    code: (text) => theme.fg("muted", text),
+    codeBlock: (text) => theme.fg("muted", text),
+    codeBlockBorder: (text) => theme.fg("dim", text),
+    quote: (text) => theme.fg("muted", text),
+    quoteBorder: (text) => theme.fg("dim", text),
+    hr: (text) => theme.fg("dim", text),
+    listBullet: (text) => theme.fg("accent", text),
+    bold: (text) => theme.bold(text),
+    italic: sgr(3, 23),
+    underline: sgr(4, 24),
+    strikethrough: sgr(9, 29),
+  };
 }
