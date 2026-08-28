@@ -1,4 +1,4 @@
-import { writeJsonAtomic } from "../durable-write.ts";
+import { writeJsonAtomic } from "../../../src/core/index.ts";
 import type { BgTaskSnapshot } from "../registry.ts";
 import type { BgTask } from "./task.ts";
 
