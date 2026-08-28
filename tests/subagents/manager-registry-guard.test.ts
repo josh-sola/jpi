@@ -74,7 +74,9 @@ async function spawnBackground(tools: Map<string, any>): Promise<string> {
     undefined,
     ctx(),
   );
-  return /Agent ID: (\S+)/.exec(textOf(r))![1];
+  const id = /Agent ID: (\S+)/.exec(textOf(r))?.[1];
+  if (!id) throw new Error(`No agent ID in: ${textOf(r)}`);
+  return id;
 }
 
 // Restore the global slot around every test.
@@ -134,7 +136,7 @@ describe("the registry spawn strips internal capabilities", () => {
       isBackground: true,
       ...options,
     });
-    return { entry, id, root, runOpts: () => vi.mocked(runAgent).mock.calls[0][3] as any };
+    return { entry, id, root, runOpts: () => vi.mocked(runAgent).mock.calls[0]![3] as any };
   }
 
   it("refuses a forged nesting, so the agent cannot hide under someone else's id", async () => {

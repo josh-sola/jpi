@@ -55,7 +55,7 @@ function tools(
   maxSubagentDepth = 2,
   configCwd = cwd,
 ) {
-  return createNestedSubagentTools({
+  const [agent, getResult, steer] = createNestedSubagentTools({
     manager,
     pi: {} as any,
     parentAgentId: "parent-1",
@@ -64,6 +64,7 @@ function tools(
     allowedSubagents,
     configCwd,
   });
+  return [agent!, getResult!, steer!] as const;
 }
 
 async function execute(tool: any, params: Record<string, unknown>, executionCwd = cwd) {
@@ -624,7 +625,7 @@ describe("child-safe nested Agent tools", () => {
       executionCtx,
     );
 
-    expect(spawnAndWait.mock.calls[0][1]).toBe(executionCtx);
+    expect(spawnAndWait.mock.calls[0]![1]).toBe(executionCtx);
   });
 });
 

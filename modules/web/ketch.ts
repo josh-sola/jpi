@@ -235,7 +235,7 @@ export function createKetchRunner(options: CreateKetchRunnerOptions): KetchRunne
         let result: KetchExecResult;
         try {
           result = await options.exec(executable, [...args], {
-            signal: runOptions.signal,
+            ...(runOptions.signal !== undefined && { signal: runOptions.signal }),
             timeout: runOptions.timeoutMs,
           });
         } catch (error) {

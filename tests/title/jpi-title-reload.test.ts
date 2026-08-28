@@ -34,7 +34,7 @@ test("repeated session starts ignore stale worktree results and callbacks", asyn
   await currentStart;
   const startup = scheduler.active("timeout", 0);
   assert.equal(startup.length, 1);
-  scheduler.fire(startup[0]);
+  scheduler.fire(startup[0]!);
   assert.equal(titles.at(-1), "⏹ current tree");
 
   const titleCount = titles.length;

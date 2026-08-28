@@ -74,7 +74,9 @@ async function spawnBackground(tools: Map<string, any>): Promise<string> {
     undefined,
     ctx(),
   );
-  return /Agent ID: (\S+)/.exec(textOf(r))![1];
+  const id = /Agent ID: (\S+)/.exec(textOf(r))?.[1];
+  if (!id) throw new Error(`No agent ID in: ${textOf(r)}`);
+  return id;
 }
 
 const steer = (tools: Map<string, any>, agent_id: string, message: string) =>

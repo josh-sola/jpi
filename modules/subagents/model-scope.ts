@@ -56,7 +56,7 @@ export function checkModelScope(args: {
   /** Display name used in the warning toast. */
   agentLabel: string;
   /** The raw `model:` input, when there was one. */
-  modelInput?: string;
+  modelInput?: string | undefined;
 }): ModelScopeVerdict {
   const { model, cwd, modelRegistry, callerSupplied, agentLabel, modelInput } = args;
   if (!scopeModelsEnabled || !model) return { kind: "ok" };

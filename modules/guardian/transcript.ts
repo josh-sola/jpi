@@ -197,7 +197,7 @@ function capToolCallItems(items: TranscriptItem[]): TranscriptItem[] {
   let toolItemsSeen = 0;
   const kept: TranscriptItem[] = [];
   for (let index = items.length - 1; index >= 0; index -= 1) {
-    const item = items[index];
+    const item = items[index]!;
     if (item.role === "tool") {
       toolItemsSeen += 1;
       if (toolItemsSeen > MAX_TOOL_CALL_ITEMS) continue;
@@ -218,7 +218,7 @@ function splitHeadAndTail(
   let headChars = 0;
   let headEnd = 0;
   while (headEnd < items.length) {
-    const next = headChars + items[headEnd].text.length;
+    const next = headChars + items[headEnd]!.text.length;
     if (headEnd > 0 && next > headBudget) break;
     headChars = next;
     headEnd += 1;
@@ -228,7 +228,7 @@ function splitHeadAndTail(
   let tailStart = items.length;
   const tailBudget = maxChars - headChars;
   while (tailStart > headEnd) {
-    const next = tailChars + items[tailStart - 1].text.length;
+    const next = tailChars + items[tailStart - 1]!.text.length;
     if (tailStart < items.length && next > tailBudget) break;
     tailChars = next;
     tailStart -= 1;

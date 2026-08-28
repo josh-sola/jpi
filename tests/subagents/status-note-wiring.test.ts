@@ -194,7 +194,7 @@ describe("status note reaches the parent through the real handlers", () => {
     );
 
     // Internal scoped tools receive the raw owning manager through nestedRuntime.
-    const rawManager = vi.mocked(runAgent).mock.calls[0][3].nestedRuntime!.manager;
+    const rawManager = vi.mocked(runAgent).mock.calls[0]![3].nestedRuntime!.manager;
     pi.events.emit.mockClear();
     pi.appendEntry.mockClear();
     pi.sendMessage.mockClear();
@@ -379,8 +379,8 @@ describe("subagents:compacted", () => {
         undefined,
         ctx(),
       );
-    const rawManager = vi.mocked(runAgent).mock.calls[0][3].nestedRuntime!.manager;
-    const parentId = vi.mocked(runAgent).mock.calls[0][3].nestedRuntime!.parentAgentId;
+    const rawManager = vi.mocked(runAgent).mock.calls[0]![3].nestedRuntime!.manager;
+    const parentId = vi.mocked(runAgent).mock.calls[0]![3].nestedRuntime!.parentAgentId;
     pi.events.emit.mockClear();
 
     rawManager.spawn(pi, ctx(), "general-purpose", "nested", {

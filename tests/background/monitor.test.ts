@@ -57,16 +57,22 @@ function makeManagers(
     sendNotification: () => undefined,
     killGraceMs: 300,
     stopWaitMs: 1500,
-    maxRecentTasks: overrides.maxRecentTasks,
+    ...(overrides.maxRecentTasks !== undefined && { maxRecentTasks: overrides.maxRecentTasks }),
     logger: { error: () => undefined },
   });
   const monitors = new MonitorManager({
     registry,
     sendNotification,
     batchWindowMs: overrides.batchWindowMs ?? 30,
-    maxEventsPerMinute: overrides.maxEventsPerMinute,
-    defaultTimeoutSeconds: overrides.defaultTimeoutSeconds,
-    maxRecentMonitors: overrides.maxRecentMonitors,
+    ...(overrides.maxEventsPerMinute !== undefined && {
+      maxEventsPerMinute: overrides.maxEventsPerMinute,
+    }),
+    ...(overrides.defaultTimeoutSeconds !== undefined && {
+      defaultTimeoutSeconds: overrides.defaultTimeoutSeconds,
+    }),
+    ...(overrides.maxRecentMonitors !== undefined && {
+      maxRecentMonitors: overrides.maxRecentMonitors,
+    }),
     logger: { error: () => undefined },
   });
   return { registry, monitors, calls };

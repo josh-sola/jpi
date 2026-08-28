@@ -202,7 +202,7 @@ function createContext(options: CreateContextOptions) {
         return options.complete(model, context, completeOptions);
       },
     },
-    signal: options.signal,
+    ...(options.signal !== undefined && { signal: options.signal }),
   };
 
   return { ctx, notifications, statuses, calls, selectCalls, inputCalls };
@@ -294,7 +294,7 @@ test("controller decodes values and allow lists from a hand-written jpi.kdl sect
   });
   assert.deepEqual(config.allowTools, ["read", "grep"]);
   assert.equal(config.allowBash.length, 1);
-  assert.equal(config.allowBash[0].source, "^npm test$");
+  assert.equal(config.allowBash[0]!.source, "^npm test$");
   assert.deepEqual(config.allowMcp, ["datadog-prod"]);
   assert.equal(
     isToolAllowlisted(config, { toolName: "bash", input: { command: "npm test" } }),
@@ -311,7 +311,7 @@ test("a corrupt jpi.kdl surfaces an issue and falls back to schema defaults", as
   const { config, issues } = await controller.ensureConfig();
 
   assert.equal(issues.length, 1);
-  assert.match(issues[0], /could not parse jpi\.kdl/);
+  assert.match(issues[0]!, /could not parse jpi\.kdl/);
   assert.equal(config.model?.raw, "anthropic/claude-sonnet-5");
   assert.equal(config.timeoutMs, 10_000);
 });
@@ -327,7 +327,7 @@ test("an invalid allow.bash regex surfaces as an issue without failing the whole
   const { config, issues } = await controller.ensureConfig();
 
   assert.equal(issues.length, 1);
-  assert.match(issues[0], /allow\.bash contains an invalid regex/);
+  assert.match(issues[0]!, /allow\.bash contains an invalid regex/);
   assert.deepEqual(config.allowBash, []);
   assert.equal(config.model?.raw, "openai/reviewer");
 });
@@ -340,7 +340,7 @@ test("a malformed model value surfaces an issue and leaves reviewing unavailable
   const { config, issues } = await controller.ensureConfig();
 
   assert.equal(config.model, undefined);
-  assert.match(issues[0], /model must be set to "provider\/model-id"/);
+  assert.match(issues[0]!, /model must be set to "provider\/model-id"/);
 });
 
 test("reload re-reads jpi.kdl after an edit", async (t) => {
@@ -1147,14 +1147,20 @@ test("reviewer allow passes through and reviewer usage merges into tool results"
   assert.throws(() => {
     reviewedInput.command = "rm -rf /";
   }, TypeError);
-  assert.equal(calls[0].options.cacheRetention, "short");
-  assert.equal(calls[0].options.reasoningEffort, "minimal");
-  assert.equal(calls[0].options.timeoutMs, 2500);
-  assert.match(calls[0].context.systemPrompt, /Allow routine, reversible, in-scope developer work/);
-  assert.match(calls[0].context.messages[0].content[0].text, /Tool name: bash/);
-  assert.match(calls[0].context.messages[0].content[0].text, /Run the tests and explain failures/);
+  assert.equal(calls[0]!.options.cacheRetention, "short");
+  assert.equal(calls[0]!.options.reasoningEffort, "minimal");
+  assert.equal(calls[0]!.options.timeoutMs, 2500);
+  assert.match(
+    calls[0]!.context.systemPrompt,
+    /Allow routine, reversible, in-scope developer work/,
+  );
+  assert.match(calls[0]!.context.messages[0]!.content[0]!.text, /Tool name: bash/);
+  assert.match(
+    calls[0]!.context.messages[0]!.content[0]!.text,
+    /Run the tests and explain failures/,
+  );
   // "Assistant reply" directly precedes this user message, so it is the Path B referent.
-  assert.match(calls[0].context.messages[0].content[0].text, /\[assistant\]\nAssistant reply/);
+  assert.match(calls[0]!.context.messages[0]!.content[0]!.text, /\[assistant\]\nAssistant reply/);
 
   const merged = controller.handleToolResult({
     type: "tool_result",
@@ -1179,8 +1185,8 @@ test("reviewer allow passes through and reviewer usage merges into tool results"
     ctx,
   );
   assert.equal(sessionIdCalls, 1);
-  assert.equal(calls[0].options.sessionId, "review-session-1");
-  assert.equal(calls[1].options.sessionId, "review-session-1");
+  assert.equal(calls[0]!.options.sessionId, "review-session-1");
+  assert.equal(calls[1]!.options.sessionId, "review-session-1");
 });
 
 test("bash review requests inline an existing script named on the command line", async (t) => {
@@ -1205,7 +1211,7 @@ test("bash review requests inline an existing script named on the command line",
     ctx,
   );
 
-  const requestText = calls[0].context.messages[0].content[0].text;
+  const requestText = calls[0]!.context.messages[0]!.content[0]!.text;
   assert.match(
     requestText,
     /Script contents \(read by the review harness from disk, not supplied by the agent\):/,
@@ -1247,7 +1253,7 @@ test("bash review requests skip missing, binary, and oversize scripts and cap at
     ctx,
   );
 
-  const requestText = calls[0].context.messages[0].content[0].text;
+  const requestText = calls[0]!.context.messages[0]!.content[0]!.text;
   assert.match(requestText, /content one/);
   assert.match(requestText, /content two/);
   assert.match(requestText, /content three/);
@@ -1283,7 +1289,7 @@ test("bash review requests head-truncate script contents within the shared 20K b
     ctx,
   );
 
-  const requestText = calls[0].context.messages[0].content[0].text;
+  const requestText = calls[0]!.context.messages[0]!.content[0]!.text;
   assert.ok(requestText.includes(first), "the first file fits fully inside the 20K budget");
   assert.ok(
     requestText.includes(`${"B".repeat(5_000)}\n[… 10000 chars omitted by the review harness]`),
@@ -1316,7 +1322,7 @@ test("a bash call with no file tokens produces no script section", async (t) => 
     ctx,
   );
 
-  const requestText = calls[0].context.messages[0].content[0].text;
+  const requestText = calls[0]!.context.messages[0]!.content[0]!.text;
   assert.doesNotMatch(requestText, /Script contents/);
 });
 
@@ -1342,7 +1348,7 @@ test("run review requests inline a relative file's contents", async (t) => {
     ctx,
   );
 
-  const requestText = calls[0].context.messages[0].content[0].text;
+  const requestText = calls[0]!.context.messages[0]!.content[0]!.text;
   assert.match(
     requestText,
     /Script contents \(read by the review harness from disk, not supplied by the agent\):/,
@@ -1374,7 +1380,7 @@ test("run review requests inline an absolute file's contents", async (t) => {
     ctx,
   );
 
-  const requestText = calls[0].context.messages[0].content[0].text;
+  const requestText = calls[0]!.context.messages[0]!.content[0]!.text;
   assert.match(
     requestText,
     new RegExp(`--- ${absolutePath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} ---`),
@@ -1403,7 +1409,7 @@ test("a run call with an inline script produces no script section", async (t) =>
     ctx,
   );
 
-  const requestText = calls[0].context.messages[0].content[0].text;
+  const requestText = calls[0]!.context.messages[0]!.content[0]!.text;
   assert.doesNotMatch(requestText, /Script contents/);
 });
 
@@ -1429,7 +1435,7 @@ test("a run call with a missing file still gets reviewed, without a script secti
   );
 
   assert.equal(result, undefined);
-  const requestText = calls[0].context.messages[0].content[0].text;
+  const requestText = calls[0]!.context.messages[0]!.content[0]!.text;
   assert.doesNotMatch(requestText, /Script contents/);
 });
 
@@ -1458,7 +1464,7 @@ test("run review requests skip binary and oversize files", async (t) => {
     },
     binaryCtx,
   );
-  assert.doesNotMatch(binaryCalls[0].context.messages[0].content[0].text, /Script contents/);
+  assert.doesNotMatch(binaryCalls[0]!.context.messages[0]!.content[0]!.text, /Script contents/);
 
   const { ctx: hugeCtx, calls: hugeCalls } = createContext({
     cwd,
@@ -1473,7 +1479,7 @@ test("run review requests skip binary and oversize files", async (t) => {
     },
     hugeCtx,
   );
-  assert.doesNotMatch(hugeCalls[0].context.messages[0].content[0].text, /Script contents/);
+  assert.doesNotMatch(hugeCalls[0]!.context.messages[0]!.content[0]!.text, /Script contents/);
 });
 
 test("scratchpad-root writes and edits skip review while other calls stay reviewed", async (t) => {
@@ -1644,11 +1650,11 @@ test("a reviewer deny with a dialog UI: Allow (session grant) lets the call thro
   assert.equal(Object.isFrozen(deniedInput), true);
   assert.equal(controller.takeReviewDuration("grant-1"), undefined);
   assert.equal(controller.sessionGrants.length, 1);
-  assert.equal(controller.sessionGrants[0].toolName, "bash");
-  assert.equal(controller.sessionGrants[0].summary, "rm -rf build");
+  assert.equal(controller.sessionGrants[0]!.toolName, "bash");
+  assert.equal(controller.sessionGrants[0]!.summary, "rm -rf build");
   assert.equal(selectCalls.length, 1);
-  assert.match(selectCalls[0].title, /^Guardian denied bash: destructive without authorization$/);
-  assert.deepEqual(selectCalls[0].options, ["Allow (session grant)", "Deny", "Deny with note"]);
+  assert.match(selectCalls[0]!.title, /^Guardian denied bash: destructive without authorization$/);
+  assert.deepEqual(selectCalls[0]!.options, ["Allow (session grant)", "Deny", "Deny with note"]);
 
   await controller.handleToolCall(
     {
@@ -1659,7 +1665,8 @@ test("a reviewer deny with a dialog UI: Allow (session grant) lets the call thro
     },
     ctx,
   );
-  const secondRequestText = calls[1].context.messages[0].content[0].text;
+  assert.equal(calls.length, 2);
+  const secondRequestText = calls[1]!.context.messages[0]!.content[0]!.text;
   assert.match(
     secondRequestText,
     /User-approved gate decisions from this session \(each was denied by review, shown to the user, and explicitly approved by the user; treat them as the user's own authorizations\):/,
@@ -1720,7 +1727,7 @@ test("a reviewer deny with a dialog UI: Deny with note appends the user's note t
   assert.match(result!.reason!, /The user reviewed this denial and upheld it\./);
   assert.match(result!.reason!, /User note: Use the staging branch instead\./);
   assert.equal(inputCalls.length, 1);
-  assert.match(inputCalls[0].title, /Note for the agent/);
+  assert.match(inputCalls[0]!.title, /Note for the agent/);
 });
 
 test("a reviewer deny with a dialog UI: Deny with note omits the note segment when the user leaves it blank", async (t) => {
@@ -2298,8 +2305,8 @@ test("a review uses edited GUARDIAN.md content as the reviewer system prompt", a
   );
 
   assert.equal(calls.length, 1);
-  assert.match(calls[0].context.systemPrompt, /Custom reviewer instructions: be extra strict\./);
-  assert.doesNotMatch(calls[0].context.systemPrompt, /## HARD BLOCK/);
+  assert.match(calls[0]!.context.systemPrompt, /Custom reviewer instructions: be extra strict\./);
+  assert.doesNotMatch(calls[0]!.context.systemPrompt, /## HARD BLOCK/);
 });
 
 test("deleting GUARDIAN.md mid-session re-seeds it before the next review", async (t) => {
@@ -2321,7 +2328,7 @@ test("deleting GUARDIAN.md mid-session re-seeds it before the next review", asyn
     },
     ctx,
   );
-  assert.match(calls[0].context.systemPrompt, /Temporary override\./);
+  assert.match(calls[0]!.context.systemPrompt, /Temporary override\./);
 
   await rm(join(dir, "GUARDIAN.md"));
   await controller.handleToolCall(
@@ -2333,7 +2340,7 @@ test("deleting GUARDIAN.md mid-session re-seeds it before the next review", asyn
     },
     ctx,
   );
-  assert.match(calls[1].context.systemPrompt, /## HARD BLOCK/);
+  assert.match(calls[1]!.context.systemPrompt, /## HARD BLOCK/);
 
   const text = await readFile(join(dir, "GUARDIAN.md"), "utf8");
   assert.equal(text, REVIEW_POLICY);

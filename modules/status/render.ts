@@ -19,18 +19,18 @@ export type WidthHelpers = {
 
 export type FooterSnapshot = {
   modelName: string;
-  contextPercent?: number;
-  contextWindow?: number;
-  contextTokens?: number;
-  sessionName?: string;
+  contextPercent?: number | undefined;
+  contextWindow?: number | undefined;
+  contextTokens?: number | undefined;
+  sessionName?: string | undefined;
   turnCount?: number;
-  liveSpeed?: number;
+  liveSpeed?: number | undefined;
   cost?: number;
   tokensIn?: number;
   tokensOut?: number;
   cacheRead?: number;
   cacheWrite?: number;
-  activeToolName?: string;
+  activeToolName?: string | undefined;
   cwd?: string;
   homeDirectory?: string;
   repository: RepositoryMetadata;

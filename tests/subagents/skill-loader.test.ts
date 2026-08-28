@@ -2,7 +2,17 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
-import { preloadSkills } from "../../modules/subagents/skill-loader.ts";
+import { preloadSkills, type PreloadedSkill } from "../../modules/subagents/skill-loader.ts";
+
+// preloadSkills maps 1:1 over its input names, so indexing into its result at a
+// position we know we passed a name for is always in bounds.
+function at(skills: PreloadedSkill[], index: number): PreloadedSkill {
+  const skill = skills[index];
+  if (skill === undefined) {
+    throw new Error(`expected a preloaded skill at index ${index}`);
+  }
+  return skill;
+}
 
 describe("preloadSkills", () => {
   let tmpDir: string;
@@ -44,90 +54,90 @@ describe("preloadSkills", () => {
   it("loads a top-level flat .md skill from project", () => {
     writeFlat(projectRoot(), "api-conventions", "# API Conventions");
     const result = preloadSkills(["api-conventions"], tmpDir);
-    expect(result[0].content).toContain("API Conventions");
+    expect(at(result, 0).content).toContain("API Conventions");
   });
 
   it("ignores .txt files (only .md is supported)", () => {
     writeFlat(projectRoot(), "error-handling", "should not load", ".txt");
-    expect(preloadSkills(["error-handling"], tmpDir)[0].content).toContain("not found");
+    expect(at(preloadSkills(["error-handling"], tmpDir), 0).content).toContain("not found");
   });
 
   it("ignores extensionless files (only .md is supported)", () => {
     writeFlat(projectRoot(), "bare-skill", "should not load", "");
-    expect(preloadSkills(["bare-skill"], tmpDir)[0].content).toContain("not found");
+    expect(at(preloadSkills(["bare-skill"], tmpDir), 0).content).toContain("not found");
   });
 
   it("loads a top-level <name>/SKILL.md from project", () => {
     writeSkillDir(projectRoot(), "writing-go", "# Writing Go");
-    expect(preloadSkills(["writing-go"], tmpDir)[0].content).toContain("Writing Go");
+    expect(at(preloadSkills(["writing-go"], tmpDir), 0).content).toContain("Writing Go");
   });
 
   it("loads a top-level <name>/SKILL.md from getAgentDir()/skills", () => {
     writeSkillDir(globalRoot(), "writing-python", "# Writing Python");
-    expect(preloadSkills(["writing-python"], tmpDir)[0].content).toContain("Writing Python");
+    expect(at(preloadSkills(["writing-python"], tmpDir), 0).content).toContain("Writing Python");
   });
 
   it("loads a flat .md from getAgentDir()/skills", () => {
     writeFlat(globalRoot(), "shell-tips", "use rg");
-    expect(preloadSkills(["shell-tips"], tmpDir)[0].content).toBe("use rg");
+    expect(at(preloadSkills(["shell-tips"], tmpDir), 0).content).toBe("use rg");
   });
 
   it("finds nested <subdir>/<name>/SKILL.md in getAgentDir()/skills", () => {
     writeSkillDir(join(globalRoot(), "dev-tools"), "using-modern-cli", "# Modern CLI");
-    expect(preloadSkills(["using-modern-cli"], tmpDir)[0].content).toContain("Modern CLI");
+    expect(at(preloadSkills(["using-modern-cli"], tmpDir), 0).content).toContain("Modern CLI");
   });
 
   it("finds nested <subdir>/<name>/SKILL.md", () => {
     writeSkillDir(join(projectRoot(), "dev-tools"), "using-modern-cli", "# Modern CLI");
-    expect(preloadSkills(["using-modern-cli"], tmpDir)[0].content).toContain("Modern CLI");
+    expect(at(preloadSkills(["using-modern-cli"], tmpDir), 0).content).toContain("Modern CLI");
   });
 
   it("prefers project over global", () => {
     writeSkillDir(projectRoot(), "shared", "from-project");
     writeSkillDir(globalRoot(), "shared", "from-global");
-    expect(preloadSkills(["shared"], tmpDir)[0].content).toBe("from-project");
+    expect(at(preloadSkills(["shared"], tmpDir), 0).content).toBe("from-project");
   });
 
   it("prefers shallower match (lex tie-break)", () => {
     // Different depths — shallower wins.
     writeSkillDir(join(projectRoot(), "z-deep", "nested"), "collide", "deep");
     writeSkillDir(join(projectRoot(), "a-shallow"), "collide", "shallow");
-    expect(preloadSkills(["collide"], tmpDir)[0].content).toBe("shallow");
+    expect(at(preloadSkills(["collide"], tmpDir), 0).content).toBe("shallow");
 
     // Same depth — alphabetical wins.
     writeSkillDir(join(projectRoot(), "b-sibling"), "tie", "b");
     writeSkillDir(join(projectRoot(), "a-sibling"), "tie", "a");
-    expect(preloadSkills(["tie"], tmpDir)[0].content).toBe("a");
+    expect(at(preloadSkills(["tie"], tmpDir), 0).content).toBe("a");
   });
 
   it("descends past a same-named dir that lacks SKILL.md to find a deeper match", () => {
     // .pi/skills/foo exists empty; .pi/skills/foo/inner/foo/SKILL.md is the real skill.
     mkdirSync(join(projectRoot(), "foo"), { recursive: true });
     writeSkillDir(join(projectRoot(), "foo", "inner"), "foo", "deeper");
-    expect(preloadSkills(["foo"], tmpDir)[0].content).toBe("deeper");
+    expect(at(preloadSkills(["foo"], tmpDir), 0).content).toBe("deeper");
   });
 
   it("does not descend into a sibling skill directory (skills don't nest)", () => {
     // .pi/skills/outer is itself a skill; .pi/skills/outer/target/SKILL.md must NOT be found.
     writeSkillDir(projectRoot(), "outer", "outer-skill");
     writeSkillDir(join(projectRoot(), "outer"), "target", "hidden");
-    expect(preloadSkills(["target"], tmpDir)[0].content).toContain("not found");
+    expect(at(preloadSkills(["target"], tmpDir), 0).content).toContain("not found");
   });
 
   it("skips node_modules during recursion", () => {
     writeSkillDir(join(projectRoot(), "node_modules", "some-pkg"), "leaked", "should not load");
-    expect(preloadSkills(["leaked"], tmpDir)[0].content).toContain("not found");
+    expect(at(preloadSkills(["leaked"], tmpDir), 0).content).toContain("not found");
   });
 
   it("skips dotfile directories during recursion", () => {
     writeSkillDir(join(projectRoot(), ".hidden-tree"), "buried", "should not load");
-    expect(preloadSkills(["buried"], tmpDir)[0].content).toContain("not found");
+    expect(at(preloadSkills(["buried"], tmpDir), 0).content).toContain("not found");
   });
 
   it("returns fallback for missing skills", () => {
     const result = preloadSkills(["nonexistent"], tmpDir);
-    expect(result[0].name).toBe("nonexistent");
-    expect(result[0].content).toContain("not found");
+    expect(at(result, 0).name).toBe("nonexistent");
+    expect(at(result, 0).content).toContain("not found");
   });
 
   it("loads multiple skills", () => {
@@ -141,39 +151,39 @@ describe("preloadSkills", () => {
   });
 
   it("skips skill names with path traversal (..)", () => {
-    expect(preloadSkills(["../../etc/passwd"], tmpDir)[0].content).toContain("path traversal");
+    expect(at(preloadSkills(["../../etc/passwd"], tmpDir), 0).content).toContain("path traversal");
   });
 
   it("skips skill names with forward slash", () => {
-    expect(preloadSkills(["sub/dir"], tmpDir)[0].content).toContain("path traversal");
+    expect(at(preloadSkills(["sub/dir"], tmpDir), 0).content).toContain("path traversal");
   });
 
   it("skips skill names with backslash", () => {
-    expect(preloadSkills(["sub\\dir"], tmpDir)[0].content).toContain("path traversal");
+    expect(at(preloadSkills(["sub\\dir"], tmpDir), 0).content).toContain("path traversal");
   });
 
   it("skips skill names with spaces", () => {
-    expect(preloadSkills(["my skill"], tmpDir)[0].content).toContain("path traversal");
+    expect(at(preloadSkills(["my skill"], tmpDir), 0).content).toContain("path traversal");
   });
 
   it("skips skill names starting with a dot", () => {
-    expect(preloadSkills([".hidden"], tmpDir)[0].content).toContain("path traversal");
+    expect(at(preloadSkills([".hidden"], tmpDir), 0).content).toContain("path traversal");
   });
 
   it("skips empty skill names", () => {
-    expect(preloadSkills([""], tmpDir)[0].content).toContain("path traversal");
+    expect(at(preloadSkills([""], tmpDir), 0).content).toContain("path traversal");
   });
 
   it("skips skill names exceeding 128 characters", () => {
     const longName = "a".repeat(129);
-    expect(preloadSkills([longName], tmpDir)[0].content).toContain("path traversal");
+    expect(at(preloadSkills([longName], tmpDir), 0).content).toContain("path traversal");
   });
 
   it("loads valid skills alongside skipped unsafe ones", () => {
     writeFlat(projectRoot(), "legit", "Good content");
     const result = preloadSkills(["../evil", "legit"], tmpDir);
-    expect(result[0].content).toContain("path traversal");
-    expect(result[1].content).toBe("Good content");
+    expect(at(result, 0).content).toContain("path traversal");
+    expect(at(result, 1).content).toBe("Good content");
   });
 
   it("rejects symlinked flat .md files", () => {
@@ -182,8 +192,8 @@ describe("preloadSkills", () => {
     writeFileSync(secret, "TOP SECRET");
     symlinkSync(secret, join(projectRoot(), "evil.md"));
     const result = preloadSkills(["evil"], tmpDir);
-    expect(result[0].content).toContain("not found");
-    expect(result[0].content).not.toContain("TOP SECRET");
+    expect(at(result, 0).content).toContain("not found");
+    expect(at(result, 0).content).not.toContain("TOP SECRET");
   });
 
   it("rejects symlinked skill directories", () => {
@@ -193,8 +203,8 @@ describe("preloadSkills", () => {
     writeFileSync(join(realDir, "SKILL.md"), "TOP SECRET");
     symlinkSync(realDir, join(projectRoot(), "evil-dir"));
     const result = preloadSkills(["evil-dir"], tmpDir);
-    expect(result[0].content).toContain("not found");
-    expect(result[0].content).not.toContain("TOP SECRET");
+    expect(at(result, 0).content).toContain("not found");
+    expect(at(result, 0).content).not.toContain("TOP SECRET");
   });
 
   it("rejects symlinked skill root", () => {
@@ -207,11 +217,11 @@ describe("preloadSkills", () => {
     mkdirSync(join(tmpDir, ".agents"), { recursive: true });
     symlinkSync(realRoot, projectRoot());
 
-    const flatResult = preloadSkills(["leaked-flat"], tmpDir)[0].content;
+    const flatResult = at(preloadSkills(["leaked-flat"], tmpDir), 0).content;
     expect(flatResult).toContain("not found");
     expect(flatResult).not.toContain("TOP SECRET");
 
-    const dirResult = preloadSkills(["leaked-dir"], tmpDir)[0].content;
+    const dirResult = at(preloadSkills(["leaked-dir"], tmpDir), 0).content;
     expect(dirResult).toContain("not found");
     expect(dirResult).not.toContain("TOP SECRET");
   });
@@ -223,7 +233,7 @@ describe("preloadSkills", () => {
     writeFileSync(secret, "TOP SECRET");
     symlinkSync(secret, join(skillDir, "SKILL.md"));
     const result = preloadSkills(["evil-inner"], tmpDir);
-    expect(result[0].content).toContain("not found");
-    expect(result[0].content).not.toContain("TOP SECRET");
+    expect(at(result, 0).content).toContain("not found");
+    expect(at(result, 0).content).not.toContain("TOP SECRET");
   });
 });

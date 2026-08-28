@@ -31,7 +31,7 @@ function mockUICtx() {
       state.statuses.set(key, text);
     },
     notify(message, type) {
-      state.notifications.push({ message, type });
+      state.notifications.push({ message, ...(type !== undefined && { type }) });
     },
   };
 
@@ -210,7 +210,7 @@ describe("TaskWidget", () => {
     await store.create("A subject far too long for this terminal", "Desc");
     widget.update();
 
-    const line = renderWidget(ui.state, 20)[1].replace(/\u001b\[[0-9;]*m/g, "");
+    const line = renderWidget(ui.state, 20)[1]!.replace(/\u001b\[[0-9;]*m/g, "");
     expect(line.endsWith("...")).toBe(true);
     expect(line.length).toBeLessThanOrEqual(20);
     expect(line).not.toContain("terminal");
@@ -478,7 +478,7 @@ describe("spinner animation timing", () => {
   });
 
   /** The spinner glyph is the first non-space character of the task line. */
-  const glyph = () => renderWidget(ui.state)[1].trim().split(" ")[0];
+  const glyph = () => renderWidget(ui.state)[1]!.trim().split(" ")[0];
 
   it("advances one frame per timer tick", async () => {
     const frames = [glyph()];

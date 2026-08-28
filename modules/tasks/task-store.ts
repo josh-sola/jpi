@@ -30,12 +30,13 @@ import type { Task, TaskStatus, TaskStoreData } from "./types.ts";
  */
 function normalizeTask(t: Record<string, unknown>): Task {
   const now = Date.now();
+  const activeForm = typeof t.activeForm === "string" ? t.activeForm : undefined;
   return {
     id: t.id as string,
     subject: typeof t.subject === "string" ? t.subject : "",
     description: typeof t.description === "string" ? t.description : "",
     status: t.status === "in_progress" || t.status === "completed" ? t.status : "pending",
-    activeForm: typeof t.activeForm === "string" ? t.activeForm : undefined,
+    ...(activeForm !== undefined && { activeForm }),
     createdAt: typeof t.createdAt === "number" ? t.createdAt : now,
     updatedAt: typeof t.updatedAt === "number" ? t.updatedAt : now,
   };
@@ -126,7 +127,7 @@ export class TaskStore {
         subject,
         description,
         status: "pending",
-        activeForm,
+        ...(activeForm !== undefined && { activeForm }),
         createdAt: now,
         updatedAt: now,
       };

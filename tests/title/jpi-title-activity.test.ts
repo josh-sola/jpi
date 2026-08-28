@@ -27,7 +27,7 @@ function harness() {
 test("activity starts at the first frame and advances in the exact 80 ms order", async () => {
   const { scheduler, titles, context, extension } = harness();
   await extension.onSessionStart({}, context);
-  scheduler.fire(scheduler.active("timeout", 0)[0]);
+  scheduler.fire(scheduler.active("timeout", 0)[0]!);
   titles.length = 0;
 
   extension.onAgentStart({}, context);
@@ -50,10 +50,11 @@ test("activity starts at the first frame and advances in the exact 80 ms order",
 test("main, background agents, and multiple subagents use union semantics", async () => {
   const { scheduler, events, titles, context, extension } = harness();
   await extension.onSessionStart({}, context);
-  scheduler.fire(scheduler.active("timeout", 0)[0]);
+  scheduler.fire(scheduler.active("timeout", 0)[0]!);
 
   extension.onAgentStart({}, context);
   const spinner = scheduler.active("interval", 80)[0];
+  assert.ok(spinner);
   events.emit("subagents:started", { id: "one" });
   events.emit("subagents:started", { id: "two" });
   extension.onAgentSettled({}, context);

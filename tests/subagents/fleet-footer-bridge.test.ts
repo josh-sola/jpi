@@ -51,10 +51,10 @@ describe("wireFleetFooterProvider", () => {
     wireFleetFooterProvider(events, fleet);
 
     expect(payloads).toHaveLength(1);
-    expect(payloads[0].schema).toBe("subagents.fleet.provider.v1");
+    expect(payloads[0]!.schema).toBe("subagents.fleet.provider.v1");
 
     const consumer: FleetConsumer = { requestRender: vi.fn() };
-    payloads[0].attach(consumer);
+    payloads[0]!.attach(consumer);
     expect(fleet.attachConsumer).toHaveBeenCalledWith(consumer);
   });
 
@@ -72,7 +72,7 @@ describe("wireFleetFooterProvider", () => {
 
     expect(payloads).toHaveLength(1);
     const consumer: FleetConsumer = { requestRender: vi.fn() };
-    payloads[0].attach(consumer);
+    payloads[0]!.attach(consumer);
     expect(fleet.attachConsumer).toHaveBeenCalledWith(consumer);
   });
 
@@ -87,7 +87,7 @@ describe("wireFleetFooterProvider", () => {
     expect(payloads).toHaveLength(2);
 
     const consumer: FleetConsumer = { requestRender: vi.fn() };
-    payloads[1].attach(consumer);
+    payloads[1]!.attach(consumer);
     expect(fleet.attachConsumer).toHaveBeenCalledWith(consumer);
     expect(fleet.attachConsumer).toHaveBeenCalledTimes(1);
   });
@@ -99,7 +99,7 @@ describe("wireFleetFooterProvider", () => {
     wireFleetFooterProvider(events, fleet);
 
     const theme = { fg: (_c: string, s: string) => s } as any;
-    const lines = payloads[0].render(80, theme);
+    const lines = payloads[0]!.render(80, theme);
 
     expect(fleet.renderForConsumer).toHaveBeenCalledWith(80, theme);
     expect(lines).toEqual(["line1"]);
@@ -116,7 +116,7 @@ describe("wireFleetFooterProvider", () => {
     wireFleetFooterProvider(events, fleet);
 
     const consumer: FleetConsumer = { requestRender: vi.fn() };
-    const returnedDetach = payloads[0].attach(consumer);
+    const returnedDetach = payloads[0]!.attach(consumer);
     returnedDetach();
 
     expect(detach).toHaveBeenCalledTimes(1);

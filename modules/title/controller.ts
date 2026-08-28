@@ -34,7 +34,7 @@ function eventId(data: unknown): string | undefined {
 }
 
 export class TitleController {
-  private worktreeName?: string;
+  private worktreeName?: string | undefined;
   private unsubscribers: Array<() => void> = [];
   private startupTimer?: unknown;
   private worktreeLookup = new AbortController();

@@ -421,12 +421,12 @@ export interface RunOptions {
   pi: ExtensionAPI;
   /** Manager-assigned id; suffixes session name to disambiguate parallel spawns (e.g. `Explore#a1b2c3d4`). */
   agentId?: string;
-  model?: Model<any>;
-  maxTurns?: number;
+  model?: Model<any> | undefined;
+  maxTurns?: number | undefined;
   signal?: AbortSignal;
-  isolated?: boolean;
-  inheritContext?: boolean;
-  thinkingLevel?: ThinkingLevel;
+  isolated?: boolean | undefined;
+  inheritContext?: boolean | undefined;
+  thinkingLevel?: ThinkingLevel | undefined;
   /**
    * Reopen this pi session file rather than starting an empty conversation.
    * `createAgentSession` seeds itself from whatever its SessionManager holds,
@@ -435,7 +435,7 @@ export interface RunOptions {
    * caps — is still resolved from the agent type, so the continuation runs
    * under the type's *current* definition, not the one the original run used.
    */
-  resumeSessionFile?: string;
+  resumeSessionFile?: string | undefined;
   /**
    * True when another agent spawned this one. Only top-level agents get a
    * handle, so only they can be reopened by name — which is the whole reason
@@ -445,13 +445,13 @@ export interface RunOptions {
    */
   nested?: boolean;
   /** Override working directory (e.g. for worktree isolation). */
-  cwd?: string;
+  cwd?: string | undefined;
   /**
    * Directory the worktree copy was created from. Set only when `cwd` points
    * into a worktree — the prompt then tells the agent to stay in the copy
    * instead of following the inherited parent prompt back to the main tree.
    */
-  worktreeBase?: string;
+  worktreeBase?: string | undefined;
   /**
    * Where .pi config is discovered (project extensions, skills, pi settings).
    * Default: same as the working directory. The manager sets
@@ -465,14 +465,14 @@ export interface RunOptions {
    * (Worktree isolation is the one intentional exception: its copy IS the
    * parent's repo, so config resolving inside it is correct.)
    */
-  configCwd?: string;
+  configCwd?: string | undefined;
   /** Called on tool start/end with activity info. */
   onToolActivity?: (activity: ToolActivity) => void;
   /** Called on streaming text deltas from the assistant response. */
-  onTextDelta?: (delta: string, fullText: string) => void;
+  onTextDelta?: ((delta: string, fullText: string) => void) | undefined;
   onSessionCreated?: (session: AgentSession) => void;
   /** Called at the end of each agentic turn with the cumulative count. */
-  onTurnEnd?: (turnCount: number) => void;
+  onTurnEnd?: ((turnCount: number) => void) | undefined;
   /**
    * Called once per assistant message_end with that message's usage delta.
    * Lets callers maintain a lifetime accumulator that survives compaction
@@ -497,7 +497,7 @@ export interface RunOptions {
     manager: NestedAgentManager;
     parentAgentId: string;
     depth: number;
-    maxSubagentDepth?: number;
+    maxSubagentDepth?: number | undefined;
   };
 }
 
@@ -517,7 +517,7 @@ export interface RunResult {
    * presented as the answer (#144). Undefined for a clean stop, or a "length"
    * stop that produced text (a legitimate truncated answer).
    */
-  failure?: string;
+  failure?: string | undefined;
 }
 
 /**
@@ -549,7 +549,7 @@ function collectResponseText(session: AgentSession) {
  */
 function getLastAssistantText(session: AgentSession, startIndex = 0): string {
   for (let i = session.messages.length - 1; i >= startIndex; i--) {
-    const msg = session.messages[i];
+    const msg = session.messages[i]!;
     if (msg.role !== "assistant") continue;
     const text = extractText(msg.content).trim();
     if (text) return text;
@@ -573,7 +573,7 @@ function getLastAssistantText(session: AgentSession, startIndex = 0): string {
  */
 function finalTurnError(session: AgentSession, startIndex = 0): string | undefined {
   for (let i = session.messages.length - 1; i >= startIndex; i--) {
-    const msg = session.messages[i];
+    const msg = session.messages[i]!;
     if (msg.role !== "assistant") continue;
     if (msg.stopReason === "error") {
       return (
@@ -737,8 +737,8 @@ export async function runAgent(
     cwd: configCwd,
     agentDir,
     noExtensions,
-    additionalExtensionPaths,
-    extensionsOverride,
+    ...(additionalExtensionPaths !== undefined && { additionalExtensionPaths }),
+    ...(extensionsOverride !== undefined && { extensionsOverride }),
     noSkills,
     noPromptTemplates: true,
     noThemes: true,
@@ -923,6 +923,7 @@ export async function runAgent(
   // which `rememberAgents` supplies for top-level agents only. Same precedence
   // as `outputTranscript`.
   const persistSession = agentConfig?.persistSession ?? (options.nested ? false : rememberAgents);
+  const parentSessionFile = ctx.sessionManager?.getSessionFile?.();
   const sessionManager = options.resumeSessionFile
     ? // Reopening an existing conversation: the file already carries its own
       // header (cwd, parent) and history, so none of the create-time options
@@ -935,7 +936,7 @@ export async function runAgent(
           // `persist_session: true` agent; now it runs for every spawn, so a
           // context without a session manager (a bare programmatic ctx) must
           // still persist rather than take the whole spawn down.
-          parentSession: ctx.sessionManager?.getSessionFile?.(),
+          ...(parentSessionFile !== undefined && { parentSession: parentSessionFile }),
         })
       : SessionManager.inMemory(effectiveCwd);
 
@@ -957,8 +958,8 @@ export async function runAgent(
     // above, while newer Pi types it as `ModelRuntime` — a shape an opaque
     // `unknown` read off the private facade field can never satisfy.
     ...(parentModelRuntime !== undefined && { modelRuntime: parentModelRuntime as never }),
-    model,
-    tools: sessionTools,
+    ...(model !== undefined && { model }),
+    ...(sessionTools !== undefined && { tools: sessionTools }),
     customTools: nestedTools,
     resourceLoader: loader,
   };
@@ -1106,9 +1107,9 @@ export async function resumeAgent(
       reason: "manual" | "threshold" | "overflow";
       tokensBefore: number;
     }) => void;
-    signal?: AbortSignal;
+    signal?: AbortSignal | undefined;
   } = {},
-): Promise<{ text: string; failure?: string }> {
+): Promise<{ text: string; failure?: string | undefined }> {
   // Boundary for the history fallback: the session already holds prior turns,
   // so only assistant text produced by THIS resume prompt counts as its output
   // — a failed resume must not surface the previous turn's answer (#144).

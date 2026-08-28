@@ -538,7 +538,7 @@ export class AutoReviewController {
         const choice = await ctx.ui.select(
           title,
           ["Allow (session grant)", "Deny", "Deny with note"],
-          { signal: ctx.signal },
+          { ...(ctx.signal !== undefined && { signal: ctx.signal }) },
         );
 
         if (choice === "Allow (session grant)") {
@@ -552,7 +552,7 @@ export class AutoReviewController {
           let reason = `${reviewerReason} The user reviewed this denial and upheld it.`;
           if (choice === "Deny with note") {
             const note = await ctx.ui.input?.("Note for the agent (optional)", undefined, {
-              signal: ctx.signal,
+              ...(ctx.signal !== undefined && { signal: ctx.signal }),
             });
             if (note && note.trim().length > 0) reason += ` User note: ${note}`;
           }
@@ -584,7 +584,8 @@ export class AutoReviewController {
     const usage = this.pendingUsage.get(event.toolCallId);
     if (!usage) return undefined;
     this.pendingUsage.delete(event.toolCallId);
-    return { usage: mergeUsage(event.usage, usage) };
+    const merged = mergeUsage(event.usage, usage);
+    return { ...(merged !== undefined && { usage: merged }) };
   }
 
   // Returns the measured reviewer duration for a call the reviewer actually
@@ -600,6 +601,7 @@ export class AutoReviewController {
     const usage = this.pendingUsage.get(message.toolCallId);
     if (!usage) return undefined;
     this.pendingUsage.delete(message.toolCallId);
-    return { message: { ...message, usage: mergeUsage(message.usage, usage) } };
+    const merged = mergeUsage(message.usage, usage);
+    return { message: { ...message, ...(merged !== undefined && { usage: merged }) } };
   }
 }

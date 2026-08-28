@@ -77,7 +77,7 @@ const MODIFIERS = new Set(["ctrl", "shift", "alt", "super"]);
 export function isValidKeyId(keyId: string): boolean {
   if (keyId.trim() === "") return false;
   const parts = keyId.toLowerCase().split("+");
-  const base = parts[parts.length - 1];
+  const base = parts[parts.length - 1]!;
   if (!BASE_KEYS.has(base)) return false;
   return parts.slice(0, -1).every((part) => MODIFIERS.has(part));
 }

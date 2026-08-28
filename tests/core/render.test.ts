@@ -215,9 +215,10 @@ test("createToolHeader shortens the arg first, ending the line in an ellipsis", 
   const header = createToolHeader("success", "Write", "src/core/guards.ts", testTheme());
   const lines = renderPlain(header, 20);
   assert.equal(lines.length, 1);
-  assert.ok(lines[0].length <= 20, `expected length <= 20, got ${lines[0].length}`);
-  assert.ok(lines[0].endsWith("…"));
-  assert.equal(lines[0], "⏺ Write(src/core/gu…");
+  const [line] = lines;
+  assert.ok(line!.length <= 20, `expected length <= 20, got ${line!.length}`);
+  assert.ok(line!.endsWith("…"));
+  assert.equal(line, "⏺ Write(src/core/gu…");
 });
 
 test("createToolHeader never exceeds the render width across a range of widths", () => {
@@ -230,10 +231,8 @@ test("createToolHeader never exceeds the render width across a range of widths",
   for (const width of [1, 2, 3, 5, 8, 12, 20, 30, 45, 80]) {
     const lines = renderPlain(header, width);
     assert.equal(lines.length, 1);
-    assert.ok(
-      lines[0].length <= width,
-      `width ${width}: got "${lines[0]}" (${lines[0].length} chars)`,
-    );
+    const [line] = lines;
+    assert.ok(line!.length <= width, `width ${width}: got "${line}" (${line!.length} chars)`);
   }
 });
 
@@ -241,8 +240,9 @@ test("createToolHeader falls back to clipping the bullet+name at very narrow wid
   const header = createToolHeader("success", "Write", "src/core/guards.ts", testTheme());
   const lines = renderPlain(header, 5);
   assert.equal(lines.length, 1);
-  assert.ok(lines[0].length <= 5);
-  assert.ok(lines[0].endsWith("…"));
+  const [line] = lines;
+  assert.ok(line!.length <= 5);
+  assert.ok(line!.endsWith("…"));
 });
 
 test("createToolHeader reuses a passed-in ToolHeader instance", () => {
@@ -269,9 +269,10 @@ test("createResultLine clips a long summary and never exceeds the width", () => 
   for (const width of [1, 5, 10, 20, 40, 80]) {
     const lines = renderPlain(line, width);
     assert.equal(lines.length, 1);
+    const [rendered] = lines;
     assert.ok(
-      lines[0].length <= width,
-      `width ${width}: got "${lines[0]}" (${lines[0].length} chars)`,
+      rendered!.length <= width,
+      `width ${width}: got "${rendered}" (${rendered!.length} chars)`,
     );
   }
 });

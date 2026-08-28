@@ -181,7 +181,7 @@ function createSession(finalText: string) {
     }),
     // pi's Agent; `beforeToolCall` is an optional, assignable hook the scope
     // installer wraps to block out-of-scope calls on turn 1.
-    agent: { beforeToolCall: undefined } as {
+    agent: {} as {
       beforeToolCall?: (context: any, signal?: any) => Promise<any>;
     },
     setSessionName: vi.fn(),
@@ -243,8 +243,8 @@ describe("agent-runner final output capture", () => {
       expect.objectContaining({ onError: expect.any(Function) }),
     );
 
-    const bindOrder = session.bindExtensions.mock.invocationCallOrder[0];
-    const promptOrder = session.prompt.mock.invocationCallOrder[0];
+    const bindOrder = session.bindExtensions.mock.invocationCallOrder[0]!;
+    const promptOrder = session.prompt.mock.invocationCallOrder[0]!;
     expect(bindOrder).toBeLessThan(promptOrder);
   });
 
@@ -314,7 +314,7 @@ describe("agent-runner final output capture", () => {
 
     await runAgent(ctx, "Explore", "Say LEGACY", { pi });
 
-    expect(createAgentSession.mock.calls[0][0]).not.toHaveProperty("modelRuntime");
+    expect(createAgentSession.mock.calls[0]![0]).not.toHaveProperty("modelRuntime");
   });
 
   it("suppresses AGENTS.md/CLAUDE.md/APPEND_SYSTEM.md for subagents", async () => {
@@ -332,7 +332,7 @@ describe("agent-runner final output capture", () => {
       }),
     );
     // The override returns an empty list so any loaded sources are discarded.
-    const ctorArgs = defaultResourceLoaderCtor.mock.calls[0][0];
+    const ctorArgs = defaultResourceLoaderCtor.mock.calls[0]![0];
     expect(ctorArgs.appendSystemPromptOverride(["would-be-loaded"])).toEqual([]);
   });
 
@@ -352,8 +352,8 @@ describe("agent-runner final output capture", () => {
     await runAgent(ctx, "Explore", "go", { pi });
 
     expect(session.setSessionName).toHaveBeenCalledWith("Explore");
-    const setOrder = session.setSessionName.mock.invocationCallOrder[0];
-    const bindOrder = session.bindExtensions.mock.invocationCallOrder[0];
+    const setOrder = session.setSessionName.mock.invocationCallOrder[0]!;
+    const bindOrder = session.bindExtensions.mock.invocationCallOrder[0]!;
     expect(setOrder).toBeLessThan(bindOrder);
   });
 
@@ -849,13 +849,13 @@ function mockRegistry(opts: Record<string, any>): string[] {
  * reimplementation of pi's gate.
  */
 function lastToolsPassed(): string[] {
-  const opts = createAgentSession.mock.calls[0][0];
+  const opts = createAgentSession.mock.calls[0]![0];
   if (opts.tools) return opts.tools;
   return lastSession?.getActiveToolNames() ?? [];
 }
 
 function lastLoaderOpts(): Record<string, unknown> {
-  return defaultResourceLoaderCtor.mock.calls[0][0];
+  return defaultResourceLoaderCtor.mock.calls[0]![0];
 }
 
 describe("agent-runner session persistence", () => {
@@ -1078,7 +1078,7 @@ describe("agent-runner master tool allowlist", () => {
 
     expect(createNestedSubagentTools).not.toHaveBeenCalled();
     expect(lastToolsPassed()).not.toContain("Agent");
-    expect(createAgentSession.mock.calls[0][0].customTools).toEqual([]);
+    expect(createAgentSession.mock.calls[0]![0].customTools).toEqual([]);
   });
 
   it("injects scoped nested tools for an opted-in non-isolated agent", async () => {
@@ -1109,7 +1109,7 @@ describe("agent-runner master tool allowlist", () => {
     expect(lastToolsPassed()).toEqual(
       expect.arrayContaining(["Agent", "get_subagent_result", "steer_subagent"]),
     );
-    expect(createAgentSession.mock.calls[0][0].customTools).toHaveLength(3);
+    expect(createAgentSession.mock.calls[0]![0].customTools).toHaveLength(3);
   });
 
   it("keeps opt-in nested tools active UNDER EXTENSIONS despite the EXCLUDED-name collision", async () => {
@@ -1130,7 +1130,7 @@ describe("agent-runner master tool allowlist", () => {
       nestedRuntime: { manager: {} as any, parentAgentId: "parent", depth: 1 },
     });
 
-    const opts = createAgentSession.mock.calls[0][0];
+    const opts = createAgentSession.mock.calls[0]![0];
     // (a) not denied at the registry gate, and passed as customTools.
     expect(opts.excludeTools ?? []).not.toContain("Agent");
     expect(opts.customTools).toHaveLength(3);
@@ -1184,7 +1184,7 @@ describe("agent-runner master tool allowlist", () => {
         nestedRuntime: { manager: {} as any, parentAgentId: "parent", depth: 1 },
       });
 
-      expect(createAgentSession.mock.calls[0][0].excludeTools ?? []).toContain("Agent");
+      expect(createAgentSession.mock.calls[0]![0].excludeTools ?? []).toContain("Agent");
       expect(lastToolsPassed()).not.toContain("Agent");
     });
 
@@ -1353,7 +1353,7 @@ describe("agent-runner master tool allowlist", () => {
 
     // Allowlist unset so async tools (e.g. MCP on session_start) can register;
     // scope is a denylist of this extension's own tools plus `disallowedTools`.
-    const opts = createAgentSession.mock.calls[0][0];
+    const opts = createAgentSession.mock.calls[0]![0];
     expect(opts.tools).toBeUndefined();
     expect(new Set(opts.excludeTools)).toEqual(
       new Set([...Object.values(SUBAGENT_TOOL_NAMES), "bash"]),
@@ -1363,10 +1363,10 @@ describe("agent-runner master tool allowlist", () => {
     // session_start), activating the full allowed registry — the extension tool
     // included, the denied built-in excluded.
     expect(session.setActiveToolsByName).toHaveBeenCalledTimes(1);
-    const setOrder = session.setActiveToolsByName.mock.invocationCallOrder[0];
-    const bindOrder = session.bindExtensions.mock.invocationCallOrder[0];
+    const setOrder = session.setActiveToolsByName.mock.invocationCallOrder[0]!;
+    const bindOrder = session.bindExtensions.mock.invocationCallOrder[0]!;
     expect(setOrder).toBeGreaterThan(bindOrder);
-    const activated = new Set(session.setActiveToolsByName.mock.calls[0][0]);
+    const activated = new Set(session.setActiveToolsByName.mock.calls[0]![0]);
     expect(activated.has("mcp")).toBe(true);
     expect(activated.has("read")).toBe(true);
     expect(activated.has("bash")).toBe(false);
@@ -1528,7 +1528,7 @@ describe("agent-runner async extension tool registration", () => {
 
     // A hard registry gate is the right boundary here: nothing can register
     // asynchronously, so there is no active-set narrowing to maintain.
-    expect(createAgentSession.mock.calls[0][0].tools).toEqual(["read"]);
+    expect(createAgentSession.mock.calls[0]![0].tools).toEqual(["read"]);
     expect(session.setActiveToolsByName).not.toHaveBeenCalled();
     expect(session.agent.beforeToolCall).toBeUndefined();
   });
@@ -2398,7 +2398,7 @@ describe("agent-runner turn limits", () => {
     setGraceTurns(5);
     const { session, result } = await runWithTurns(5, { maxTurns: 5 });
     expect(session.steer).toHaveBeenCalledTimes(1);
-    expect(session.steer.mock.calls[0][0]).toContain("turn limit");
+    expect(session.steer.mock.calls[0]![0]).toContain("turn limit");
     expect(session.abort).not.toHaveBeenCalled();
     expect(result.steered).toBe(true);
   });
@@ -2527,7 +2527,7 @@ describe("resolveDefaultModel", () => {
   function registry(available?: any[]) {
     return {
       find: vi.fn((provider: string, id: string) => ({ provider, id }) as any),
-      getAvailable: available ? () => available : undefined,
+      ...(available && { getAvailable: () => available }),
     };
   }
 
@@ -2557,7 +2557,7 @@ describe("resolveDefaultModel", () => {
   });
 
   it("falls back to the parent when the registry cannot find the model", () => {
-    const r = { find: vi.fn(() => undefined), getAvailable: undefined };
+    const r = { find: vi.fn(() => undefined) };
     expect(resolveDefaultModel(parent, r as any, "anthropic/nope")).toBe(parent);
   });
 

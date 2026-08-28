@@ -6,7 +6,7 @@ const VARIABLE_PATTERN = /\$\{([A-Z][A-Z0-9_]*)\}/g;
  * vanishing.
  */
 export function interpolate(template: string, variables: Record<string, string>): string {
-  return template.replace(VARIABLE_PATTERN, (match, name: string) => {
-    return Object.hasOwn(variables, name) ? variables[name] : match;
+  return template.replace(VARIABLE_PATTERN, (match: string, name: string) => {
+    return Object.hasOwn(variables, name) ? variables[name]! : match;
   });
 }

@@ -230,10 +230,10 @@ function buildDetails(
   record: {
     toolUses: number;
     startedAt: number;
-    completedAt?: number;
+    completedAt?: number | undefined;
     status: string;
-    error?: string;
-    id?: string;
+    error?: string | undefined;
+    id?: string | undefined;
     session?: any;
     lifetimeUsage: LifetimeUsage;
   },
@@ -275,7 +275,11 @@ export async function startBackgroundResume(
   ctx: ExtensionContext,
   existing: AgentRecord,
   prompt: string,
-  opts: { outputTranscript: boolean; maxTurns?: number; toolCallId?: string },
+  opts: {
+    outputTranscript: boolean;
+    maxTurns?: number | undefined;
+    toolCallId?: string | undefined;
+  },
 ): Promise<AgentRecord | undefined> {
   const id = existing.id;
   const joinMode = resolveJoinMode(rt.getDefaultJoinMode(), true);
@@ -1028,7 +1032,7 @@ Terse command-style prompts produce shallow, generic work.
 
       // ---- While running (streaming) ----
       if (isPartial || details.status === "running") {
-        const frame = SPINNER[details.spinnerFrame ?? 0];
+        const frame = SPINNER[details.spinnerFrame ?? 0]!;
         const s = stats(details);
         return renderRunningAgentStatus(frame, s, details.activity ?? "thinking…", theme);
       }

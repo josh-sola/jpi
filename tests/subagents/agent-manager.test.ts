@@ -2136,7 +2136,7 @@ describe("AgentManager — waitForAll", () => {
       manager.spawn(mockPi, mockCtx, "X", p, { description: p, isBackground: true }),
     );
     // Only the first can be running; the other two are behind the pool.
-    expect(manager.getRecord(ids[1])?.status).toBe("queued");
+    expect(manager.getRecord(ids[1]!)?.status).toBe("queued");
 
     let settled = false;
     const all = manager.waitForAll().then(() => {

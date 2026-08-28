@@ -391,6 +391,6 @@ test("union field reports an issue and falls back to defaults for a value in nei
 
   const { value, issues } = await config.load();
   assert.equal(issues.length, 1);
-  assert.match(issues[0], /^agents\.fallback: /);
+  assert.match(issues[0]!, /^agents\.fallback: /);
   assert.equal(value.fallback, "general-purpose");
 });

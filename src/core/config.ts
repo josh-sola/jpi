@@ -160,7 +160,9 @@ export class Config<Schema extends AnyJpiNodeSpec> {
         );
         continue;
       }
-      const parsed = this.#compiled.zodObject.shape[key].safeParse(value);
+      const shape = this.#compiled.zodObject.shape[key];
+      if (!shape) throw new Error(`schema has no shape entry for scalar field "${key}"`);
+      const parsed = shape.safeParse(value);
       if (!parsed.success) {
         for (const issue of parsed.error.issues) {
           issues.push(formatIssue(this.#section, key, issue.message));

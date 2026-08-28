@@ -86,7 +86,7 @@ const create = (subject: string) => async (mock: ReturnType<typeof mockPi>) => {
 describe("/tasks main menu", () => {
   it("offers only view and create when the list is empty", async () => {
     const { selects } = await runTasks([undefined], async () => {});
-    expect(selects[0].choices).toEqual(["View all tasks (0)", "Create task"]);
+    expect(selects[0]!.choices).toEqual(["View all tasks (0)", "Create task"]);
   });
 
   it("offers the clear actions with their counts once tasks exist", async () => {
@@ -95,7 +95,7 @@ describe("/tasks main menu", () => {
       await create("Open")(mock);
       await mock.executeTool("TaskUpdate", { taskId: "1", status: "completed" });
     });
-    expect(selects[0].choices).toEqual([
+    expect(selects[0]!.choices).toEqual([
       "View all tasks (2)",
       "Create task",
       "Clear completed (1)",
@@ -129,7 +129,7 @@ describe("/tasks task detail", () => {
 
   it("offers Complete only for in-progress tasks", async () => {
     const { selects } = await runTasks([0, 0, undefined], create("Work"));
-    expect(selects[2].choices).toEqual(["▸ Start (in_progress)", "✗ Delete", "← Back"]);
+    expect(selects[2]!.choices).toEqual(["▸ Start (in_progress)", "✗ Delete", "← Back"]);
   });
 
   it("acts on the task whose row was picked, not on an ID inside its subject", async () => {
@@ -141,7 +141,7 @@ describe("/tasks task detail", () => {
 
   it("lists tasks with the default status glyphs", async () => {
     const { selects } = await runTasks([0, undefined], create("Work"));
-    expect(selects[1].choices).toEqual(["◻ #1 [pending] Work", "← Back"]);
+    expect(selects[1]!.choices).toEqual(["◻ #1 [pending] Work", "← Back"]);
   });
 
   it("shows a placeholder screen when there is nothing to view", async () => {

@@ -211,7 +211,7 @@ function renderContentBody(rawPath: string, content: string, startAt: number): C
  * this renders exactly what it returns, indented to sit under the "⎿" line.
  */
 function renderDiffBody(diff: string, rawPath: string): Component {
-  const rendered = renderDiff(diff, { filePath: rawPath || undefined });
+  const rendered = renderDiff(diff, { ...(rawPath && { filePath: rawPath }) });
   return new Text(
     rendered
       .split("\n")

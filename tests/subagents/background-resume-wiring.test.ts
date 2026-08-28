@@ -231,7 +231,7 @@ describe("Agent tool — background resume wiring", () => {
     // Streaming is anchored past the turns the session already carries, so the
     // prior conversation is not re-emitted behind the resumed run.
     expect(streamToOutputFile).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(streamToOutputFile).mock.calls[0][4]).toBe(3);
+    expect(vi.mocked(streamToOutputFile).mock.calls[0]![4]).toBe(3);
 
     await lifecycle.get("session_shutdown")?.({}, ctx);
   });

@@ -22,7 +22,7 @@ function makeRegistry(models = MODELS, available?: typeof MODELS): ModelRegistry
     getAll() {
       return models;
     },
-    getAvailable: available ? () => available : undefined,
+    ...(available && { getAvailable: () => available }),
   };
 }
 
@@ -224,7 +224,7 @@ describe("resolveModel", () => {
 
   describe("getAvailable filtering", () => {
     it("uses getAvailable when present (filters to configured models)", () => {
-      const available = [MODELS[0], MODELS[2]]; // only opus and haiku
+      const available = [MODELS[0]!, MODELS[2]!]; // only opus and haiku
       const result = resolveModel("sonnet", makeRegistry(MODELS, available));
       // sonnet is in getAll but not in getAvailable — should not fuzzy match
       expect(typeof result).toBe("string");
@@ -232,14 +232,14 @@ describe("resolveModel", () => {
     });
 
     it("exact match fails when model is not in getAvailable (no auth)", () => {
-      const available = [MODELS[0]]; // only opus available
+      const available = [MODELS[0]!]; // only opus available
       const result = resolveModel("anthropic/claude-sonnet-4-6", makeRegistry(MODELS, available));
       expect(typeof result).toBe("string");
       expect(result).toContain("Model not found");
     });
 
     it("fuzzy matches against available models only", () => {
-      const available = [MODELS[2]]; // only haiku available
+      const available = [MODELS[2]!]; // only haiku available
       const result = resolveModel("haiku", makeRegistry(MODELS, available));
       expect(result).toEqual(MODELS[2]);
     });

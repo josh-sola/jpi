@@ -14,7 +14,7 @@ interface AgentGroup {
   groupId: string;
   agentIds: Set<string>;
   completedRecords: Map<string, AgentRecord>;
-  timeoutHandle?: ReturnType<typeof setTimeout>;
+  timeoutHandle?: ReturnType<typeof setTimeout> | undefined;
   delivered: boolean;
   /** Shorter timeout for stragglers after a partial delivery. */
   isStraggler: boolean;

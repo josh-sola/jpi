@@ -38,14 +38,16 @@ export type BranchEntryLike = {
 };
 
 export type SessionStartInput = {
-  sessionManager?: {
-    getSessionName?(): string | undefined;
-    getBranch?(): BranchEntryLike[];
-  };
+  sessionManager?:
+    | {
+        getSessionName?(): string | undefined;
+        getBranch?(): BranchEntryLike[];
+      }
+    | undefined;
 };
 
 export type SessionInfoChangedInput = {
-  name?: string;
+  name?: string | undefined;
 };
 
 export type MessageEventInput = {

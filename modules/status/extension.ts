@@ -41,15 +41,17 @@ type FooterData = {
 type FooterContext = {
   mode: string;
   cwd: string;
-  model?: {
-    id?: string;
-    name?: string;
-    provider?: string;
-    reasoning?: boolean;
-    contextWindow?: number;
-    maxTokens?: number;
-  };
-  thinkingLevel?: string;
+  model?:
+    | {
+        id?: string;
+        name?: string;
+        provider?: string;
+        reasoning?: boolean;
+        contextWindow?: number;
+        maxTokens?: number;
+      }
+    | undefined;
+  thinkingLevel?: string | undefined;
   isIdle?(): boolean;
   getContextUsage():
     | {
@@ -58,10 +60,12 @@ type FooterContext = {
         percent: number | null;
       }
     | undefined;
-  sessionManager?: {
-    getSessionName?(): string | undefined;
-    getBranch?(): BranchEntryLike[];
-  };
+  sessionManager?:
+    | {
+        getSessionName?(): string | undefined;
+        getBranch?(): BranchEntryLike[];
+      }
+    | undefined;
   ui: {
     notify: Notifier;
     setFooter(
@@ -106,8 +110,8 @@ export class RepositoryMetadataController {
   private generation = 0;
   private pending = false;
   private disposed = false;
-  private drainPromise?: Promise<void>;
-  private abortController?: AbortController;
+  private drainPromise?: Promise<void> | undefined;
+  private abortController?: AbortController | undefined;
   private unsubscribe?: () => void;
   private timer?: ReturnType<typeof setInterval>;
 

@@ -202,7 +202,7 @@ export function createBackgroundTools(deps: BackgroundToolDeps): ToolDefinition[
     parameters: BgLogsParams,
     async execute(_toolCallId, params) {
       const read = await registry.readOutput(params.taskId, {
-        maxBytes: params.maxBytes,
+        ...(params.maxBytes !== undefined && { maxBytes: params.maxBytes }),
         tail: params.tail ?? true,
       });
       return { content: textContent(read.text), details: read };
@@ -260,7 +260,7 @@ export function createBackgroundTools(deps: BackgroundToolDeps): ToolDefinition[
         params.command,
         params.description,
         {
-          timeoutSeconds: params.timeoutSeconds,
+          ...(params.timeoutSeconds !== undefined && { timeoutSeconds: params.timeoutSeconds }),
           persistent: params.persistent ?? false,
         },
       );
@@ -434,8 +434,8 @@ export function createRunTool(deps: RunToolDeps): ToolDefinition<typeof RunParam
 
       if (params.background) {
         const task = await registry.start(runCtx, prepared.displayCommand, {
-          name: params.name,
-          timeoutSeconds: params.timeout,
+          ...(params.name !== undefined && { name: params.name }),
+          ...(params.timeout !== undefined && { timeoutSeconds: params.timeout }),
           invocation,
         });
         return {
@@ -446,9 +446,10 @@ export function createRunTool(deps: RunToolDeps): ToolDefinition<typeof RunParam
         };
       }
 
+      const timeoutSeconds = params.timeout ?? defaultTimeoutSeconds;
       const task = await registry.start(runCtx, prepared.displayCommand, {
-        name: params.name,
-        timeoutSeconds: params.timeout ?? defaultTimeoutSeconds,
+        ...(params.name !== undefined && { name: params.name }),
+        ...(timeoutSeconds !== undefined && { timeoutSeconds }),
         invocation,
         awaited: true,
       });

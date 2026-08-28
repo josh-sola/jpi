@@ -23,7 +23,7 @@ export type ExecCommand = (
 export type PullRequestMetadata = {
   number: number;
   draft: boolean;
-  url?: string;
+  url?: string | undefined;
 };
 
 export type StackPosition = {
@@ -32,28 +32,30 @@ export type StackPosition = {
 };
 
 export type RepositoryMetadata = {
-  repo?: string;
-  worktree?: {
-    name: string;
-    color: number;
-  };
-  branch?: string;
-  pullRequest?: PullRequestMetadata;
-  stack?: StackPosition;
+  repo?: string | undefined;
+  worktree?:
+    | {
+        name: string;
+        color: number;
+      }
+    | undefined;
+  branch?: string | undefined;
+  pullRequest?: PullRequestMetadata | undefined;
+  stack?: StackPosition | undefined;
 };
 
 export type StackEntry = {
   branch: string;
-  parent?: string;
+  parent?: string | undefined;
   current: boolean;
-  prNumber?: number;
+  prNumber?: number | undefined;
   prDraft: boolean;
 };
 
 type ParsedOrigin = {
-  host?: string;
-  owner?: string;
-  repo?: string;
+  host?: string | undefined;
+  owner?: string | undefined;
+  repo?: string | undefined;
 };
 
 export function stringHash(value: string): number {
@@ -99,8 +101,8 @@ function parseOrigin(origin: string): ParsedOrigin {
   let path: string | undefined;
   const scpMatch = /^[^@\s]+@([^:\s]+):(.+)$/.exec(trimmed);
   if (scpMatch) {
-    host = scpMatch[1];
-    path = scpMatch[2];
+    host = scpMatch[1]!;
+    path = scpMatch[2]!;
   } else {
     try {
       const parsed = new URL(trimmed);

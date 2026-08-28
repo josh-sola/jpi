@@ -293,7 +293,7 @@ export class ConversationViewer implements Component {
     if (matchesKey(data, "m")) {
       this.stopArmed = false;
       const next =
-        MARKDOWN_MODES[(MARKDOWN_MODES.indexOf(this.markdownMode()) + 1) % MARKDOWN_MODES.length];
+        MARKDOWN_MODES[(MARKDOWN_MODES.indexOf(this.markdownMode()) + 1) % MARKDOWN_MODES.length]!;
       this.markdownModeOverride = next;
       this.onMarkdownMode?.(next);
       this.tui.requestRender();

@@ -97,14 +97,14 @@ export function resolveAgentInvocationConfig(
   params: AgentInvocationParams,
   opts?: ResolveOptions,
 ): {
-  modelInput?: string;
+  modelInput?: string | undefined;
   modelFromParams: boolean;
-  thinking?: ThinkingLevel;
-  maxTurns?: number;
+  thinking?: ThinkingLevel | undefined;
+  maxTurns?: number | undefined;
   inheritContext: boolean;
   runInBackground: boolean;
   isolated: boolean;
-  isolation?: IsolationMode;
+  isolation?: IsolationMode | undefined;
   /**
    * Caller parameters an agent file's frontmatter outranked, so the surfaces can
    * say "(asked X)" instead of presenting the effective value as the requested
@@ -114,7 +114,7 @@ export function resolveAgentInvocationConfig(
    * `max_turns` is deliberately absent: no surface renders a requested-vs-
    * effective turn limit, so recording one would be dead data.
    */
-  overridden?: { thinking?: ThinkingLevel; model?: string };
+  overridden?: { thinking?: ThinkingLevel | undefined; model?: string | undefined } | undefined;
 } {
   // Precedence first, collapse second — reversing these loses the veto, since
   // an agent file's "off" only outranks a caller's "worktree" while it is still

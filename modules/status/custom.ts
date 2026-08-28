@@ -39,15 +39,17 @@ export type CustomStatusPayload = {
 
 export type CustomPayloadContext = {
   cwd?: string;
-  model?: {
-    id?: string;
-    name?: string;
-    provider?: string;
-    reasoning?: boolean;
-    contextWindow?: number;
-    maxTokens?: number;
-  };
-  thinkingLevel?: string;
+  model?:
+    | {
+        id?: string;
+        name?: string;
+        provider?: string;
+        reasoning?: boolean;
+        contextWindow?: number;
+        maxTokens?: number;
+      }
+    | undefined;
+  thinkingLevel?: string | undefined;
   isIdle?(): boolean;
   getContextUsage():
     | {
@@ -148,8 +150,8 @@ type CustomControllerOptions = {
 };
 
 type CustomOccurrenceState = {
-  output?: string;
-  failure?: string;
+  output?: string | undefined;
+  failure?: string | undefined;
 };
 
 type ActiveRun = {
@@ -194,8 +196,8 @@ export class CustomStatusController {
   private started = false;
   private disposed = false;
   private pending = false;
-  private activeRun?: ActiveRun;
-  private timer?: ReturnType<typeof setInterval>;
+  private activeRun?: ActiveRun | undefined;
+  private timer?: ReturnType<typeof setInterval> | undefined;
 
   constructor(options: CustomControllerOptions) {
     this.options = options;
@@ -290,7 +292,7 @@ export class CustomStatusController {
       occurrences.map(async (occurrence) => {
         try {
           const result = await this.options.exec(occurrence.path, [argument], {
-            cwd: payload.cwd ?? undefined,
+            ...(payload.cwd !== null && { cwd: payload.cwd }),
             timeout: CUSTOM_COMMAND_TIMEOUT_MS,
             signal: run.abortController.signal,
           });

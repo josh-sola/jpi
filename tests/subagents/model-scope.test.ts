@@ -31,7 +31,6 @@ function makeRegistry(models = MODELS): ModelRegistryRef {
     getAll() {
       return models;
     },
-    getAvailable: undefined,
   };
 }
 

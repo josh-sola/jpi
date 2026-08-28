@@ -67,7 +67,7 @@ export type WebFetchDetails = {
 };
 
 type WebFetchContext = {
-  model?: Model<any>;
+  model?: Model<any> | undefined;
   modelRegistry?: {
     getProviderAuth(provider: string): Promise<AuthResult | undefined>;
     complete(
@@ -142,7 +142,7 @@ export function parseFetchedPage(rawPage: unknown): FetchedPage {
 
   return {
     url,
-    fetchedUrl,
+    ...(fetchedUrl !== undefined && { fetchedUrl }),
     title: boundedText(rawPage.title, MAX_FETCH_TITLE_CHARS),
     markdown,
   };
@@ -210,7 +210,7 @@ async function answerFromPage(
           buildWebFetchUserMessage(
             {
               requestedUrl,
-              fetchedUrl,
+              ...(fetchedUrl !== undefined && { fetchedUrl }),
               title: page.title,
               question: input.prompt,
               markdown: page.markdown,
@@ -247,7 +247,7 @@ export async function executeWebFetch(
   const model = await getActiveModel(ctx);
   const rawPage = await options.runner.runJson(
     ["scrape", requestedUrl, "--json", "--no-llms-txt", "--max-chars", "40000"],
-    { timeoutMs: WEB_FETCH_TIMEOUT_MS, signal },
+    { timeoutMs: WEB_FETCH_TIMEOUT_MS, ...(signal !== undefined && { signal }) },
   );
   const page = parseFetchedPage(rawPage);
   const helpers = {

@@ -275,7 +275,7 @@ describe("nested delegation e2e (real pi-mono, faux model)", () => {
       // arguments, and would pass with nested transcripts switched off entirely.
       const transcripts = findOutputFiles(transcriptRoot).map((f) => readFileSync(f, "utf-8"));
       const workerTranscript = transcripts.find((t) => {
-        const first = JSON.parse(t.split("\n")[0]) as { message?: { content?: unknown } };
+        const first = JSON.parse(t.split("\n")[0]!) as { message?: { content?: unknown } };
         return first.message?.content === "Do the leaf work.";
       });
       expect(workerTranscript).toBeDefined();

@@ -1015,8 +1015,8 @@ async function showSettings(rt: SubagentsRuntime, ctx: ExtensionCommandContext) 
         }
 
         // Enter on numeric field → close and prompt for typed input
-        if (matchesKey(data, Key.enter) && NUMERIC_IDS.has(items[currentIndex].id)) {
-          done(items[currentIndex].id);
+        if (matchesKey(data, Key.enter) && NUMERIC_IDS.has(items[currentIndex]!.id)) {
+          done(items[currentIndex]!.id);
           return;
         }
         list.handleInput?.(data);

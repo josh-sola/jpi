@@ -368,7 +368,7 @@ export async function runPrintMode(options: RunPrintModeOptions): Promise<PrintM
   const { session } = await createAgentSession({
     cwd,
     agentDir,
-    model,
+    ...(model !== undefined && { model }),
     // Structural faux registry/runtime in faux mode; undefined in live mode (defaults).
     // Spread (not literal keys) so the excess-property check doesn't reject
     // `modelRegistry` on the pi version whose CreateAgentSessionOptions dropped it.
@@ -601,9 +601,7 @@ export function agentToolCalls(session: AgentSession): Array<Record<string, unkn
 
 /** Walk session history backward for the last non-empty assistant text. */
 function lastAssistantText(session: AgentSession): string {
-  const messages = session.messages;
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const msg = messages[i];
+  for (const msg of session.messages.slice().reverse()) {
     if (msg.role !== "assistant") continue;
     const text = msg.content
       .map((b) =>
