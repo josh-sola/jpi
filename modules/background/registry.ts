@@ -1,21 +1,33 @@
 import { randomBytes } from "node:crypto";
 import { spawn as nodeSpawn, type SpawnOptions } from "node:child_process";
-import { createWriteStream, existsSync, type WriteStream } from "node:fs";
-import { open, stat } from "node:fs/promises";
 import { join } from "node:path";
 
 import { errorMessage, projectSlug, type Store } from "../../src/core/index.ts";
 
-import { writeJsonAtomic } from "./durable-write.ts";
+import { logBestEffort } from "./log-best-effort.ts";
 import type { MonitorSnapshot } from "./monitor.ts";
-import { NOTIFICATION_PREAMBLE_LINES } from "./prompts.ts";
+import {
+  DEFAULT_MAX_RECENT_TASKS,
+  pruneOldTasks,
+  TaskCompletionNotifier,
+} from "./registry/completion.ts";
+import {
+  DEFAULT_KILL_GRACE_MS,
+  DEFAULT_STOP_WAIT_MS,
+  TaskProcessLifecycle,
+} from "./registry/process-lifecycle.ts";
+import { TaskMetadataWriter } from "./registry/metadata.ts";
+import { DEFAULT_MAX_OUTPUT_BYTES, TaskOutputStream } from "./registry/output-stream.ts";
+import { appendError, snapshot, type BgTask } from "./registry/task.ts";
 
-export const DEFAULT_MAX_OUTPUT_BYTES = 20 * 1024 * 1024;
-export const DEFAULT_KILL_GRACE_MS = 3000;
-export const DEFAULT_STOP_WAIT_MS = 4500;
-export const DEFAULT_MAX_RECENT_TASKS = 20;
-export const MIN_LOG_BYTES = 1;
-export const MAX_LOG_BYTES = 50 * 1024;
+export {
+  DEFAULT_KILL_GRACE_MS,
+  DEFAULT_MAX_OUTPUT_BYTES,
+  DEFAULT_MAX_RECENT_TASKS,
+  DEFAULT_STOP_WAIT_MS,
+};
+export { MAX_LOG_BYTES, MIN_LOG_BYTES } from "./registry/output-stream.ts";
+
 const NOTIFICATION_TAIL_BYTES = 2000;
 
 export type TaskStatus = "running" | "completed" | "failed" | "killed";
@@ -157,53 +169,6 @@ interface RuntimeDir {
   readonly abs: string;
 }
 
-interface BgTask {
-  id: string;
-  name: string;
-  command: string;
-  cwd: string;
-  status: TaskStatus;
-  outputPath: string;
-  outputAbsPath: string;
-  metadataAbsPath: string;
-  startTime: number;
-  endTime: number | undefined;
-  exitCode: number | null | undefined;
-  signal: string | null | undefined;
-  pid: number | undefined;
-  bytesWritten: number;
-  capExceeded: boolean;
-  killKind: KillKind | undefined;
-  killSignalSent: boolean;
-  killEscalationTimer: NodeJS.Timeout | undefined;
-  timeoutHandle: NodeJS.Timeout | undefined;
-  timeoutSeconds: number | undefined;
-  wakeOnCompletion: boolean;
-  notified: boolean;
-  error: string | undefined;
-  finalized: boolean;
-  awaited: boolean;
-  language: RunLanguage | undefined;
-  stageDir: string | undefined;
-  child: BackgroundChildProcess | undefined;
-  stream: WriteStream | undefined;
-  waiters: Array<() => void>;
-  outputListeners: Set<(chunk: string, source: "stdout" | "stderr") => void>;
-  metadataWriteChain: Promise<void> | undefined;
-}
-
-function appendError(existing: string | undefined, next: string): string {
-  if (!existing) return next;
-  if (existing.includes(next)) return existing;
-  return `${existing}; ${next}`;
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MiB`;
-  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KiB`;
-  return `${bytes} B`;
-}
-
 function sanitizePathSegment(value: string): string {
   const safe = value.trim().replace(/[^a-zA-Z0-9._-]/g, "-");
   return safe.length > 0 ? safe : "session";
@@ -227,83 +192,6 @@ function shellInvocation(
   return { shell, args: ["-c", command] };
 }
 
-function clampMaxBytes(value: number | undefined): number {
-  if (value === undefined || !Number.isFinite(value)) return MAX_LOG_BYTES;
-  return Math.max(MIN_LOG_BYTES, Math.min(MAX_LOG_BYTES, Math.floor(value)));
-}
-
-function closeOutputStream(stream: WriteStream): Promise<void> {
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    const finish = () => {
-      if (settled) return;
-      settled = true;
-      stream.off("error", fail);
-      resolve();
-    };
-    const fail = (error: Error) => {
-      if (settled) return;
-      settled = true;
-      stream.off("close", finish);
-      reject(error);
-    };
-    stream.once("close", finish);
-    stream.once("error", fail);
-    stream.end();
-  });
-}
-
-async function boundedRead(
-  filePath: string,
-  maxBytes: number,
-  tail: boolean,
-): Promise<{ content: string; truncated: boolean; bytesRead: number; totalBytes: number }> {
-  const stats = await stat(filePath);
-  const totalBytes = stats.size;
-  const bytesToRead = Math.min(totalBytes, maxBytes);
-  if (bytesToRead === 0) return { content: "", truncated: false, bytesRead: 0, totalBytes };
-
-  const file = await open(filePath, "r");
-  try {
-    const buffer = Buffer.alloc(bytesToRead);
-    const position = tail ? Math.max(0, totalBytes - bytesToRead) : 0;
-    const { bytesRead } = await file.read(buffer, 0, bytesToRead, position);
-    return {
-      content: buffer.subarray(0, bytesRead).toString("utf8"),
-      truncated: totalBytes > bytesRead,
-      bytesRead,
-      totalBytes,
-    };
-  } finally {
-    await file.close();
-  }
-}
-
-function snapshot(task: BgTask): BgTaskSnapshot {
-  return {
-    kind: "task",
-    id: task.id,
-    name: task.name,
-    command: task.command,
-    cwd: task.cwd,
-    status: task.status,
-    outputPath: task.outputPath,
-    startTime: task.startTime,
-    endTime: task.endTime,
-    exitCode: task.exitCode,
-    signal: task.signal,
-    pid: task.pid,
-    bytesWritten: task.bytesWritten,
-    error: task.error,
-    notified: task.notified,
-    wakeOnCompletion: task.wakeOnCompletion,
-    timeoutSeconds: task.timeoutSeconds,
-    killKind: task.killKind,
-    language: task.language,
-    stageDir: task.stageDir,
-  };
-}
-
 function defaultTaskId(): string {
   return `b${randomBytes(4).toString("hex")}`;
 }
@@ -316,6 +204,12 @@ function noop(): void {
  * Runs shell commands as detached, group-killable background tasks: durable
  * output files, a hard output cap, optional per-task timeout, and a
  * completion wake sent through an injected notifier. POSIX only.
+ *
+ * Owns the task registry itself (creation, lookup, change/output listeners)
+ * and orchestrates four collaborators for everything else: `lifecycle`
+ * (spawning and killing the child process), `outputStream` (the durable
+ * output file and its byte cap), `metadataWriter` (durable snapshot
+ * persistence), and `notifier` (the completion wake and history pruning).
  */
 export class BackgroundTaskRegistry {
   private readonly tasks = new Map<string, BgTask>();
@@ -323,49 +217,73 @@ export class BackgroundTaskRegistry {
   private runtimeDir: RuntimeDir | undefined;
   private shuttingDown = false;
 
-  private readonly spawnFn: BackgroundSpawnFn;
-  private readonly killProcessFn: (pid: number, signal: NodeJS.Signals) => void;
   private readonly env: NodeJS.ProcessEnv;
   private readonly makeTaskId: () => string;
   private readonly now: () => number;
   private readonly maxRecentTasks: number;
-  private readonly killGraceMs: number;
-  private readonly stopWaitMs: number;
   private readonly logger: Pick<Console, "error">;
   private readonly sendNotification: CompletionNotificationSender;
   private readonly publishTerminal: (snapshot: BgTaskSnapshot) => void;
   private readonly store: Store;
 
-  private maxOutputBytes: number;
+  private readonly lifecycle: TaskProcessLifecycle;
+  private readonly outputStream: TaskOutputStream;
+  private readonly metadataWriter: TaskMetadataWriter;
+  private readonly notifier: TaskCompletionNotifier;
+
   private defaultTimeoutSeconds: number | undefined;
 
   constructor(options: BackgroundTaskRegistryOptions) {
     this.store = options.store;
-    this.spawnFn =
-      options.spawn ??
-      ((command, args, spawnOptions) =>
-        nodeSpawn(command, args, spawnOptions) as unknown as BackgroundChildProcess);
-    this.killProcessFn =
-      options.killProcess ??
-      ((pid, signal) => {
-        process.kill(pid, signal);
-      });
     this.env = options.env ?? process.env;
     this.makeTaskId = options.makeTaskId ?? defaultTaskId;
     this.now = options.now ?? Date.now;
-    this.maxOutputBytes = options.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES;
     this.defaultTimeoutSeconds = options.defaultTimeoutSeconds;
     this.maxRecentTasks = options.maxRecentTasks ?? DEFAULT_MAX_RECENT_TASKS;
-    this.killGraceMs = options.killGraceMs ?? DEFAULT_KILL_GRACE_MS;
-    this.stopWaitMs = options.stopWaitMs ?? DEFAULT_STOP_WAIT_MS;
     this.logger = options.logger ?? console;
     this.sendNotification = options.sendNotification;
     this.publishTerminal = options.publishTerminal ?? noop;
+
+    this.lifecycle = new TaskProcessLifecycle({
+      spawn:
+        options.spawn ??
+        ((command, args, spawnOptions) =>
+          nodeSpawn(command, args, spawnOptions) as unknown as BackgroundChildProcess),
+      killProcess:
+        options.killProcess ??
+        ((pid, signal) => {
+          process.kill(pid, signal);
+        }),
+      killGraceMs: options.killGraceMs ?? DEFAULT_KILL_GRACE_MS,
+      stopWaitMs: options.stopWaitMs ?? DEFAULT_STOP_WAIT_MS,
+    });
+    this.outputStream = new TaskOutputStream(
+      {
+        onWriteError: (task) => {
+          try {
+            this.lifecycle.requestKill(task, "SIGTERM");
+          } catch {
+            void this.finalizeTask(task, "failed", null, undefined, task.error);
+          }
+        },
+        onCapExceeded: (task) => {
+          try {
+            this.lifecycle.requestKill(task, "SIGTERM");
+          } catch (error) {
+            task.error = appendError(task.error, `kill failed: ${errorMessage(error)}`);
+            void this.finalizeTask(task, "failed", null, undefined, task.error);
+          }
+        },
+      },
+      options.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES,
+    );
+    this.metadataWriter = new TaskMetadataWriter();
+    this.notifier = new TaskCompletionNotifier(this.sendNotification);
   }
 
   /** Apply freshly loaded config. A defaultTimeoutSeconds of 0 means "no default timeout". */
   configure(options: { maxOutputBytes?: number; defaultTimeoutSeconds?: number }): void {
-    if (options.maxOutputBytes !== undefined) this.maxOutputBytes = options.maxOutputBytes;
+    if (options.maxOutputBytes !== undefined) this.outputStream.configure(options.maxOutputBytes);
     if (options.defaultTimeoutSeconds !== undefined) {
       this.defaultTimeoutSeconds =
         options.defaultTimeoutSeconds > 0 ? options.defaultTimeoutSeconds : undefined;
@@ -458,25 +376,14 @@ export class BackgroundTaskRegistry {
     if (options.onOutput) task.outputListeners.add(options.onOutput);
     this.tasks.set(id, task);
 
-    const stream = createWriteStream(outputAbsPath, { flags: "a" });
-    task.stream = stream;
-    stream.on("error", (error) => {
-      if (task.status !== "running") return;
-      task.error = appendError(task.error, `output file write failed: ${errorMessage(error)}`);
-      task.killKind = task.killKind ?? "write_error";
-      try {
-        this.requestKill(task, "SIGTERM");
-      } catch {
-        void this.finalizeTask(task, "failed", null, undefined, task.error);
-      }
-    });
+    task.stream = this.outputStream.open(task, outputAbsPath);
 
     try {
       const spawnInvocation = options.invocation
         ? { shell: options.invocation.argv[0] ?? "", args: options.invocation.argv.slice(1) }
         : shellInvocation(normalizedCommand, this.env);
       if (!spawnInvocation.shell) throw new Error("Prepared invocation argv must not be empty");
-      const child = this.spawnFn(spawnInvocation.shell, spawnInvocation.args, {
+      const child = this.lifecycle.spawn(spawnInvocation.shell, spawnInvocation.args, {
         cwd: spawnCwd,
         detached: true,
         stdio: ["ignore", "pipe", "pipe"],
@@ -485,16 +392,23 @@ export class BackgroundTaskRegistry {
       task.child = child;
       task.pid = child.pid;
 
-      child.stdout?.on("data", (chunk) => this.handleChildOutput(task, chunk, "stdout"));
-      child.stderr?.on("data", (chunk) => this.handleChildOutput(task, chunk, "stderr"));
+      child.stdout?.on("data", (chunk) =>
+        this.outputStream.handleChildOutput(task, chunk, "stdout"),
+      );
+      child.stderr?.on("data", (chunk) =>
+        this.outputStream.handleChildOutput(task, chunk, "stderr"),
+      );
 
       child.on("error", (error) => {
-        this.writeNotice(task, `\n[background task spawn error: ${errorMessage(error)}]\n`);
+        this.outputStream.writeNotice(
+          task,
+          `\n[background task spawn error: ${errorMessage(error)}]\n`,
+        );
         void this.finalizeTask(task, "failed", null, undefined, errorMessage(error));
       });
 
       child.on("close", (code, signalName) => {
-        const { status, error } = this.resolveCloseOutcome(task, code, signalName);
+        const { status, error } = this.lifecycle.resolveCloseOutcome(task, code, signalName);
         void this.finalizeTask(task, status, code, signalName, error);
       });
 
@@ -503,9 +417,9 @@ export class BackgroundTaskRegistry {
           if (task.status !== "running") return;
           task.killKind = "timeout";
           task.error = `Timed out after ${timeoutSeconds}s`;
-          this.writeNotice(task, `\n[background task timeout: ${task.error}]\n`);
+          this.outputStream.writeNotice(task, `\n[background task timeout: ${task.error}]\n`);
           try {
-            this.requestKill(task, "SIGTERM");
+            this.lifecycle.requestKill(task, "SIGTERM");
           } catch (error) {
             void this.finalizeTask(
               task,
@@ -524,7 +438,7 @@ export class BackgroundTaskRegistry {
       return snapshot(task);
     } catch (error) {
       const failure = errorMessage(error);
-      this.writeNotice(task, `\n[background task spawn exception: ${failure}]\n`);
+      this.outputStream.writeNotice(task, `\n[background task spawn exception: ${failure}]\n`);
       await this.finalizeTask(task, "failed", null, undefined, failure);
       throw new Error(`Failed to start background task: ${failure}`);
     }
@@ -532,7 +446,7 @@ export class BackgroundTaskRegistry {
 
   async stop(idOrPrefix: string): Promise<BgTaskSnapshot> {
     const task = this.resolveTask(idOrPrefix);
-    return snapshot(await this.stopTask(task, "user"));
+    return snapshot(await this.lifecycle.stopTask(task, "user"));
   }
 
   /**
@@ -564,37 +478,7 @@ export class BackgroundTaskRegistry {
 
   async readOutput(idOrPrefix: string, options: ReadOutputOptions = {}): Promise<ReadOutputResult> {
     const task = this.resolveTask(idOrPrefix);
-    const tail = options.tail ?? true;
-    const maxBytes = clampMaxBytes(options.maxBytes);
-
-    if (!existsSync(task.outputAbsPath)) {
-      return {
-        text: "(no output yet)",
-        truncated: false,
-        bytesRead: 0,
-        totalBytes: 0,
-        outputPath: task.outputPath,
-      };
-    }
-
-    const read = await boundedRead(task.outputAbsPath, maxBytes, tail);
-    let text = read.content.length > 0 ? read.content : "(no output yet)";
-    if (read.truncated) {
-      const omitted = read.totalBytes - read.bytesRead;
-      const direction = tail ? "tail" : "head";
-      const notice = `[Showing ${direction} ${read.bytesRead} of ${read.totalBytes} bytes; ${omitted} omitted. Full output: ${task.outputPath}]`;
-      text = tail ? `${notice}\n${text}` : `${text}\n${notice}`;
-    } else {
-      text += `\n[Full output: ${task.outputPath}]`;
-    }
-
-    return {
-      text,
-      truncated: read.truncated,
-      bytesRead: read.bytesRead,
-      totalBytes: read.totalBytes,
-      outputPath: task.outputPath,
-    };
+    return this.outputStream.readOutput(task, options);
   }
 
   async shutdown(): Promise<void> {
@@ -602,13 +486,11 @@ export class BackgroundTaskRegistry {
     this.shuttingDown = true;
     const running = [...this.tasks.values()].filter((task) => task.status === "running");
     await Promise.all(
-      running.map(async (task) => {
-        try {
-          await this.stopTask(task, "shutdown");
-        } catch (error) {
-          this.logger.error(`[jpi-background] shutdown kill failed for task ${task.id}:`, error);
-        }
-      }),
+      running.map((task) =>
+        logBestEffort(this.logger, `shutdown kill failed for task ${task.id}`, () =>
+          this.lifecycle.stopTask(task, "shutdown"),
+        ),
+      ),
     );
   }
 
@@ -648,188 +530,8 @@ export class BackgroundTaskRegistry {
     return this.store.path(this.relativeSessionDir(ctx));
   }
 
-  private resolveCloseOutcome(
-    task: BgTask,
-    code: number | null,
-    signalName: NodeJS.Signals | null,
-  ): { status: TaskStatus; error: string | undefined } {
-    if (task.killKind === "user" || task.killKind === "shutdown") {
-      return { status: "killed", error: undefined };
-    }
-    if (
-      task.killKind === "timeout" ||
-      task.killKind === "output_cap" ||
-      task.killKind === "write_error"
-    ) {
-      return { status: "failed", error: undefined };
-    }
-    if ((code ?? 0) === 0) return { status: "completed", error: undefined };
-    return {
-      status: "failed",
-      error: `Exited with code ${code === null ? "null" : code}${signalName ? ` (${signalName})` : ""}`,
-    };
-  }
-
-  private handleChildOutput(task: BgTask, chunk: Buffer, source: "stdout" | "stderr"): void {
-    if (chunk.length === 0) return;
-    if (task.outputListeners.size > 0) {
-      const text = chunk.toString("utf8");
-      for (const listener of task.outputListeners) listener(text, source);
-    }
-    this.writeToStream(task, chunk);
-  }
-
-  private writeToStream(task: BgTask, buffer: Buffer): void {
-    if (!task.stream || task.stream.destroyed || buffer.length === 0) return;
-
-    const nextBytes = task.bytesWritten + buffer.length;
-    if (nextBytes <= this.maxOutputBytes) {
-      task.stream.write(buffer);
-      task.bytesWritten = nextBytes;
-      return;
-    }
-
-    const remaining = Math.max(0, this.maxOutputBytes - task.bytesWritten);
-    if (remaining > 0) {
-      task.stream.write(buffer.subarray(0, remaining));
-      task.bytesWritten += remaining;
-    }
-
-    if (task.capExceeded) return;
-    task.capExceeded = true;
-    task.error = `Output exceeded the ${formatBytes(this.maxOutputBytes)} cap; task was killed`;
-    const notice = `\n[background task output cap: ${task.error}]\n`;
-    task.stream.write(notice);
-    task.bytesWritten += Buffer.byteLength(notice, "utf8");
-    task.killKind = "output_cap";
-    try {
-      this.requestKill(task, "SIGTERM");
-    } catch (error) {
-      task.error = appendError(task.error, `kill failed: ${errorMessage(error)}`);
-      void this.finalizeTask(task, "failed", null, undefined, task.error);
-    }
-  }
-
-  private writeNotice(task: BgTask, text: string): void {
-    this.writeToStream(task, Buffer.from(text, "utf8"));
-  }
-
-  private requestKill(task: BgTask, signal: NodeJS.Signals): void {
-    if (task.status !== "running")
-      throw new Error(`Task ${task.id} is ${task.status}, not running`);
-    if (!task.child || task.pid === undefined)
-      throw new Error(`Task ${task.id} has no process to kill`);
-    if (task.killSignalSent && signal === "SIGTERM") return;
-
-    const errors: string[] = [];
-    let killed = false;
-    try {
-      this.killProcessFn(-task.pid, signal);
-      killed = true;
-    } catch (error) {
-      errors.push(`process group kill failed: ${errorMessage(error)}`);
-    }
-    if (!killed) {
-      try {
-        task.child.kill(signal);
-        killed = true;
-      } catch (error) {
-        errors.push(`child kill failed: ${errorMessage(error)}`);
-      }
-    }
-    if (!killed) throw new Error(`Could not kill task ${task.id}: ${errors.join("; ")}`);
-
-    task.killSignalSent = true;
-    // SIGKILL is the terminal escalation; it must never schedule a further one.
-    if (signal === "SIGKILL") return;
-    // Only one escalation timer may be outstanding, so concurrent stop
-    // requests on the same task never arm a second one.
-    if (task.killEscalationTimer !== undefined) return;
-    task.killEscalationTimer = setTimeout(() => {
-      task.killEscalationTimer = undefined;
-      if (task.status !== "running") return;
-      try {
-        this.requestKill(task, "SIGKILL");
-      } catch (error) {
-        task.error = appendError(task.error, `SIGKILL failed: ${errorMessage(error)}`);
-      }
-    }, this.killGraceMs);
-    task.killEscalationTimer.unref?.();
-  }
-
-  private async stopTask(task: BgTask, kind: KillKind, reason?: string): Promise<BgTask> {
-    if (task.status !== "running")
-      throw new Error(`Task ${task.id} is ${task.status}, not running`);
-    task.killKind = kind;
-    if (reason) task.error = reason;
-    this.requestKill(task, "SIGTERM");
-    const stopped = await this.waitForEnd(task, this.stopWaitMs);
-    if (!stopped)
-      throw new Error(
-        `Task ${task.id} did not exit within ${this.stopWaitMs}ms after cancellation`,
-      );
-    return task;
-  }
-
-  private waitForEnd(task: BgTask, timeoutMs: number): Promise<boolean> {
-    if (task.status !== "running") return Promise.resolve(true);
-    return new Promise((resolve) => {
-      const timer = setTimeout(() => {
-        const index = task.waiters.indexOf(done);
-        if (index >= 0) task.waiters.splice(index, 1);
-        resolve(false);
-      }, timeoutMs);
-      const done = () => {
-        clearTimeout(timer);
-        resolve(true);
-      };
-      task.waiters.push(done);
-    });
-  }
-
   private async writeMetadata(task: BgTask, value: BgTaskSnapshot = snapshot(task)): Promise<void> {
-    const previous = task.metadataWriteChain ?? Promise.resolve();
-    const write = () => writeJsonAtomic(task.metadataAbsPath, value);
-    const next = previous.then(write, write);
-    task.metadataWriteChain = next.catch(noop);
-    await next;
-  }
-
-  private buildNotificationContent(task: BgTask, outputTail: string): string {
-    const lines = [
-      ...NOTIFICATION_PREAMBLE_LINES,
-      `task_id: ${task.id}`,
-      `name: ${task.name}`,
-      `status: ${task.status}`,
-    ];
-    if (task.exitCode !== undefined && task.exitCode !== null)
-      lines.push(`exit_code: ${task.exitCode}`);
-    if (task.error) lines.push(`error: ${task.error}`);
-    lines.push(`output_path: ${task.outputPath}`);
-    lines.push("output_tail:", outputTail.length > 0 ? outputTail : "(no output)");
-    lines.push("Use bg_logs to read more output if needed. Do not poll for status.");
-    return lines.join("\n");
-  }
-
-  /** Sends the completion wake at most once per task; resets the flag and rethrows if the sender fails. */
-  private notifyCompletion(task: BgTask, outputTail: string): void {
-    if (!task.wakeOnCompletion || task.notified || task.awaited) return;
-    task.notified = true;
-    const content = this.buildNotificationContent(task, outputTail);
-    try {
-      this.sendNotification(
-        {
-          customType: "jpi-background-notification",
-          content,
-          display: true,
-          details: snapshot(task),
-        },
-        { deliverAs: "followUp", triggerTurn: task.wakeOnCompletion },
-      );
-    } catch (error) {
-      task.notified = false;
-      throw error;
-    }
+    await this.metadataWriter.write(task, value);
   }
 
   private async finalizeTask(
@@ -851,7 +553,7 @@ export class BackgroundTaskRegistry {
     let finalError = error ? appendError(task.error, error) : task.error;
     if (task.stream && !task.stream.destroyed) {
       try {
-        await closeOutputStream(task.stream);
+        await this.outputStream.close(task.stream);
       } catch (closeError) {
         finalStatus = "failed";
         finalError = appendError(
@@ -872,11 +574,9 @@ export class BackgroundTaskRegistry {
       endTime: this.now(),
       error: finalError,
     };
-    try {
-      await this.writeMetadata(task, terminalSnapshot);
-    } catch (writeError) {
-      this.logger.error(`[jpi-background] metadata write failed for task ${task.id}:`, writeError);
-    }
+    await logBestEffort(this.logger, `metadata write failed for task ${task.id}`, () =>
+      this.writeMetadata(task, terminalSnapshot),
+    );
 
     task.exitCode = terminalSnapshot.exitCode;
     task.signal = terminalSnapshot.signal;
@@ -887,42 +587,23 @@ export class BackgroundTaskRegistry {
     for (const waiter of task.waiters.splice(0)) waiter();
     this.emitChange();
 
-    try {
-      this.publishTerminal(terminalSnapshot);
-    } catch (publishError) {
-      this.logger.error(
-        `[jpi-background] terminal publish failed for task ${task.id}:`,
-        publishError,
-      );
-    }
+    void logBestEffort(this.logger, `terminal publish failed for task ${task.id}`, () =>
+      this.publishTerminal(terminalSnapshot),
+    );
 
     if (!this.shuttingDown) {
       let outputTail = "";
       try {
-        const read = await boundedRead(task.outputAbsPath, NOTIFICATION_TAIL_BYTES, true);
-        outputTail = read.content;
+        outputTail = await this.outputStream.tail(task.outputAbsPath, NOTIFICATION_TAIL_BYTES);
       } catch {
         // Best effort: an unreadable output file must not block the wake.
       }
-      try {
-        this.notifyCompletion(task, outputTail);
-      } catch (notifyError) {
-        this.logger.error(`[jpi-background] notification failed for task ${task.id}:`, notifyError);
-      }
+      void logBestEffort(this.logger, `notification failed for task ${task.id}`, () =>
+        this.notifier.notify(task, outputTail),
+      );
     }
 
-    this.pruneOldTasks();
-  }
-
-  private pruneOldTasks(): void {
-    if (this.tasks.size <= this.maxRecentTasks) return;
-    const finished = [...this.tasks.values()]
-      .filter((task) => task.status !== "running")
-      .sort((a, b) => (a.endTime ?? a.startTime) - (b.endTime ?? b.startTime));
-    while (this.tasks.size > this.maxRecentTasks && finished.length > 0) {
-      const task = finished.shift();
-      if (task) this.tasks.delete(task.id);
-    }
+    pruneOldTasks(this.tasks, this.maxRecentTasks);
   }
 
   private emitChange(): void {

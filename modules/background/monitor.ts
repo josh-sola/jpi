@@ -1,3 +1,4 @@
+import { logBestEffort } from "./log-best-effort.ts";
 import { NOTIFICATION_PREAMBLE_LINES } from "./prompts.ts";
 import {
   type BackgroundTaskRegistry,
@@ -297,9 +298,9 @@ export class MonitorManager {
     if (recentCount > this.maxEventsPerMinute * FLOOD_HARD_MULTIPLE) {
       monitor.floodStopped = true;
       monitor.error = `Monitor produced more than ${this.maxEventsPerMinute * FLOOD_HARD_MULTIPLE} events in one minute; stopped. Restart with a tighter filter.`;
-      this.registry.stop(monitor.id).catch((error: unknown) => {
-        this.logger.error(`[jpi-background] flood-stop failed for monitor ${monitor.id}:`, error);
-      });
+      void logBestEffort(this.logger, `flood-stop failed for monitor ${monitor.id}`, () =>
+        this.registry.stop(monitor.id),
+      );
       return;
     }
 
@@ -319,7 +320,7 @@ export class MonitorManager {
 
   private sendEvent(monitor: MonitorState, text: string): void {
     if (this.shuttingDown) return;
-    try {
+    void logBestEffort(this.logger, `monitor event notification failed for ${monitor.id}`, () =>
       this.sendNotification(
         {
           customType: "jpi-background-notification",
@@ -328,13 +329,8 @@ export class MonitorManager {
           details: snapshot(monitor),
         },
         { deliverAs: "followUp", triggerTurn: true },
-      );
-    } catch (error) {
-      this.logger.error(
-        `[jpi-background] monitor event notification failed for ${monitor.id}:`,
-        error,
-      );
-    }
+      ),
+    );
   }
 
   private finalize(monitor: MonitorState, task: BgTaskSnapshot): void {
@@ -365,32 +361,25 @@ export class MonitorManager {
     if (status === "failed" && !monitor.error) monitor.error = note;
 
     const finalSnapshot = snapshot(monitor);
-    try {
-      this.publishTerminalFn(finalSnapshot);
-    } catch (error) {
-      this.logger.error(
-        `[jpi-background] monitor terminal publish failed for ${monitor.id}:`,
-        error,
-      );
-    }
+    void logBestEffort(this.logger, `monitor terminal publish failed for ${monitor.id}`, () =>
+      this.publishTerminalFn(finalSnapshot),
+    );
 
     if (!this.shuttingDown) {
-      try {
-        this.sendNotification(
-          {
-            customType: "jpi-background-notification",
-            content: buildTerminalContent(monitor, status, note),
-            display: true,
-            details: finalSnapshot,
-          },
-          { deliverAs: "followUp", triggerTurn: true },
-        );
-      } catch (error) {
-        this.logger.error(
-          `[jpi-background] monitor terminal notification failed for ${monitor.id}:`,
-          error,
-        );
-      }
+      void logBestEffort(
+        this.logger,
+        `monitor terminal notification failed for ${monitor.id}`,
+        () =>
+          this.sendNotification(
+            {
+              customType: "jpi-background-notification",
+              content: buildTerminalContent(monitor, status, note),
+              display: true,
+              details: finalSnapshot,
+            },
+            { deliverAs: "followUp", triggerTurn: true },
+          ),
+      );
     }
 
     this.pruneOldMonitors();
