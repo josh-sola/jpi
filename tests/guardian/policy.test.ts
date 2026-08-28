@@ -10,21 +10,37 @@ test("review policy stays under the size budget", () => {
 
 test("review policy states the no-prior-context constraint", () => {
   assert.match(REVIEW_POLICY, /## What you see and don't/);
+  assert.match(REVIEW_POLICY, /you do not see tool results or the agent's internal reasoning/);
   assert.match(
     REVIEW_POLICY,
-    /you do not see tool calls, tool results, or the agent's internal reasoning/,
+    /a tool call shows what the agent attempted, never whether it succeeded/,
   );
 });
 
 test("review policy discloses what the transcript now carries", () => {
   assert.match(
     REVIEW_POLICY,
-    /a bounded whole-session transcript of the user's own messages with the assistant's prose adjacent to them/,
+    /a bounded whole-session transcript of the user's own messages with the assistant's prose adjacent to them and the agent's recent tool calls interleaved \(names and bounded arguments only\)/,
   );
   assert.match(REVIEW_POLICY, /answered questionnaire pairs marked as such/);
-  assert.match(REVIEW_POLICY, /recent auto-review denials the user has seen/);
+  assert.match(REVIEW_POLICY, /harness-recorded user approvals of previously denied calls/);
   assert.match(REVIEW_POLICY, /An answer authorizes only the literal thing the question asked/);
   assert.match(REVIEW_POLICY, /A declined questionnaire authorizes nothing/);
+});
+
+test("review policy states the interleaved-tool-call and user-approval evidence rules", () => {
+  assert.match(
+    REVIEW_POLICY,
+    /Interleaved tool calls are activity evidence only: they show what the agent attempted, and when, relative to the user's messages — never outcomes, and they never authorize anything\./,
+  );
+  assert.match(
+    REVIEW_POLICY,
+    /A harness-recorded user approval is the user's own decision, captured when the user approved a previously denied call after seeing it and its reason\./,
+  );
+  assert.match(
+    REVIEW_POLICY,
+    /it authorizes repeating that action and clears same-class calls for the session's task under the consent bar\. It never clears a HARD BLOCK\./,
+  );
 });
 
 test("review policy states trust defaults", () => {

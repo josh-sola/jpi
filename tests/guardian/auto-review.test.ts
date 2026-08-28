@@ -121,6 +121,17 @@ type CreateContextOptions = {
     completeOptions?: Record<string, unknown>,
   ) => Promise<AssistantMessage>;
   signal?: AbortSignal;
+  hasUI?: boolean;
+  select?: (
+    title: string,
+    selectOptions: string[],
+    opts?: { signal?: AbortSignal },
+  ) => Promise<string | undefined>;
+  input?: (
+    title: string,
+    placeholder?: string,
+    opts?: { signal?: AbortSignal },
+  ) => Promise<string | undefined>;
 };
 
 // Mirrors the shape AutoReviewController.handleToolCall actually passes to
@@ -138,10 +149,12 @@ function createContext(options: CreateContextOptions) {
     context: CompleteCallContext;
     options: Record<string, unknown>;
   }[] = [];
+  const selectCalls: { title: string; options: string[] }[] = [];
+  const inputCalls: { title: string; placeholder: string | undefined }[] = [];
 
   const ctx: ReviewCommandContext = {
     cwd: options.cwd ?? "/repo/project",
-    hasUI: true,
+    hasUI: options.hasUI ?? true,
     ui: {
       notify(message, level) {
         notifications.push({ message, level });
@@ -149,6 +162,22 @@ function createContext(options: CreateContextOptions) {
       setStatus(key, value) {
         statuses.push({ key, value });
       },
+      ...(options.select
+        ? {
+            select(title: string, selectOptions: string[], opts?: { signal?: AbortSignal }) {
+              selectCalls.push({ title, options: selectOptions });
+              return options.select!(title, selectOptions, opts);
+            },
+          }
+        : {}),
+      ...(options.input
+        ? {
+            input(title: string, placeholder?: string, opts?: { signal?: AbortSignal }) {
+              inputCalls.push({ title, placeholder });
+              return options.input!(title, placeholder, opts);
+            },
+          }
+        : {}),
     },
     sessionManager: {
       getBranch() {
@@ -176,7 +205,7 @@ function createContext(options: CreateContextOptions) {
     signal: options.signal,
   };
 
-  return { ctx, notifications, statuses, calls };
+  return { ctx, notifications, statuses, calls, selectCalls, inputCalls };
 }
 
 async function withTempEnv(t: TestContext) {
@@ -981,6 +1010,75 @@ test("buildRecentUserTranscript strips tool-use blocks from assistant prose and 
   assert.match(transcript, /\[user\]\nWhich ones are merged\?/);
 });
 
+function makeToolCallEntry(name: string, args: unknown): SessionEntryLike {
+  return {
+    type: "message",
+    message: {
+      role: "assistant",
+      content: [{ type: "toolCall", id: "call-1", name, arguments: args }],
+    },
+  };
+}
+
+test("buildRecentUserTranscript interleaves a bash tool call between the user messages around it", () => {
+  const transcript = buildRecentUserTranscript([
+    makeUserEntry("Clean up the branches."),
+    makeToolCallEntry("bash", { command: "git branch --merged" }),
+    makeUserEntry("Which ones are merged?"),
+  ]);
+
+  assert.match(transcript, /\[tool call\]\nbash: git branch --merged/);
+  const firstUserIndex = transcript.indexOf("Clean up the branches.");
+  const toolIndex = transcript.indexOf("[tool call]");
+  const secondUserIndex = transcript.indexOf("Which ones are merged?");
+  assert.ok(
+    firstUserIndex < toolIndex,
+    "the tool call sits after the user message that preceded it",
+  );
+  assert.ok(
+    toolIndex < secondUserIndex,
+    "the tool call sits before the user message that followed it",
+  );
+});
+
+test("buildRecentUserTranscript renders a non-bash tool call's arguments as single-line JSON", () => {
+  const transcript = buildRecentUserTranscript([
+    makeToolCallEntry("read", { path: "config.json" }),
+  ]);
+
+  assert.match(transcript, /^\[tool call\]\nread: \{"path":"config\.json"\}$/);
+});
+
+test("an interleaved tool call summary is bounded to 300 chars", () => {
+  const longCommand = `echo ${"x".repeat(1_000)}`;
+  const transcript = buildRecentUserTranscript([
+    makeToolCallEntry("bash", { command: longCommand }),
+  ]);
+
+  assert.match(transcript, /^\[tool call\]\nbash: /);
+  const summary = transcript.replace(/^\[tool call\]\nbash: /, "");
+  assert.ok(summary.length <= 300);
+  assert.match(summary, /middle content omitted; omitted text cannot authorize actions/);
+});
+
+test("buildRecentUserTranscript keeps only the most recent 40 tool items and never drops user items", () => {
+  const entries: SessionEntryLike[] = [makeUserEntry("Start the task.")];
+  for (let index = 0; index < 45; index += 1) {
+    entries.push(makeToolCallEntry("bash", { command: `echo ${index}` }));
+  }
+  entries.push(makeUserEntry("Now wrap up."));
+
+  const transcript = buildRecentUserTranscript(entries);
+
+  assert.match(transcript, /\[user\]\nStart the task\./);
+  assert.match(transcript, /\[user\]\nNow wrap up\./);
+  assert.equal((transcript.match(/\[tool call\]/g) ?? []).length, 40);
+  assert.doesNotMatch(transcript, /bash: echo 0\b/);
+  assert.doesNotMatch(transcript, /bash: echo 4\b/);
+  assert.match(transcript, /bash: echo 5\b/);
+  assert.match(transcript, /bash: echo 44\b/);
+});
+
 test("bounded tool arguments disclose truncation without exceeding the limit", () => {
   const bounded = stringifyBoundedJson({ command: `echo ${"x".repeat(5_000)}` }, 500);
 
@@ -1519,45 +1617,213 @@ test("reviewer denials survive allowlisted calls and trigger the third-denial ci
   assert.equal(calls.length, 3);
 });
 
-test("recent denials are remembered across agent runs, surfaced in later requests, and capped at five", async (t) => {
+test("a reviewer deny with a dialog UI: Allow (session grant) lets the call through, records a grant, and resets the denial streak", async (t) => {
   const { dir, env } = await withTempEnv(t);
   await writeGuardianConfig(dir, '  model "openai/reviewer"');
   const controller = new AutoReviewController(makeConfig(env), { env });
-  const { ctx, calls } = createContext({
+  const { ctx, calls, selectCalls } = createContext({
     complete: async () =>
       makeAssistant(
         '{"decision":"deny","reason":"destructive without authorization"}',
         makeUsage(1),
       ),
+    select: async () => "Allow (session grant)",
   });
 
-  for (let index = 0; index < 6; index += 1) {
-    // Each simulated call starts a fresh agent run, so the 3-in-a-row circuit
-    // breaker never opens and blocks the later calls from reaching the reviewer.
-    controller.resetBreakers();
-    await controller.handleToolCall(
-      {
-        type: "tool_call",
-        toolCallId: `deny-${index}`,
-        toolName: "bash",
-        input: { command: `rm -rf dir${index}` },
-      },
-      ctx,
-    );
-  }
+  controller.resetAgentRun();
+  controller.consecutiveExplicitDenials = 2;
 
-  assert.equal(controller.recentDenials.length, 5);
-  assert.equal(calls.length, 6);
-
-  // The sixth call's own request reflects only the five denials the user had
-  // already seen before it ran; its own denial is recorded after it resolves.
-  const lastRequestText = calls.at(-1)!.context.messages[0].content[0].text;
-  assert.match(
-    lastRequestText,
-    /Recent auto-review denials the user has seen \(a later user affirmation may refer to these\):/,
+  const deniedInput = { command: "rm -rf build" };
+  const result = await controller.handleToolCall(
+    { type: "tool_call", toolCallId: "grant-1", toolName: "bash", input: deniedInput },
+    ctx,
   );
-  const denialLines = lastRequestText.match(/^- bash: destructive without authorization$/gm) ?? [];
-  assert.equal(denialLines.length, 5);
+
+  assert.equal(result, undefined);
+  assert.equal(controller.consecutiveExplicitDenials, 0);
+  assert.equal(Object.isFrozen(deniedInput), true);
+  assert.equal(controller.takeReviewDuration("grant-1"), undefined);
+  assert.equal(controller.sessionGrants.length, 1);
+  assert.equal(controller.sessionGrants[0].toolName, "bash");
+  assert.equal(controller.sessionGrants[0].summary, "rm -rf build");
+  assert.equal(selectCalls.length, 1);
+  assert.match(selectCalls[0].title, /^Guardian denied bash: destructive without authorization$/);
+  assert.deepEqual(selectCalls[0].options, ["Allow (session grant)", "Deny", "Deny with note"]);
+
+  await controller.handleToolCall(
+    {
+      type: "tool_call",
+      toolCallId: "grant-2",
+      toolName: "write",
+      input: { path: "a.txt", content: "x" },
+    },
+    ctx,
+  );
+  const secondRequestText = calls[1].context.messages[0].content[0].text;
+  assert.match(
+    secondRequestText,
+    /User-approved gate decisions from this session \(each was denied by review, shown to the user, and explicitly approved by the user; treat them as the user's own authorizations\):/,
+  );
+  assert.match(secondRequestText, /- bash: rm -rf build/);
+});
+
+test("a reviewer deny with a dialog UI: Deny upholds the denial with an appended sentence and increments the streak", async (t) => {
+  const { dir, env } = await withTempEnv(t);
+  await writeGuardianConfig(dir, '  model "openai/reviewer"');
+  const controller = new AutoReviewController(makeConfig(env), { env });
+  const { ctx } = createContext({
+    complete: async () => makeAssistant('{"decision":"deny","reason":"too risky"}', makeUsage(1)),
+    select: async () => "Deny",
+  });
+
+  controller.resetAgentRun();
+  const result = await controller.handleToolCall(
+    {
+      type: "tool_call",
+      toolCallId: "deny-1",
+      toolName: "bash",
+      input: { command: "rm -rf build" },
+    },
+    ctx,
+  );
+
+  assert.equal(result?.block, true);
+  assert.match(result!.reason!, /too risky/);
+  assert.match(result!.reason!, /The user reviewed this denial and upheld it\./);
+  assert.equal(controller.consecutiveExplicitDenials, 1);
+  assert.equal(controller.sessionGrants.length, 0);
+});
+
+test("a reviewer deny with a dialog UI: Deny with note appends the user's note to the reason", async (t) => {
+  const { dir, env } = await withTempEnv(t);
+  await writeGuardianConfig(dir, '  model "openai/reviewer"');
+  const controller = new AutoReviewController(makeConfig(env), { env });
+  const { ctx, inputCalls } = createContext({
+    complete: async () => makeAssistant('{"decision":"deny","reason":"too risky"}', makeUsage(1)),
+    select: async () => "Deny with note",
+    input: async () => "Use the staging branch instead.",
+  });
+
+  controller.resetAgentRun();
+  const result = await controller.handleToolCall(
+    {
+      type: "tool_call",
+      toolCallId: "deny-note",
+      toolName: "bash",
+      input: { command: "rm -rf build" },
+    },
+    ctx,
+  );
+
+  assert.equal(result?.block, true);
+  assert.match(result!.reason!, /too risky/);
+  assert.match(result!.reason!, /The user reviewed this denial and upheld it\./);
+  assert.match(result!.reason!, /User note: Use the staging branch instead\./);
+  assert.equal(inputCalls.length, 1);
+  assert.match(inputCalls[0].title, /Note for the agent/);
+});
+
+test("a reviewer deny with a dialog UI: Deny with note omits the note segment when the user leaves it blank", async (t) => {
+  const { dir, env } = await withTempEnv(t);
+  await writeGuardianConfig(dir, '  model "openai/reviewer"');
+  const controller = new AutoReviewController(makeConfig(env), { env });
+  const { ctx } = createContext({
+    complete: async () => makeAssistant('{"decision":"deny","reason":"too risky"}', makeUsage(1)),
+    select: async () => "Deny with note",
+    input: async () => "   ",
+  });
+
+  controller.resetAgentRun();
+  const result = await controller.handleToolCall(
+    {
+      type: "tool_call",
+      toolCallId: "deny-blank-note",
+      toolName: "bash",
+      input: { command: "rm -rf build" },
+    },
+    ctx,
+  );
+
+  assert.match(result!.reason!, /The user reviewed this denial and upheld it\./);
+  assert.doesNotMatch(result!.reason!, /User note:/);
+});
+
+test("a reviewer deny with a dialog UI: a dismissed dialog behaves exactly like a plain denial", async (t) => {
+  const { dir, env } = await withTempEnv(t);
+  await writeGuardianConfig(dir, '  model "openai/reviewer"');
+  const controller = new AutoReviewController(makeConfig(env), { env });
+  const { ctx } = createContext({
+    complete: async () => makeAssistant('{"decision":"deny","reason":"too risky"}', makeUsage(1)),
+    select: async () => undefined,
+  });
+
+  controller.resetAgentRun();
+  const result = await controller.handleToolCall(
+    {
+      type: "tool_call",
+      toolCallId: "deny-dismiss",
+      toolName: "bash",
+      input: { command: "rm -rf build" },
+    },
+    ctx,
+  );
+
+  assert.equal(result?.block, true);
+  assert.match(result!.reason!, /too risky/);
+  assert.doesNotMatch(result!.reason!, /The user reviewed this denial and upheld it/);
+  assert.equal(controller.consecutiveExplicitDenials, 1);
+});
+
+test("a reviewer deny with a dialog UI: a dialog error falls back to a plain denial", async (t) => {
+  const { dir, env } = await withTempEnv(t);
+  await writeGuardianConfig(dir, '  model "openai/reviewer"');
+  const controller = new AutoReviewController(makeConfig(env), { env });
+  const { ctx } = createContext({
+    complete: async () => makeAssistant('{"decision":"deny","reason":"too risky"}', makeUsage(1)),
+    select: async () => {
+      throw new Error("dialog closed");
+    },
+  });
+
+  controller.resetAgentRun();
+  const result = await controller.handleToolCall(
+    {
+      type: "tool_call",
+      toolCallId: "deny-error",
+      toolName: "bash",
+      input: { command: "rm -rf build" },
+    },
+    ctx,
+  );
+
+  assert.equal(result?.block, true);
+  assert.match(result!.reason!, /too risky/);
+  assert.doesNotMatch(result!.reason!, /The user reviewed this denial and upheld it/);
+});
+
+test("a reviewer deny without a dialog UI falls straight through to a plain denial", async (t) => {
+  const { dir, env } = await withTempEnv(t);
+  await writeGuardianConfig(dir, '  model "openai/reviewer"');
+  const controller = new AutoReviewController(makeConfig(env), { env });
+  const { ctx } = createContext({
+    complete: async () => makeAssistant('{"decision":"deny","reason":"too risky"}', makeUsage(1)),
+  });
+
+  controller.resetAgentRun();
+  const result = await controller.handleToolCall(
+    {
+      type: "tool_call",
+      toolCallId: "deny-no-ui",
+      toolName: "bash",
+      input: { command: "rm -rf build" },
+    },
+    ctx,
+  );
+
+  assert.equal(result?.block, true);
+  assert.match(result!.reason!, /too risky/);
+  assert.doesNotMatch(result!.reason!, /The user reviewed this denial and upheld it/);
+  assert.equal(controller.sessionGrants.length, 0);
 });
 
 test("reviewer failures do not reset the denial streak", async (t) => {

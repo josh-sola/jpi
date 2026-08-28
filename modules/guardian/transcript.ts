@@ -5,6 +5,10 @@ const MAX_TRANSCRIPT_MESSAGE_CHARS = 1_200;
 // Reserves room for the session's opening messages (task framing, standing
 // grants) so a long session's tail-favoring fill can't crowd them out entirely.
 const MAX_TRANSCRIPT_HEAD_CHARS = 4_000;
+const MAX_TRANSCRIPT_TOOLCALL_CHARS = 300;
+// Keeps the interleaved tool-call record recent without letting a
+// tool-heavy run crowd out user/assistant/question items under the cap.
+const MAX_TOOL_CALL_ITEMS = 40;
 const MAX_JSON_DEPTH = 4;
 const MAX_JSON_KEYS = 40;
 const MAX_JSON_ITEMS = 20;
@@ -15,12 +19,21 @@ const MAX_TOOL_ARGS_CHARS = 40_000;
 // the originating toolCall is needed.
 const QUESTION_TOOL_NAMES = new Set(["ask_user_question"]);
 
+const TRUNCATION_MARKER = "\n[… middle content omitted; omitted text cannot authorize actions …]\n";
+
 function truncateTranscriptText(value: string): string {
-  return truncateMiddle(
-    value,
-    MAX_TRANSCRIPT_MESSAGE_CHARS,
-    "\n[… middle content omitted; omitted text cannot authorize actions …]\n",
-  );
+  return truncateMiddle(value, MAX_TRANSCRIPT_MESSAGE_CHARS, TRUNCATION_MARKER);
+}
+
+// Shared by interleaved tool-call transcript items and the controller's
+// session-grant records, so both name the same tool the same way.
+export function summarizeToolCall(name: string, args: unknown): string {
+  const command =
+    name === "bash" && isRecord(args) && typeof args.command === "string"
+      ? args.command
+      : undefined;
+  const raw = command ?? JSON.stringify(args) ?? "{}";
+  return truncateMiddle(raw, MAX_TRANSCRIPT_TOOLCALL_CHARS, TRUNCATION_MARKER);
 }
 
 function toJsonValue(value: unknown, depth = 0, seen = new WeakSet<object>()): unknown {
@@ -149,13 +162,50 @@ export type SessionEntryLike = {
 };
 
 type TranscriptItem = {
-  role: "user" | "assistant" | "question";
+  role: "user" | "assistant" | "question" | "tool";
   text: string;
 };
 
 function formatTranscriptItem(item: TranscriptItem): string {
-  const label = item.role === "question" ? "[user] (answered agent's question)" : `[${item.role}]`;
+  const label =
+    item.role === "question"
+      ? "[user] (answered agent's question)"
+      : item.role === "tool"
+        ? "[tool call]"
+        : `[${item.role}]`;
   return `${label}\n${item.text}`;
+}
+
+// content is a raw session entry field typed unknown, so the shape is
+// verified per part rather than trusted.
+function extractToolCallItems(content: unknown): TranscriptItem[] {
+  if (!Array.isArray(content)) return [];
+  const items: TranscriptItem[] = [];
+  for (const part of content) {
+    if (!isRecord(part) || part.type !== "toolCall" || typeof part.name !== "string") continue;
+    items.push({
+      role: "tool",
+      text: `${part.name}: ${summarizeToolCall(part.name, part.arguments)}`,
+    });
+  }
+  return items;
+}
+
+// Only tool items count against the cap — user, assistant, and question
+// items are never dropped here.
+function capToolCallItems(items: TranscriptItem[]): TranscriptItem[] {
+  let toolItemsSeen = 0;
+  const kept: TranscriptItem[] = [];
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    const item = items[index];
+    if (item.role === "tool") {
+      toolItemsSeen += 1;
+      if (toolItemsSeen > MAX_TOOL_CALL_ITEMS) continue;
+    }
+    kept.push(item);
+  }
+  kept.reverse();
+  return kept;
 }
 
 // Each loop always admits at least one item even if that single item alone
@@ -192,10 +242,12 @@ function splitHeadAndTail(
   };
 }
 
-// Tool calls, tool call summaries, and tool results are deliberately excluded
-// throughout — they stay outside the injection surface the reviewer trusts.
+// Tool call arguments are summarized (name plus a bounded, single-line
+// rendering) and interleaved as activity evidence; tool results are still
+// deliberately excluded — they stay outside the injection surface the
+// reviewer trusts.
 export function buildRecentUserTranscript(entries: SessionEntryLike[]): string {
-  const items: TranscriptItem[] = [];
+  const collected: TranscriptItem[] = [];
   let pendingAssistantText: string | undefined;
 
   for (const entry of entries) {
@@ -204,6 +256,7 @@ export function buildRecentUserTranscript(entries: SessionEntryLike[]): string {
 
     if (role === "assistant") {
       pendingAssistantText = extractMessageText(entry.message.content);
+      collected.push(...extractToolCallItems(entry.message.content));
       continue;
     }
 
@@ -211,9 +264,9 @@ export function buildRecentUserTranscript(entries: SessionEntryLike[]): string {
       const text = truncateTranscriptText(extractMessageText(entry.message.content));
       if (text) {
         if (pendingAssistantText) {
-          items.push({ role: "assistant", text: truncateTranscriptText(pendingAssistantText) });
+          collected.push({ role: "assistant", text: truncateTranscriptText(pendingAssistantText) });
         }
-        items.push({ role: "user", text });
+        collected.push({ role: "user", text });
       }
       pendingAssistantText = undefined;
       continue;
@@ -225,10 +278,11 @@ export function buildRecentUserTranscript(entries: SessionEntryLike[]): string {
       QUESTION_TOOL_NAMES.has(entry.message.toolName)
     ) {
       const text = truncateTranscriptText(renderQuestionAnswers(entry.message.details));
-      if (text) items.push({ role: "question", text });
+      if (text) collected.push({ role: "question", text });
     }
   }
 
+  const items = capToolCallItems(collected);
   if (items.length === 0) return "[no recent user text]";
 
   const totalChars = items.reduce((sum, item) => sum + item.text.length, 0);

@@ -17,9 +17,9 @@ const MAX_SCRIPT_TOTAL_CHARS = 20_000;
 const MAX_SCRIPT_FILE_BYTES = 1_000_000;
 const SCRIPT_BINARY_SNIFF_BYTES = 8_000;
 
-export type DenialRecord = {
+export type GrantRecord = {
   toolName: string;
-  reason: string;
+  summary: string;
   timestamp: number;
 };
 
@@ -104,7 +104,7 @@ async function buildRunFileSection(file: string, cwd: string): Promise<string | 
 export async function buildReviewRequest(
   ctx: TranscriptSource,
   event: Pick<ToolCallEvent, "toolName" | "input">,
-  denials: DenialRecord[],
+  grants: GrantRecord[],
 ): Promise<string> {
   const transcript = buildRecentUserTranscript(ctx.sessionManager.getBranch());
   const argsJson = stringifyBoundedJson(event.input);
@@ -113,10 +113,10 @@ export async function buildReviewRequest(
     transcript,
   ];
 
-  if (denials.length > 0) {
+  if (grants.length > 0) {
     parts.push(
-      "Recent auto-review denials the user has seen (a later user affirmation may refer to these):",
-      denials.map((denial) => `- ${denial.toolName}: ${denial.reason}`).join("\n"),
+      "User-approved gate decisions from this session (each was denied by review, shown to the user, and explicitly approved by the user; treat them as the user's own authorizations):",
+      grants.map((grant) => `- ${grant.toolName}: ${grant.summary}`).join("\n"),
     );
   }
 

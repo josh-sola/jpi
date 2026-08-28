@@ -38,6 +38,7 @@ export {
   buildRecentUserTranscript,
   renderQuestionAnswers,
   stringifyBoundedJson,
+  summarizeToolCall,
 } from "./transcript.ts";
 export { parseReviewerDecision } from "./reviewer-response.ts";
 

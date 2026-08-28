@@ -17,6 +17,7 @@ import {
   errorMessage,
   scratchpadRoot,
   seedIfMissing,
+  truncateMiddle,
   type Config,
   type NotifyLevel,
   type WithEnabled,
@@ -31,9 +32,9 @@ import {
 import type { guardianSchema } from "./index.ts";
 import { REVIEW_POLICY } from "./policy.ts";
 import { buildSystemPrompt, getGuardianPromptPath, loadGuardianPromptBase } from "./prompt.ts";
-import { buildReviewRequest, type DenialRecord } from "./review-request.ts";
+import { buildReviewRequest, type GrantRecord } from "./review-request.ts";
 import { getReviewerText, normalizeReason, parseReviewerDecision } from "./reviewer-response.ts";
-import type { SessionEntryLike } from "./transcript.ts";
+import { summarizeToolCall, type SessionEntryLike } from "./transcript.ts";
 
 // The root barrel exports ToolCallEventResult but omits this sibling type
 // (a gap in pi-coding-agent 0.84.3); mirror it until upstream fixes the export.
@@ -47,7 +48,8 @@ interface ToolResultEventResult {
 export const COMMAND_NAME = "guardian";
 export const STATUS_KEY = "@jpi-guardian/review-mode";
 const MAX_REVIEW_TOKENS = 220;
-const MAX_RECENT_DENIALS = 5;
+const MAX_SESSION_GRANTS = 20;
+const MAX_DENY_DIALOG_TITLE_CHARS = 200;
 
 // jpi-status passes setStatus values through to the terminal unmodified, so
 // the short status carries its own truecolor SGR sequence.
@@ -80,6 +82,19 @@ export type ReviewContext = {
   ui?: {
     notify(message: string, level: NotifyLevel): void;
     setStatus(key: string, value: string | undefined): void;
+    // Mirrors pi's ExtensionUIContext dialog methods. Optional: older hosts
+    // (or tests) may not implement them, in which case a denial falls back
+    // to the plain (no-dialog) path.
+    select?(
+      title: string,
+      options: string[],
+      opts?: { signal?: AbortSignal },
+    ): Promise<string | undefined>;
+    input?(
+      title: string,
+      placeholder?: string,
+      opts?: { signal?: AbortSignal },
+    ): Promise<string | undefined>;
   };
   sessionManager: {
     getBranch(): SessionEntryLike[];
@@ -224,12 +239,13 @@ export class AutoReviewController {
   consecutiveReviewFailures = 0;
   openCircuitReason: string | undefined;
   readonly pendingUsage = new Map<string, Usage>();
-  // Lives for the whole session, unlike consecutiveExplicitDenials: a later
-  // user affirmation may refer to a denial from an earlier agent run.
-  readonly recentDenials: DenialRecord[] = [];
   // Set only when the reviewer model actually ran and allowed the call, so
   // the transcript annotation never appears for allowlisted or denied calls.
   readonly reviewDurations = new Map<string, number>();
+  // Lives for the whole session (never cleared by resetAgentRun/resetBreakers):
+  // a user's explicit override of a denial stays in force for later calls in
+  // the same session, capped so the reviewer prompt can't grow unbounded.
+  readonly sessionGrants: GrantRecord[] = [];
 
   constructor(cfg: Config<WithEnabled<typeof guardianSchema>>, options: ControllerOptions = {}) {
     this.cfg = cfg;
@@ -282,9 +298,9 @@ export class AutoReviewController {
     this.consecutiveExplicitDenials = 0;
   }
 
-  recordDenial(toolName: string, reason: string): void {
-    this.recentDenials.push({ toolName, reason, timestamp: this.now() });
-    if (this.recentDenials.length > MAX_RECENT_DENIALS) this.recentDenials.shift();
+  recordGrant(toolName: string, summary: string): void {
+    this.sessionGrants.push({ toolName, summary, timestamp: this.now() });
+    if (this.sessionGrants.length > MAX_SESSION_GRANTS) this.sessionGrants.shift();
   }
 
   resetReviewFailures(): void {
@@ -453,7 +469,7 @@ export class AutoReviewController {
             {
               role: "user",
               content: [
-                { type: "text", text: await buildReviewRequest(ctx, event, this.recentDenials) },
+                { type: "text", text: await buildReviewRequest(ctx, event, this.sessionGrants) },
               ],
               timestamp: startedAt,
             },
@@ -504,14 +520,64 @@ export class AutoReviewController {
       return undefined;
     }
 
+    return this.resolveDenial(ctx, event, decision.reason);
+  }
+
+  private async resolveDenial(
+    ctx: ReviewContext,
+    event: ToolCallEvent,
+    reviewerReason: string,
+  ): Promise<ToolCallEventResult | undefined> {
+    if (ctx.hasUI && ctx.ui && typeof ctx.ui.select === "function") {
+      try {
+        const title = truncateMiddle(
+          `Guardian denied ${event.toolName}: ${reviewerReason}`,
+          MAX_DENY_DIALOG_TITLE_CHARS,
+          "…",
+        );
+        const choice = await ctx.ui.select(
+          title,
+          ["Allow (session grant)", "Deny", "Deny with note"],
+          { signal: ctx.signal },
+        );
+
+        if (choice === "Allow (session grant)") {
+          this.recordGrant(event.toolName, summarizeToolCall(event.toolName, event.input));
+          this.resetDenials();
+          freezeToolInput(event.input);
+          return undefined;
+        }
+
+        if (choice === "Deny" || choice === "Deny with note") {
+          let reason = `${reviewerReason} The user reviewed this denial and upheld it.`;
+          if (choice === "Deny with note") {
+            const note = await ctx.ui.input?.("Note for the agent (optional)", undefined, {
+              signal: ctx.signal,
+            });
+            if (note && note.trim().length > 0) reason += ` User note: ${note}`;
+          }
+          return this.denyToolCall(reason);
+        }
+
+        // undefined means dismissed or aborted — the user made no decision,
+        // so the reason deliberately omits the upheld-by-user sentence.
+        return this.denyToolCall(reviewerReason);
+      } catch {
+        return this.denyToolCall(reviewerReason);
+      }
+    }
+
+    return this.denyToolCall(reviewerReason);
+  }
+
+  private denyToolCall(reason: string): ToolCallEventResult {
     this.consecutiveExplicitDenials += 1;
-    this.recordDenial(event.toolName, decision.reason);
     // Pi only terminates early when every tool result in the current batch sets
     // terminate, so an allowed sibling in a parallel batch delays the stop by one
     // batch. The open circuit still blocks (and terminates) every later call.
     const terminate = this.consecutiveExplicitDenials >= 3;
     if (terminate) this.openCircuitReason = "three denials without an approved call";
-    return buildDenial(decision.reason, terminate);
+    return buildDenial(reason, terminate);
   }
 
   handleToolResult(event: ToolResultEvent): ToolResultEventResult | undefined {
