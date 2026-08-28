@@ -64,8 +64,15 @@ test("unsubscribe removes a still-pending subscriber", () => {
   assert.equal(fired, 0);
 });
 
-test("markReviewAnnotationConsumer flips the consumer flag on", () => {
-  assert.equal(hasReviewAnnotationConsumer(), false);
-  markReviewAnnotationConsumer();
-  assert.equal(hasReviewAnnotationConsumer(), true);
+test("markReviewAnnotationConsumer registers each named tool independently", () => {
+  assert.equal(hasReviewAnnotationConsumer("bash"), false);
+  assert.equal(hasReviewAnnotationConsumer("read"), false);
+  markReviewAnnotationConsumer(["bash", "read"]);
+  assert.equal(hasReviewAnnotationConsumer("bash"), true);
+  assert.equal(hasReviewAnnotationConsumer("read"), true);
+});
+
+test("hasReviewAnnotationConsumer returns false for a name that was never marked", () => {
+  markReviewAnnotationConsumer(["web_search"]);
+  assert.equal(hasReviewAnnotationConsumer("web_fetch"), false);
 });

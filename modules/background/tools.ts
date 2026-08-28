@@ -16,6 +16,7 @@ import {
   isRecord,
   plural,
   truncateEnd,
+  withReviewAnnotation,
 } from "../../src/core/index.ts";
 import { abortable, DETACH_MARKER, type DetachRegistry } from "./detach.ts";
 import { type MonitorManager, resolveBackgroundItem } from "./monitor.ts";
@@ -78,7 +79,7 @@ function renderBackgroundResult(
   result: { content: ReadonlyArray<{ type: string; text?: string }> },
   options: ToolRenderResultOptions,
   theme: Theme,
-  context: { isError: boolean },
+  context: { isError: boolean; toolCallId: string; invalidate(): void },
 ) {
   if (options.isPartial) return new Container();
   const text = extractResultText(result.content);
@@ -87,14 +88,14 @@ function renderBackgroundResult(
     const preview = truncateEnd(firstNonEmptyLine(text) ?? "Error", 100);
     container.addChild(createResultLine(preview, theme, "error"));
     if (options.expanded) container.addChild(new Text(theme.fg("error", text), 0, 0));
-    return container;
+    return withReviewAnnotation(container, theme, context);
   }
 
   container.addChild(createResultLine(summarizeOutput(text), theme, "dim"));
   if (options.expanded && text) {
     container.addChild(new Text(theme.fg("toolOutput", text), 0, 0));
   }
-  return container;
+  return withReviewAnnotation(container, theme, context);
 }
 
 function formatSnapshot(item: Snapshot): string {

@@ -17,6 +17,7 @@ import {
   extractResultText,
   isRecord,
   truncateEnd,
+  withReviewAnnotation,
 } from "../../src/core/index.ts";
 import type { KetchRunner } from "./ketch.ts";
 import { truncateDiagnostic } from "./ketch.ts";
@@ -315,14 +316,14 @@ export function createWebFetchTool(
         const preview = truncateEnd(firstNonEmptyLine(text) ?? "Error", 100);
         container.addChild(createResultLine(preview, theme, "error"));
         if (renderOptions.expanded) container.addChild(new Text(theme.fg("error", text), 0, 0));
-        return container;
+        return withReviewAnnotation(container, theme, context);
       }
 
       container.addChild(createResultLine(`Fetched ${formatKb(text)}`, theme, "dim"));
       if (renderOptions.expanded && text) {
         container.addChild(new Text(theme.fg("toolOutput", text), 0, 0));
       }
-      return container;
+      return withReviewAnnotation(container, theme, context);
     },
   };
 }

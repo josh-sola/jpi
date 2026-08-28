@@ -40,15 +40,13 @@ import {
   createToolHeader,
   displayPath,
   extractResultText,
-  formatReviewDuration,
-  getReviewAnnotation,
   isWithinRoot,
   markReviewAnnotationConsumer,
   memoriesRoot,
-  onReviewAnnotation,
   plural,
   scratchpadRoot,
   truncateEnd,
+  withReviewAnnotation,
 } from "../../src/core/index.ts";
 
 // Local mirror of pi's ToolRenderContext: pi-coding-agent 0.84.3's root barrel
@@ -126,32 +124,6 @@ function renderErrorResult(text: string, expanded: boolean, theme: Theme): Compo
     );
   }
   return container;
-}
-
-/**
- * Appends guardian's "⛨ reviewed · <duration>" line under a finished result
- * when that call was reviewed, aligned with the `⎿` line's two-space indent.
- * When the annotation hasn't landed yet, subscribes to repaint once it does.
- */
-function withReviewAnnotation(
-  component: Component,
-  theme: Theme,
-  context: ToolRenderContext,
-): Component {
-  if (!(component instanceof Container)) return component;
-  const annotation = getReviewAnnotation(context.toolCallId);
-  if (annotation) {
-    component.addChild(
-      new Text(
-        `  ${theme.fg("dim", `⛨ reviewed · ${formatReviewDuration(annotation.durationMs)}`)}`,
-        0,
-        0,
-      ),
-    );
-  } else {
-    onReviewAnnotation(context.toolCallId, () => context.invalidate());
-  }
-  return component;
 }
 
 /** Shared renderResult scaffolding: partial/error handling, then a tool-specific summary. */
@@ -268,7 +240,7 @@ export interface StyleToolsOptions {
 }
 
 export function registerStyleTools(pi: ExtensionAPI, options: StyleToolsOptions = {}): void {
-  markReviewAnnotationConsumer();
+  markReviewAnnotationConsumer(["read", "bash", "edit", "write", "grep", "find", "ls"]);
 
   const cwd = process.cwd();
   const memoriesRootDir = memoriesRoot(options.env, options.homeDirectory);

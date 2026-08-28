@@ -8,6 +8,7 @@ import { test } from "vite-plus/test";
 import { Theme } from "@earendil-works/pi-coding-agent";
 import { stripTerminalSequences } from "@earendil-works/pi-tui";
 
+import { recordReviewAnnotation } from "../../src/core/index.ts";
 import { createWebSearchTool, type WebSearchDetails } from "../../modules/web/search.ts";
 import { createWebFetchTool } from "../../modules/web/fetch.ts";
 
@@ -138,6 +139,21 @@ test("web_search shows the first error line on the ⎿ line when the result is a
     context({ isError: true }),
   );
   assert.deepEqual(plainLines(rendered), ["  ⎿  Ketch returned malformed search output."]);
+});
+
+test("a reviewed web_search result renders the ⛨ reviewed annotation as its last line", () => {
+  const tool = createWebSearchTool({ runJson: async () => [] });
+  recordReviewAnnotation("call-reviewed-search", { durationMs: 600 });
+  const details: WebSearchDetails = { query: "weather", results: [] };
+  const result = { content: [{ type: "text", text: "No web results found." }], details };
+
+  const rendered = tool.renderResult!(
+    result as any,
+    { isPartial: false, expanded: false },
+    testTheme(),
+    context({ isError: false, toolCallId: "call-reviewed-search" }),
+  );
+  assert.equal(plainLines(rendered).at(-1), "  ⛨ reviewed · 0.6s");
 });
 
 // --- web_fetch ---

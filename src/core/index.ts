@@ -39,6 +39,7 @@ export {
   relativizePath,
   ToolHeader,
   ToolResultLine,
+  withReviewAnnotation,
   type BulletState,
 } from "./render.ts";
 export {

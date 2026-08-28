@@ -1180,7 +1180,7 @@ export default function autoReview(
   pi.on("tool_result", async (event) => {
     const durationMs = controller.takeReviewDuration(event.toolCallId);
     if (durationMs === undefined) return undefined;
-    if (hasReviewAnnotationConsumer()) {
+    if (hasReviewAnnotationConsumer(event.toolName)) {
       recordReviewAnnotation(event.toolCallId, { durationMs });
       return undefined;
     }

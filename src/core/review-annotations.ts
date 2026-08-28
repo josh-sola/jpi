@@ -1,7 +1,7 @@
 /**
  * Session-scoped registry that lets guardian's "reviewed" annotation reach
- * the style module's tool-result renderer instead of pi's own appended-entry
- * path (which always inserts a blank-line spacer above the annotation).
+ * a tool's own result renderer instead of pi's own appended-entry path
+ * (which always inserts a blank-line spacer above the annotation).
  * Module-level state: one process is one session.
  */
 
@@ -11,15 +11,15 @@ export interface ReviewAnnotation {
 
 const annotations = new Map<string, ReviewAnnotation>();
 const subscribers = new Map<string, () => void>();
-let hasConsumer = false;
+const consumedToolNames = new Set<string>();
 
-/** Called once by a module (the style module) that renders the annotation itself. */
-export function markReviewAnnotationConsumer(): void {
-  hasConsumer = true;
+/** Called by a module that renders the annotation itself, for every tool name it renders. */
+export function markReviewAnnotationConsumer(toolNames: readonly string[]): void {
+  for (const name of toolNames) consumedToolNames.add(name);
 }
 
-export function hasReviewAnnotationConsumer(): boolean {
-  return hasConsumer;
+export function hasReviewAnnotationConsumer(toolName: string): boolean {
+  return consumedToolNames.has(toolName);
 }
 
 /** Stores the annotation for `toolCallId` and fires its subscriber, if any. */

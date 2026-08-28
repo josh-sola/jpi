@@ -2,9 +2,8 @@
  * Guardian's tool_result handler has two ways to hand off a reviewed call's
  * duration: pi's own appendEntry (a separate transcript entry, spaced away
  * from the tool call by pi's CustomEntryComponent) or the shared
- * review-annotation registry the style module renders inline. Which one runs
- * depends on whether a consumer has been marked — a one-way flip for the
- * process, so the "no consumer" case must run before the "consumer" case.
+ * review-annotation registry a tool's own renderer draws inline. Which one
+ * runs depends on whether the call's tool name has been marked as a consumer.
  */
 import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -61,12 +60,13 @@ function makeAllowResponse(): AssistantMessage {
   };
 }
 
-// Wires autoReview against a fake ExtensionAPI, drives one bash call through
-// a review that allows it, then fires every registered tool_result handler
-// for that call, returning what pi's appendEntry recorded.
+// Wires autoReview against a fake ExtensionAPI, drives one call through a
+// review that allows it, then fires every registered tool_result handler for
+// that call, returning what pi's appendEntry recorded.
 async function driveOneReviewedCall(
   t: TestContext,
   toolCallId: string,
+  toolName: string,
 ): Promise<{ customType: string; data: unknown }[]> {
   const { env } = await withTempEnv(t);
   const handlers: Record<string, ((event: unknown, ctx?: unknown) => unknown)[]> = {};
@@ -99,7 +99,7 @@ async function driveOneReviewedCall(
   const callEvent = {
     type: "tool_call",
     toolCallId,
-    toolName: "bash",
+    toolName,
     input: { command: "npm test" },
   };
   for (const handler of handlers.tool_call ?? []) {
@@ -110,7 +110,7 @@ async function driveOneReviewedCall(
   const resultEvent = {
     type: "tool_result",
     toolCallId,
-    toolName: "bash",
+    toolName,
     input: { command: "npm test" },
     content: [],
     details: undefined,
@@ -123,8 +123,12 @@ async function driveOneReviewedCall(
   return appendEntryCalls;
 }
 
-test("without a review-annotation consumer, a reviewed call appends the legacy entry", async (t) => {
-  const appendEntryCalls = await driveOneReviewedCall(t, "no-consumer-call");
+test("a reviewed call to a tool name with no consumer appends the legacy entry", async (t) => {
+  const appendEntryCalls = await driveOneReviewedCall(
+    t,
+    "no-consumer-call",
+    "mcp__fake_server_action",
+  );
 
   assert.equal(appendEntryCalls.length, 1);
   assert.equal(appendEntryCalls[0]!.customType, REVIEWED_ENTRY_TYPE);
@@ -132,9 +136,9 @@ test("without a review-annotation consumer, a reviewed call appends the legacy e
   assert.equal(getReviewAnnotation("no-consumer-call"), undefined);
 });
 
-test("with a review-annotation consumer marked, a reviewed call records the annotation instead", async (t) => {
-  markReviewAnnotationConsumer();
-  const appendEntryCalls = await driveOneReviewedCall(t, "with-consumer-call");
+test("a reviewed call to a tool name marked as a consumer records the annotation instead", async (t) => {
+  markReviewAnnotationConsumer(["run"]);
+  const appendEntryCalls = await driveOneReviewedCall(t, "with-consumer-call", "run");
 
   assert.deepEqual(appendEntryCalls, []);
   const annotation = getReviewAnnotation("with-consumer-call");

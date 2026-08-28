@@ -25,11 +25,13 @@ import {
   createResultLine,
   createToolHeader,
   extractResultText,
+  markReviewAnnotationConsumer,
   plural,
   projectSlug,
   sanitizeStoreSegment,
   Store,
   truncateEnd,
+  withReviewAnnotation,
   type ModuleContext,
 } from "../../src/core/index.ts";
 import { AutoClearManager } from "./auto-clear.ts";
@@ -146,6 +148,8 @@ function buildSystemReminder(tasks: Task[]): string {
 }
 
 export function setupTasks(pi: ExtensionAPI, ctx: ModuleContext<typeof tasksSchema>) {
+  markReviewAnnotationConsumer(["TaskCreate", "TaskList", "TaskGet", "TaskUpdate"]);
+
   const jpiStore = new Store("tasks");
 
   // The loader guarantees the `tasks { }` config is loaded before setup runs, so
@@ -468,7 +472,7 @@ All tasks are created with status \`pending\`.
         const preview = truncateEnd(firstNonEmptyLine(text) ?? "Error", 100);
         container.addChild(createResultLine(preview, theme, "error"));
         if (options.expanded) container.addChild(new Text(theme.fg("error", text), 0, 0));
-        return container;
+        return withReviewAnnotation(container, theme, context);
       }
 
       const match = text.match(/^Task #(\S+) created successfully/);
@@ -478,7 +482,7 @@ All tasks are created with status \`pending\`.
       container.addChild(createResultLine(summary, theme, "dim"));
       if (options.expanded && text)
         container.addChild(new Text(theme.fg("toolOutput", text), 0, 0));
-      return container;
+      return withReviewAnnotation(container, theme, context);
     },
   });
 
@@ -536,14 +540,14 @@ Use TaskGet with a specific task ID to view full details including the descripti
         const preview = truncateEnd(firstNonEmptyLine(text) ?? "Error", 100);
         container.addChild(createResultLine(preview, theme, "error"));
         if (options.expanded) container.addChild(new Text(theme.fg("error", text), 0, 0));
-        return container;
+        return withReviewAnnotation(container, theme, context);
       }
 
       const n = text === "No tasks found" ? 0 : countLines(text);
       container.addChild(createResultLine(`${n} ${plural(n, "task")}`, theme, "dim"));
       if (options.expanded && text)
         container.addChild(new Text(theme.fg("toolOutput", text), 0, 0));
-      return container;
+      return withReviewAnnotation(container, theme, context);
     },
   });
 
@@ -608,7 +612,7 @@ Returns full task details:
         const preview = truncateEnd(firstNonEmptyLine(text) ?? "Error", 100);
         container.addChild(createResultLine(preview, theme, "error"));
         if (options.expanded) container.addChild(new Text(theme.fg("error", text), 0, 0));
-        return container;
+        return withReviewAnnotation(container, theme, context);
       }
 
       const summary =
@@ -616,7 +620,7 @@ Returns full task details:
       container.addChild(createResultLine(summary, theme, "dim"));
       if (options.expanded && text)
         container.addChild(new Text(theme.fg("toolOutput", text), 0, 0));
-      return container;
+      return withReviewAnnotation(container, theme, context);
     },
   });
 
@@ -746,7 +750,7 @@ Delete a task:
         const preview = truncateEnd(firstNonEmptyLine(text) ?? "Error", 100);
         container.addChild(createResultLine(preview, theme, "error"));
         if (options.expanded) container.addChild(new Text(theme.fg("error", text), 0, 0));
-        return container;
+        return withReviewAnnotation(container, theme, context);
       }
 
       const taskId = context.args.taskId;
@@ -756,7 +760,7 @@ Delete a task:
       container.addChild(createResultLine(summary, theme, "dim"));
       if (options.expanded && text)
         container.addChild(new Text(theme.fg("toolOutput", text), 0, 0));
-      return container;
+      return withReviewAnnotation(container, theme, context);
     },
   });
 

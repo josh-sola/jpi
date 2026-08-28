@@ -11,7 +11,7 @@ import { afterAll, test } from "vite-plus/test";
 import { Theme } from "@earendil-works/pi-coding-agent";
 import { stripTerminalSequences } from "@earendil-works/pi-tui";
 
-import { Store } from "../../src/core/index.ts";
+import { recordReviewAnnotation, Store } from "../../src/core/index.ts";
 import { DetachRegistry } from "../../modules/background/detach.ts";
 import { MonitorManager } from "../../modules/background/monitor.ts";
 import { BackgroundTaskRegistry } from "../../modules/background/registry.ts";
@@ -183,6 +183,19 @@ test("run renders a ⏺ Run(<command>) header from the script's first line", () 
     context(),
   );
   assert.deepEqual(plainLines(header), ["⏺ Run(echo hello)"]);
+});
+
+test("a reviewed run result renders the ⛨ reviewed annotation as its last line", () => {
+  const { runTool } = setUp();
+  recordReviewAnnotation("call-reviewed-run", { durationMs: 1500 });
+
+  const rendered = runTool.renderResult!(
+    textResult("done"),
+    { isPartial: false, expanded: false },
+    testTheme(),
+    context({ isError: false, toolCallId: "call-reviewed-run" }),
+  );
+  assert.equal(plainLines(rendered).at(-1), "  ⛨ reviewed · 1.5s");
 });
 
 test("bg_kill shows the first error line on the ⎿ line when the result is an error", () => {

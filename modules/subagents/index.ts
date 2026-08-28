@@ -38,7 +38,9 @@ import {
   createToolHeader,
   errorMessage,
   extractResultText,
+  markReviewAnnotationConsumer,
   truncateEnd,
+  withReviewAnnotation,
 } from "../../src/core/index.ts";
 import type { ModuleContext } from "../../src/core/module.ts";
 import { abortable } from "./abortable.ts";
@@ -2530,6 +2532,8 @@ Terse command-style prompts produce shallow, generic work.
 
   // ---- get_subagent_result tool ----
 
+  markReviewAnnotationConsumer([SUBAGENT_TOOL_NAMES.GET_RESULT, SUBAGENT_TOOL_NAMES.STEER]);
+
   registerToolReportingUsage(
     defineTool({
       name: SUBAGENT_TOOL_NAMES.GET_RESULT,
@@ -2637,14 +2641,14 @@ Terse command-style prompts produce shallow, generic work.
           const preview = truncateEnd(firstNonEmptyLine(text) ?? "Error", 100);
           container.addChild(createResultLine(preview, theme, "error"));
           if (options.expanded) container.addChild(new Text(theme.fg("error", text), 0, 0));
-          return container;
+          return withReviewAnnotation(container, theme, context);
         }
 
         const summary = truncateEnd(firstNonEmptyLine(text) ?? "(no output)", 100);
         container.addChild(createResultLine(summary, theme, "dim"));
         if (options.expanded && text)
           container.addChild(new Text(theme.fg("toolOutput", text), 0, 0));
-        return container;
+        return withReviewAnnotation(container, theme, context);
       },
     }),
   );
@@ -2733,14 +2737,14 @@ Terse command-style prompts produce shallow, generic work.
           const preview = truncateEnd(firstNonEmptyLine(text) ?? "Error", 100);
           container.addChild(createResultLine(preview, theme, "error"));
           if (options.expanded) container.addChild(new Text(theme.fg("error", text), 0, 0));
-          return container;
+          return withReviewAnnotation(container, theme, context);
         }
 
         const summary = truncateEnd(firstNonEmptyLine(text) ?? "(no output)", 100);
         container.addChild(createResultLine(summary, theme, "dim"));
         if (options.expanded && text)
           container.addChild(new Text(theme.fg("toolOutput", text), 0, 0));
-        return container;
+        return withReviewAnnotation(container, theme, context);
       },
     }),
   );
