@@ -43,8 +43,6 @@ https://raw.githubusercontent.com/josh-sola/jpi/main/ONBOARDING.md
 
 - `jpi.kdl` — settings for the jpi modules (from `templates/jpi.kdl`)
 - `mcp.json` — the MCP server registry (from `templates/mcp.json`)
-- `JPI-SYSTEM.md` — the system prompt template jpi's prompt module reads
-  (from `templates/JPI-SYSTEM.md`)
 - `settings.json` — merges in UI and behavior defaults from
   `templates/settings-defaults.json`, only for keys you haven't set
 

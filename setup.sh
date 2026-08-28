@@ -84,7 +84,6 @@ seed_file() {
 
 seed_file "$SCRIPT_DIR/templates/jpi.kdl" "$AGENT_DIR/jpi.kdl"
 seed_file "$SCRIPT_DIR/templates/mcp.json" "$AGENT_DIR/mcp.json"
-seed_file "$SCRIPT_DIR/templates/JPI-SYSTEM.md" "$AGENT_DIR/JPI-SYSTEM.md"
 
 node -e '
 const fs = require("fs");
