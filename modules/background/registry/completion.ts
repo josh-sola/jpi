@@ -1,3 +1,4 @@
+import { BACKGROUND_NOTIFICATION_TYPE } from "../notification-renderer.ts";
 import { NOTIFICATION_PREAMBLE_LINES } from "../prompts.ts";
 import type { CompletionNotificationSender } from "../registry.ts";
 import { snapshot, type BgTask } from "./task.ts";
@@ -32,7 +33,7 @@ export class TaskCompletionNotifier {
     try {
       this.sendNotification(
         {
-          customType: "jpi-background-notification",
+          customType: BACKGROUND_NOTIFICATION_TYPE,
           content,
           display: true,
           details: snapshot(task),

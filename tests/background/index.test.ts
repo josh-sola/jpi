@@ -64,6 +64,10 @@ function makeFakePi() {
     registerCommand(name: string) {
       registeredCommands.push({ name });
     },
+    registerMessageRenderer() {
+      // Exercised directly by tests/background/notification-renderer.test.ts;
+      // registerBackground just needs this to exist here.
+    },
   };
   // Exercises only the slice of ExtensionAPI that registerBackground calls.
   return {

@@ -11,6 +11,10 @@ import { resolveKeyId } from "./key-id.ts";
 import { createBgCommand } from "./log-view.ts";
 import { MonitorManager } from "./monitor.ts";
 import {
+  BACKGROUND_NOTIFICATION_TYPE,
+  renderBackgroundNotification,
+} from "./notification-renderer.ts";
+import {
   BackgroundTaskRegistry,
   type BackgroundSpawnFn,
   type BgTaskSnapshot,
@@ -88,6 +92,7 @@ export function registerBackground(
 
   for (const tool of createBackgroundTools({ registry, monitors })) pi.registerTool(tool);
   pi.registerCommand("bg", createBgCommand({ registry, monitors }));
+  pi.registerMessageRenderer(BACKGROUND_NOTIFICATION_TYPE, renderBackgroundNotification);
 
   pi.on("session_start", async (_event, ctx) => {
     currentCtx = { cwd: ctx.cwd, sessionId: ctx.sessionManager.getSessionId() };

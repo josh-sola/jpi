@@ -1,4 +1,5 @@
 import { logBestEffort } from "./log-best-effort.ts";
+import { BACKGROUND_NOTIFICATION_TYPE } from "./notification-renderer.ts";
 import { NOTIFICATION_PREAMBLE_LINES } from "./prompts.ts";
 import {
   type BackgroundTaskRegistry,
@@ -323,7 +324,7 @@ export class MonitorManager {
     void logBestEffort(this.logger, `monitor event notification failed for ${monitor.id}`, () =>
       this.sendNotification(
         {
-          customType: "jpi-background-notification",
+          customType: BACKGROUND_NOTIFICATION_TYPE,
           content: buildEventContent(monitor, text),
           display: true,
           details: snapshot(monitor),
@@ -372,7 +373,7 @@ export class MonitorManager {
         () =>
           this.sendNotification(
             {
-              customType: "jpi-background-notification",
+              customType: BACKGROUND_NOTIFICATION_TYPE,
               content: buildTerminalContent(monitor, status, note),
               display: true,
               details: finalSnapshot,
