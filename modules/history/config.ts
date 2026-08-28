@@ -8,6 +8,12 @@ export const historySchema = j.node({
       .positive()
       .describe("prompts the log file retains; the oldest are dropped at session start")
       .default(1000),
+    mouse: j
+      .boolean()
+      .describe(
+        "Claude Code style click-to-move-cursor and drag-to-select in the editor, fullscreen mode only",
+      )
+      .default(true),
     suggest: j.node({
       fields: {
         enabled: j

@@ -63,6 +63,8 @@ history {
   enabled #true
   // prompts the log file retains; the oldest are dropped at session start
   max-size 1000
+  // Claude Code style click-to-move-cursor and drag-to-select; fullscreen mode only
+  mouse #true
 }
 
 // persistent markdown memories, folded into the system prompt per project

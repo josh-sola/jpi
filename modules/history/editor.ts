@@ -3,6 +3,8 @@ import { CustomEditor } from "@earendil-works/pi-coding-agent";
 import type { EditorOptions, EditorTheme, TUI } from "@earendil-works/pi-tui";
 import { matchesKey } from "@earendil-works/pi-tui";
 
+import { installMouseSupport, type MouseSupport } from "./mouse.ts";
+
 const GHOST_HINT = "  (tab to accept)";
 const CURSOR_MARKER = "\x1b[7m \x1b[0m";
 
@@ -24,6 +26,11 @@ export function spliceGhostText(
   return spliced;
 }
 
+export interface HistoryEditorOptions extends EditorOptions {
+  /** Claude Code-style click-to-move-cursor and drag-to-select. Installs nothing when the tui doesn't support it. */
+  mouse?: boolean;
+}
+
 /**
  * The editor pi's TUI is live-swapped to. Records every submission locally
  * (pi's own `history` field is private) and can seed history from the
@@ -34,6 +41,10 @@ export class HistoryEditor extends CustomEditor {
   private readonly submissions: string[] = [];
   private seeded = false;
   private ghost: string | undefined;
+  // CustomEditor's own `keybindings` field is private to that class, so this
+  // keeps its own copy of the same manager passed to the constructor.
+  private readonly appKeybindings: KeybindingsManager;
+  private readonly mouse: MouseSupport | undefined;
 
   /**
    * Fired on ctrl+r instead of going through pi.registerShortcut, which
@@ -52,12 +63,14 @@ export class HistoryEditor extends CustomEditor {
     tui: TUI,
     theme: EditorTheme,
     keybindings: KeybindingsManager,
-    options?: EditorOptions,
+    options?: HistoryEditorOptions,
   ) {
     super(tui, theme, keybindings, options);
+    this.appKeybindings = keybindings;
     // Ghost text is only ever valid for the text it was suggested against;
     // any edit invalidates it. index.ts must not reassign onChange.
     this.onChange = () => this.clearGhostText();
+    this.mouse = options?.mouse ? installMouseSupport(tui, this) : undefined;
   }
 
   /** No-ops when the editor already has text — a ghost only makes sense over an empty prompt. */
@@ -74,6 +87,12 @@ export class HistoryEditor extends CustomEditor {
   }
 
   override handleInput(data: string): void {
+    if (this.mouse?.hasSelection() && this.isDeleteKey(data)) {
+      this.mouse.deleteSelection();
+      return;
+    }
+    this.mouse?.clearSelection();
+
     if (this.onHistorySearch && matchesKey(data, "ctrl+r")) {
       this.onHistorySearch();
       return;
@@ -93,8 +112,16 @@ export class HistoryEditor extends CustomEditor {
     super.handleInput(data);
   }
 
+  private isDeleteKey(data: string): boolean {
+    return (
+      this.appKeybindings.matches(data, "tui.editor.deleteCharBackward") ||
+      this.appKeybindings.matches(data, "tui.editor.deleteCharForward")
+    );
+  }
+
   override render(width: number): string[] {
-    const lines = super.render(width);
+    const rendered = super.render(width);
+    const lines = this.mouse ? this.mouse.applyHighlight(rendered, width) : rendered;
     if (!this.ghost || this.getText() !== "") return lines;
 
     const dim = this.dim ?? ((text: string) => text);
