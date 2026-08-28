@@ -1,7 +1,7 @@
-import type { StatusLineConfig } from "./config.ts";
-import { CUSTOM_COMPONENT_PREFIX, customOccurrenceKey } from "./custom.ts";
-import type { PullRequestMetadata, RepositoryMetadata } from "./data.ts";
-import type { JpiComponentId, StatusLineFormat } from "./layout.ts";
+import type { StatusLineConfig } from "../config.ts";
+import { CUSTOM_COMPONENT_PREFIX, customOccurrenceKey } from "../custom.ts";
+import type { PullRequestMetadata, RepositoryMetadata } from "../data.ts";
+import type { JpiComponentId, StatusLineFormat } from "../layout.ts";
 
 const ESC = "\x1b[";
 const RESET = `${ESC}0m`;

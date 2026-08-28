@@ -22,7 +22,7 @@ import {
   isFleetProviderPayload,
   type FleetProviderPayload,
 } from "./fleet-bridge.ts";
-import { renderFooter, type WidthHelpers } from "./render.ts";
+import { renderFooter, type WidthHelpers } from "./ui/render.ts";
 import {
   FooterStats,
   type BranchEntryLike,
