@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { EventEmitter } from "node:events";
 import { readFileSync } from "node:fs";
 import { chmod, mkdtemp, readFile, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -8,6 +9,8 @@ import { afterAll, test } from "vite-plus/test";
 
 import {
   BackgroundTaskRegistry,
+  type BackgroundChildProcess,
+  type BackgroundSpawnFn,
   type BackgroundTaskRegistryOptions,
   type BgTaskSnapshot,
   type CompletionNotificationMessage,
@@ -182,25 +185,40 @@ test("a per-task timeout kills the task as failed", async (t) => {
   assert.match(done.error ?? "", /Timed out/);
 });
 
+let nextFakePid = 900000;
+
+/**
+ * A controllable stand-in child process: it never ends on its own, so a test
+ * can drive its "close" event on its own schedule instead of racing a real
+ * subprocess's startup and signal-handling time against a wall-clock delay.
+ */
+class FakeChild extends EventEmitter implements BackgroundChildProcess {
+  readonly pid = nextFakePid++;
+  readonly stdout = new EventEmitter();
+  readonly stderr = new EventEmitter();
+  kill(): boolean {
+    return true;
+  }
+}
+
+/** Simulates a process that traps and ignores SIGTERM: only SIGKILL actually ends it. */
+function makeSigtermIgnoringKillProcess(child: FakeChild) {
+  const calls: NodeJS.Signals[] = [];
+  const killProcess = (_pid: number, signal: NodeJS.Signals) => {
+    calls.push(signal);
+    if (signal === "SIGKILL") queueMicrotask(() => child.emit("close", null, signal));
+  };
+  return { killProcess, calls };
+}
+
 test("stopping a task sends exactly one SIGKILL under concurrent stop calls", async (t) => {
   const cwd = await withTempCwd(t);
-  let sigtermCount = 0;
-  let sigkillCount = 0;
-  const { registry } = makeRegistry({
-    killGraceMs: 80,
-    stopWaitMs: 1000,
-    killProcess: (pid, signal) => {
-      if (signal === "SIGTERM") sigtermCount += 1;
-      if (signal === "SIGKILL") sigkillCount += 1;
-      process.kill(pid, signal);
-    },
-  });
-  // SIG_IGN dispositions (trap '' TERM) survive exec, so this process ignores
-  // SIGTERM but still dies on the SIGKILL escalation.
-  const started = await registry.start(makeCtx(cwd), "trap '' TERM; exec sleep 5");
-  // Give the shell time to install the trap before stopping it; under heavy
-  // load a signal arriving before that would kill it the ordinary way.
-  await new Promise((resolve) => setTimeout(resolve, 150));
+  const child = new FakeChild();
+  const spawn: BackgroundSpawnFn = () => child;
+  const { killProcess, calls } = makeSigtermIgnoringKillProcess(child);
+  const { registry } = makeRegistry({ spawn, killProcess, killGraceMs: 20, stopWaitMs: 2000 });
+
+  const started = await registry.start(makeCtx(cwd), "sleep 5");
 
   const [first, second] = await Promise.allSettled([
     registry.stop(started.id),
@@ -208,8 +226,8 @@ test("stopping a task sends exactly one SIGKILL under concurrent stop calls", as
   ]);
   assert.equal(first.status, "fulfilled");
   assert.equal(second.status, "fulfilled");
-  assert.equal(sigtermCount, 1);
-  assert.equal(sigkillCount, 1);
+  assert.equal(calls.filter((signal) => signal === "SIGTERM").length, 1);
+  assert.equal(calls.filter((signal) => signal === "SIGKILL").length, 1);
 
   const done = registry.get(started.id);
   assert.equal(done.status, "killed");
