@@ -138,8 +138,9 @@ export function isToolAllowlisted(
   );
 }
 
-// write/edit tool inputs both carry `path`, resolved against the handler's
-// cwd by pi's own tool implementation, so it is resolved the same way here.
+// pi-internal(tool-path-resolution): write/edit tool inputs both carry
+// `path`, resolved against the handler's cwd by pi's own tool implementation,
+// so it is resolved the same way here.
 function getPathToolTarget(event: Pick<ToolCallEvent, "toolName" | "input">): string | undefined {
   if (event.toolName !== "write" && event.toolName !== "edit") return undefined;
   const input: unknown = event.input;

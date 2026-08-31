@@ -4,11 +4,8 @@ import { isAbsolute, resolve } from "node:path";
 import type { ToolCallEvent } from "@earendil-works/pi-coding-agent";
 
 import { isRecord } from "../../src/core/index.ts";
-import {
-  buildRecentUserTranscript,
-  stringifyBoundedJson,
-  type SessionEntryLike,
-} from "./transcript.ts";
+import type { SessionManagerLike } from "../../src/pi/index.ts";
+import { buildRecentUserTranscript, stringifyBoundedJson } from "./transcript.ts";
 
 const MAX_SCRIPT_FILES = 3;
 const MAX_SCRIPT_TOTAL_CHARS = 20_000;
@@ -25,7 +22,7 @@ export type GrantRecord = {
 
 type TranscriptSource = {
   cwd: string;
-  sessionManager: { getBranch(): SessionEntryLike[] };
+  sessionManager: SessionManagerLike;
 };
 
 // Quoted-or-bareword split, not a shell parse: good enough to catch the

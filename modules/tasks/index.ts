@@ -32,6 +32,7 @@ import {
   truncateEnd,
   type ModuleContext,
 } from "../../src/core/index.ts";
+import { messageUsage } from "../../src/pi/index.ts";
 import { AutoClearManager } from "./auto-clear.ts";
 import { tasksSchema } from "./config.ts";
 import {
@@ -267,9 +268,9 @@ export function setupTasks(pi: ExtensionAPI, ctx: ModuleContext<typeof tasksSche
   // Also detect when the agent has stopped referencing tasks but left
   // them in_progress — schedule a reminder for the next LLM call.
   pi.on("turn_end", async (event) => {
-    const msg = event.message as any;
-    if (msg?.role === "assistant" && msg.usage) {
-      widget.addTokenUsage(msg.usage.input ?? 0, msg.usage.output ?? 0);
+    if (event.message?.role === "assistant") {
+      const usage = messageUsage(event.message);
+      if (usage) widget.addTokenUsage(usage.input ?? 0, usage.output ?? 0);
     }
 
     // Stale-task detection: catch the case where the agent finishes work in a
@@ -317,6 +318,9 @@ export function setupTasks(pi: ExtensionAPI, ctx: ModuleContext<typeof tasksSche
     return {};
   });
 
+  // pi-internal(context-hook-ephemeral): the `context` hook fires before
+  // each LLM call and its return is a non-persisted copy.
+  //
   // Inject the transient system-reminder into the upcoming LLM call's
   // messages, never into a tool result. The reminder is appended as a
   // user message so models that don't support custom message types still
@@ -344,9 +348,10 @@ export function setupTasks(pi: ExtensionAPI, ctx: ModuleContext<typeof tasksSche
     widget.setUICtx(ctx.ui as UICtx);
 
     const reason = event.reason;
-    // new/resume/fork reuse the running extension instance (getExtensions() is
-    // cached), so session-scoped state must be reset. startup/reload re-run the
-    // factory and start clean.
+    // pi-internal(cached-extension-instance): new/resume/fork reuse the
+    // running extension instance (getExtensions() is cached), so
+    // session-scoped state must be reset. startup/reload re-run the factory
+    // and start clean.
     const isSwitch = reason === "new" || reason === "resume" || reason === "fork";
     // A fork branches the conversation, so its tasks carry over as an independent
     // copy. Snapshot before the store re-points to the new (empty) session file.

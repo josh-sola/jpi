@@ -9,7 +9,7 @@ import {
 } from "@earendil-works/pi-tui";
 
 import { BorderBox } from "../../src/core/index.ts";
-import { resolveMarkdownTheme } from "../../src/pi/index.ts";
+import { computeOverlayMaxHeightRows, resolveMarkdownTheme } from "../../src/pi/index.ts";
 
 /**
  * Overlay maxHeight, as a percentage of terminal rows. Exported so the
@@ -185,7 +185,7 @@ export class BtwOverlay implements Component {
 
   /** Mirrors the overlay's own `maxHeight` percentage, minus the fixed chrome around the body. */
   private viewportHeight(): number {
-    const maxRows = Math.floor((this.tui.terminal.rows * BTW_OVERLAY_MAX_HEIGHT_PCT) / 100);
+    const maxRows = computeOverlayMaxHeightRows(this.tui.terminal.rows, BTW_OVERLAY_MAX_HEIGHT_PCT);
     return Math.max(MIN_VIEWPORT, maxRows - CHROME_LINES);
   }
 }

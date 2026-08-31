@@ -1,4 +1,5 @@
 import { isRecord, truncateMiddle } from "../../src/core/index.ts";
+import type { TranscriptEntryLike } from "../../src/pi/index.ts";
 
 const MAX_TRANSCRIPT_CHARS = 16_000;
 const MAX_TRANSCRIPT_MESSAGE_CHARS = 1_200;
@@ -151,16 +152,6 @@ export function renderQuestionAnswers(details: unknown): string {
   return blocks.join("\n\n");
 }
 
-export type SessionEntryLike = {
-  type?: string;
-  message?: {
-    role?: string;
-    content?: unknown;
-    toolName?: string;
-    details?: unknown;
-  };
-};
-
 type TranscriptItem = {
   role: "user" | "assistant" | "question" | "tool";
   text: string;
@@ -246,7 +237,7 @@ function splitHeadAndTail(
 // rendering) and interleaved as activity evidence; tool results are still
 // deliberately excluded — they stay outside the injection surface the
 // reviewer trusts.
-export function buildRecentUserTranscript(entries: SessionEntryLike[]): string {
+export function buildRecentUserTranscript(entries: TranscriptEntryLike[]): string {
   const collected: TranscriptItem[] = [];
   let pendingAssistantText: string | undefined;
 

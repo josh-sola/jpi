@@ -24,8 +24,9 @@ export function registerBtw(pi: ExtensionAPI, ctx: ModuleContext<typeof btwSchem
     requestId++;
   });
 
-  // Compaction rewrites the session branch out from under a snapshot taken
-  // mid-rewrite, so /btw refuses to ask while one is running.
+  // pi-internal(compaction-rewrites-branch): compaction rewrites the session
+  // branch out from under a snapshot taken mid-rewrite, so /btw refuses to
+  // ask while one is running.
   pi.on("session_before_compact", () => {
     compacting = true;
   });

@@ -1,3 +1,11 @@
+import type {
+  MessageEventInput,
+  MessageLike,
+  SessionInfoChangedInput,
+  SessionStartInput,
+  ToolExecutionStartInput,
+} from "../../src/pi/index.ts";
+
 const SPEED_WINDOW_MS = 2_000;
 
 export type FooterStatsSnapshot = {
@@ -10,52 +18,6 @@ export type FooterStatsSnapshot = {
   cost: number;
   activeToolName: string | null;
   liveSpeed: number | null;
-};
-
-type MessageContentPart = {
-  type?: string;
-  text?: string;
-};
-
-type MessageUsageLike = {
-  input?: number;
-  output?: number;
-  cacheRead?: number;
-  cacheWrite?: number;
-  cost?: { total?: number };
-};
-
-export type MessageLike = {
-  role?: string;
-  stopReason?: string;
-  usage?: MessageUsageLike;
-  content?: string | MessageContentPart[];
-};
-
-export type BranchEntryLike = {
-  type?: string;
-  message?: MessageLike;
-};
-
-export type SessionStartInput = {
-  sessionManager?:
-    | {
-        getSessionName?(): string | undefined;
-        getBranch?(): BranchEntryLike[];
-      }
-    | undefined;
-};
-
-export type SessionInfoChangedInput = {
-  name?: string | undefined;
-};
-
-export type MessageEventInput = {
-  message?: MessageLike;
-};
-
-export type ToolExecutionStartInput = {
-  toolName?: string;
 };
 
 function textLength(content: MessageLike["content"]): number {

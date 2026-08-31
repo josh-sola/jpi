@@ -43,6 +43,15 @@ export function computeMaxVisibleLines(terminalRows: number): number {
   return Math.max(5, Math.floor(terminalRows * 0.3));
 }
 
+/**
+ * Mirrors pi-tui's own `SizeValue` percentage parsing (`parseSizeValue`'s
+ * `"N%"` branch): the rows an `overlayOptions.maxHeight: "N%"` value resolves
+ * to, given the terminal's current row count.
+ */
+export function computeOverlayMaxHeightRows(terminalRows: number, percent: number): number {
+  return Math.floor((terminalRows * percent) / 100);
+}
+
 // ---------------------------------------------------------------------------
 // pi-tui Editor private-surface access
 // ---------------------------------------------------------------------------

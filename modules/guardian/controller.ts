@@ -1,12 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import type {
-  AssistantMessage,
-  ImageContent,
-  TextContent,
-  ToolResultMessage,
-  Usage,
-} from "@earendil-works/pi-ai";
+import type { AssistantMessage, ToolResultMessage, Usage } from "@earendil-works/pi-ai";
 import type {
   ToolCallEvent,
   ToolCallEventResult,
@@ -21,7 +15,13 @@ import {
   type Config,
   type WithEnabled,
 } from "../../src/core/index.ts";
-import type { NotifyLevel } from "../../src/pi/index.ts";
+import type {
+  DialogUIContext,
+  ModelRegistryLike,
+  NotifyLevel,
+  SessionManagerLike,
+  ToolResultEventResult,
+} from "../../src/pi/index.ts";
 import {
   isScratchpadWrite,
   isToolAllowlisted,
@@ -34,16 +34,7 @@ import { REVIEW_POLICY } from "./policy.ts";
 import { buildSystemPrompt, getGuardianPromptPath, loadGuardianPromptBase } from "./prompt.ts";
 import { buildReviewRequest, type GrantRecord } from "./review-request.ts";
 import { getReviewerText, normalizeReason, parseReviewerDecision } from "./reviewer-response.ts";
-import { summarizeToolCall, type SessionEntryLike } from "./transcript.ts";
-
-// The root barrel exports ToolCallEventResult but omits this sibling type
-// (a gap in pi-coding-agent 0.84.3); mirror it until upstream fixes the export.
-interface ToolResultEventResult {
-  content?: (TextContent | ImageContent)[];
-  details?: unknown;
-  isError?: boolean;
-  usage?: Usage;
-}
+import { summarizeToolCall } from "./transcript.ts";
 
 export const COMMAND_NAME = "guardian";
 export const STATUS_KEY = "@jpi-guardian/review-mode";
@@ -51,8 +42,9 @@ const MAX_REVIEW_TOKENS = 220;
 const MAX_SESSION_GRANTS = 20;
 const MAX_DENY_DIALOG_TITLE_CHARS = 200;
 
-// jpi-status passes setStatus values through to the terminal unmodified, so
-// the short status carries its own truecolor SGR sequence.
+// pi-internal(raw-sgr-status): jpi-status passes setStatus values through to
+// the terminal unmodified, so the short status carries its own truecolor SGR
+// sequence.
 function coloredStatus(hex: string, text: string): string {
   const value = Number.parseInt(hex.slice(1), 16);
   const r = (value >> 16) & 0xff;
@@ -82,32 +74,9 @@ export type ReviewContext = {
   ui?: {
     notify(message: string, level: NotifyLevel): void;
     setStatus(key: string, value: string | undefined): void;
-    // Mirrors pi's ExtensionUIContext dialog methods. Optional: older hosts
-    // (or tests) may not implement them, in which case a denial falls back
-    // to the plain (no-dialog) path.
-    select?(
-      title: string,
-      options: string[],
-      opts?: { signal?: AbortSignal },
-    ): Promise<string | undefined>;
-    input?(
-      title: string,
-      placeholder?: string,
-      opts?: { signal?: AbortSignal },
-    ): Promise<string | undefined>;
-  };
-  sessionManager: {
-    getBranch(): SessionEntryLike[];
-  };
-  modelRegistry: {
-    find(provider: string, modelId: string): unknown;
-    hasConfiguredAuth(model: unknown): boolean;
-    complete(
-      model: unknown,
-      context: unknown,
-      options?: Record<string, unknown>,
-    ): Promise<AssistantMessage>;
-  };
+  } & DialogUIContext;
+  sessionManager: SessionManagerLike;
+  modelRegistry: ModelRegistryLike;
 };
 
 export type ReviewCommandContext = ReviewContext & {
@@ -571,9 +540,10 @@ export class AutoReviewController {
 
   private denyToolCall(reason: string): ToolCallEventResult {
     this.consecutiveExplicitDenials += 1;
-    // Pi only terminates early when every tool result in the current batch sets
-    // terminate, so an allowed sibling in a parallel batch delays the stop by one
-    // batch. The open circuit still blocks (and terminates) every later call.
+    // pi-internal(batch-denial-termination): Pi only terminates early when
+    // every tool result in the current batch sets terminate, so an allowed
+    // sibling in a parallel batch delays the stop by one batch. The open
+    // circuit still blocks (and terminates) every later call.
     const terminate = this.consecutiveExplicitDenials >= 3;
     if (terminate) this.openCircuitReason = "three denials without an approved call";
     return buildDenial(reason, terminate);

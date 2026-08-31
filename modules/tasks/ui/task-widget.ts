@@ -11,7 +11,7 @@
 import { truncateToWidth } from "@earendil-works/pi-tui";
 
 import { errorMessage, splitDuration } from "../../../src/core/index.ts";
-import type { Notifier } from "../../../src/pi/index.ts";
+import type { Notifier, WidgetTheme, WidgetUIContext } from "../../../src/pi/index.ts";
 import type { TaskStore } from "../task-store.ts";
 import type { Task } from "../types.ts";
 
@@ -33,14 +33,13 @@ const GLYPHS = {
 
 // ---- Types ----
 
-export type Theme = {
-  fg(color: string, text: string): string;
-  bold(text: string): string;
+// Extends the consolidated WidgetTheme (`fg`/`bold`) with the one extra
+// primitive this widget needs for its completed-task styling.
+export type Theme = WidgetTheme & {
   strikethrough(text: string): string;
 };
 
-export type UICtx = {
-  setStatus(key: string, text: string | undefined): void;
+export type UICtx = Pick<WidgetUIContext, "setStatus"> & {
   setWidget(
     key: string,
     content: undefined | ((tui: any, theme: Theme) => { render(): string[]; invalidate(): void }),

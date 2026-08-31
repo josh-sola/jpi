@@ -31,6 +31,10 @@ export default defineConfig({
     // The merged suite saturates every worker thread; timing-sensitive tests
     // that pass alone in <1s can exceed vitest's 5s default under that load.
     testTimeout: 20_000,
+    // pi-internal(pi-ai-dedupe): npm's nested pi-ai duplication requires this;
+    // production separately relies on the loader aliasing pi-tui to pi's own
+    // copy (see src/pi/README.md's pi-tui-single-copy marker).
+    //
     // The print-mode e2e tests register a faux pi-ai provider and need the session
     // to stream through that same pi-ai instance. npm duplicates pi-ai (top-level +
     // nested under pi-coding-agent), yielding two registries and "No API provider
