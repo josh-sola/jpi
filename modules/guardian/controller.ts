@@ -427,7 +427,7 @@ export class AutoReviewController {
 
     if (this.openCircuitReason) return buildOpenCircuit(this.openCircuitReason);
 
-    if (isToolAllowlisted(config, event)) {
+    if (isToolAllowlisted(config, event, ctx.cwd)) {
       freezeToolInput(event.input);
       return undefined;
     }
