@@ -7,23 +7,24 @@ import {
 const PATCHED = Symbol.for("jpi:style:mcp-tools-patched");
 
 /**
- * Patches `ExtensionRunner.prototype.getToolDefinition` so every lookup runs
- * through `transform` first: `transform` receives the requested tool name
- * and a bound `original` lookup (`this`-correct, so it can be called more
- * than once or not at all) and returns whatever `getToolDefinition` should
- * now return for that name.
+ * Patches `ExtensionRunner.prototype.getToolDefinition` and
+ * `getAllRegisteredTools` so every definition reaches `transform`: direct
+ * lookups use the requested name, while aggregate snapshots map each entry's
+ * `definition.name`. `transform` receives a bound original direct lookup
+ * (`this`-correct, so it can be called more than once or not at all).
  *
- * `ExtensionRunner.getToolDefinition` is also the path pi's own execution
- * machinery and the HTML transcript exporter use to look up a tool by name,
- * so `transform` is responsible for preserving whatever contract callers
- * expect (falling through to `original` for names it doesn't care about,
- * returning the exact `undefined` `original` would have, etc.) — this
- * installer only owns the patch mechanics.
+ * `getToolDefinition` remains the direct path for HTML transcript export.
+ * Live `AgentSession` rendering instead refreshes its registry from
+ * `getAllRegisteredTools`, retaining each returned definition and sourceInfo.
+ * `transform` is responsible for preserving callers' contracts (falling
+ * through to `original` for names it doesn't care about, returning the exact
+ * `undefined` `original` would have, etc.); this installer only owns the
+ * patch mechanics.
  *
  * Idempotent: safe to call more than once (across separate `transform`s or
  * the same one — the second call is a no-op either way). Degrades to a
- * no-op — `original` behavior stays, `transform` never runs — if
- * `ExtensionRunner`'s shape doesn't match what this expects; `onDegrade` is
+ * no-op — original behavior stays, `transform` never runs — if either
+ * `ExtensionRunner` method does not match what this expects; `onDegrade` is
  * called with the error instead of throwing.
  */
 export function patchToolDefinitionLookup(
@@ -37,14 +38,31 @@ export function patchToolDefinitionLookup(
     if (proto[PATCHED]) return;
 
     const originalGetToolDefinition = proto.getToolDefinition;
+    const originalGetAllRegisteredTools = proto.getAllRegisteredTools;
     if (typeof originalGetToolDefinition !== "function") {
       throw new Error("ExtensionRunner.prototype is missing getToolDefinition");
     }
+    if (typeof originalGetAllRegisteredTools !== "function") {
+      throw new Error("ExtensionRunner.prototype is missing getAllRegisteredTools");
+    }
+
+    const originalLookup =
+      (runner: unknown) =>
+      (name: string): unknown =>
+        (originalGetToolDefinition as (this: unknown, name: string) => unknown).call(runner, name);
 
     proto.getToolDefinition = function (this: unknown, toolName: string): unknown {
-      const original = (name: string): unknown =>
-        (originalGetToolDefinition as (this: unknown, name: string) => unknown).call(this, name);
-      return transform(toolName, original);
+      return transform(toolName, originalLookup(this));
+    };
+    proto.getAllRegisteredTools = function (this: unknown): unknown {
+      const entries = (originalGetAllRegisteredTools as (this: unknown) => unknown).call(this) as {
+        definition: { name: string };
+      }[];
+      const original = originalLookup(this);
+      return entries.map((entry) => {
+        const definition = transform(entry.definition.name, original);
+        return definition === entry.definition ? entry : { ...entry, definition };
+      });
     };
 
     Object.defineProperty(proto, PATCHED, { value: true, configurable: true });

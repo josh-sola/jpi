@@ -28,34 +28,59 @@ describe("extension-runner (real pi)", () => {
     await handle.dispose();
   });
 
-  it("getToolDefinition is a real function on the prototype", () => {
+  it("getToolDefinition and getAllRegisteredTools are real functions on the prototype", () => {
     expect(typeof ExtensionRunner.prototype.getToolDefinition).toBe("function");
+    expect(typeof ExtensionRunner.prototype.getAllRegisteredTools).toBe("function");
   });
 
-  it("patchToolDefinitionLookup installs, transforms a real lookup, and is idempotent", () => {
+  it("patchToolDefinitionLookup transforms real direct and aggregate lookups idempotently", () => {
     const runner = handle.session.extensionRunner;
     expect(runner).toBeDefined();
 
-    const original = ExtensionRunner.prototype.getToolDefinition;
+    const originalGetToolDefinition = ExtensionRunner.prototype.getToolDefinition;
+    const originalGetAllRegisteredTools = ExtensionRunner.prototype.getAllRegisteredTools;
+    const patched = Symbol.for("jpi:style:mcp-tools-patched");
     const onDegrade = vi.fn();
     try {
-      const seen: string[] = [];
+      const originalEntry = originalGetAllRegisteredTools
+        .call(runner!)
+        .find((entry) => entry.definition.name === "PiCanaryTool");
+      expect(originalEntry).toBeDefined();
+
       patchToolDefinitionLookup((toolName, lookup) => {
-        seen.push(toolName);
-        return lookup(toolName);
+        const definition = lookup(toolName) as { name: string; label?: string } | undefined;
+        return toolName === "PiCanaryTool" && definition
+          ? { ...definition, label: "Styled PiCanaryTool" }
+          : definition;
       }, onDegrade);
       expect(onDegrade).not.toHaveBeenCalled();
 
-      const definition = runner!.getToolDefinition("PiCanaryTool");
-      expect(seen).toEqual(["PiCanaryTool"]);
-      expect((definition as { name?: string } | undefined)?.name).toBe("PiCanaryTool");
+      const direct = runner!.getToolDefinition("PiCanaryTool") as
+        | { name: string; label?: string }
+        | undefined;
+      expect(direct).toMatchObject({ name: "PiCanaryTool", label: "Styled PiCanaryTool" });
 
-      // Idempotent: a second install doesn't double-wrap the prototype method.
-      const afterFirstInstall = ExtensionRunner.prototype.getToolDefinition;
+      const aggregateEntry = runner!
+        .getAllRegisteredTools()
+        .find((entry) => entry.definition.name === "PiCanaryTool");
+      expect(aggregateEntry).toBeDefined();
+      expect(aggregateEntry).not.toBe(originalEntry);
+      expect(aggregateEntry!.definition).toMatchObject({
+        name: "PiCanaryTool",
+        label: "Styled PiCanaryTool",
+      });
+      expect(aggregateEntry!.sourceInfo).toBe(originalEntry!.sourceInfo);
+      expect(originalEntry!.definition).not.toBe(aggregateEntry!.definition);
+
+      const firstGetToolDefinitionPatch = ExtensionRunner.prototype.getToolDefinition;
+      const firstGetAllRegisteredToolsPatch = ExtensionRunner.prototype.getAllRegisteredTools;
       patchToolDefinitionLookup((toolName, lookup) => lookup(toolName), onDegrade);
-      expect(ExtensionRunner.prototype.getToolDefinition).toBe(afterFirstInstall);
+      expect(ExtensionRunner.prototype.getToolDefinition).toBe(firstGetToolDefinitionPatch);
+      expect(ExtensionRunner.prototype.getAllRegisteredTools).toBe(firstGetAllRegisteredToolsPatch);
     } finally {
-      ExtensionRunner.prototype.getToolDefinition = original;
+      ExtensionRunner.prototype.getToolDefinition = originalGetToolDefinition;
+      ExtensionRunner.prototype.getAllRegisteredTools = originalGetAllRegisteredTools;
+      delete (ExtensionRunner.prototype as unknown as Record<PropertyKey, unknown>)[patched];
     }
   });
 

@@ -3,8 +3,10 @@ import { test } from "vite-plus/test";
 
 import { ExtensionRunner, initTheme, Theme } from "@earendil-works/pi-coding-agent";
 import { stripTerminalSequences, Text } from "@earendil-works/pi-tui";
+import { Type } from "typebox";
 
 import { patchMcpToolRendering } from "../../modules/style/mcp-style.ts";
+import { bootRealSession } from "../pi/helpers/real-session.ts";
 
 initTheme();
 
@@ -105,6 +107,33 @@ function context(overrides: Record<string, unknown> = {}): any {
 function textResult(text: string, details?: unknown) {
   return { content: [{ type: "text", text }], details };
 }
+
+test("a live AgentSession registry receives the styled mcp definition", async () => {
+  const handle = await bootRealSession();
+  try {
+    patchMcpToolRendering();
+    const execute = async () => ({ content: [], details: {} });
+    const original = {
+      name: "mcp",
+      label: "MCP",
+      description: "d",
+      parameters: Type.Object({}),
+      execute,
+    };
+    handle.pi.registerTool(original);
+
+    const styled = handle.session.getToolDefinition("mcp") as any;
+    assert.notEqual(styled, original);
+    assert.equal(styled.renderShell, "self");
+    assert.equal(styled.execute, execute);
+
+    const args = { server: "xcode", tool: "xcodebuild_list_sims" };
+    const lines = plainLines(styled.renderCall!(args, testTheme(), context({ args })));
+    assert.equal(lines[0], "⏺ MCP(xcode/xcodebuild_list_sims)");
+  } finally {
+    await handle.dispose();
+  }
+}, 30_000);
 
 test("patching wraps the mcpScript lookup with jpi's renderers, execute untouched", () => {
   patchMcpToolRendering();

@@ -18,27 +18,26 @@
  * extension slot comes first in `this.extensions` regardless of
  * registration order.
  *
- * So this patches the lookup chokepoint instead:
- * `ExtensionRunner.prototype.getToolDefinition`. It calls through to the
- * original lookup and, only for names this module knows how to reskin,
- * returns a wrapped copy of the definition with jpi's renderers spliced in —
- * every other field (`execute` above all) is the original extension's own
- * reference, untouched. `getToolDefinition` is also the path pi's own
- * execution machinery (agent-session.js) and the HTML transcript exporter
- * use to look up a tool by name; preserving every non-render field is what
- * keeps running the tool and exporting its transcript safe under this
+ * So this patches both lookup paths instead:
+ * `ExtensionRunner.prototype.getToolDefinition` transforms direct lookups for
+ * the HTML transcript exporter, and `getAllRegisteredTools` transforms the
+ * aggregate snapshot `AgentSession` copies into its live registry. Only names
+ * this module knows how to reskin receive a wrapped definition with jpi's
+ * renderers spliced in — every other field (`execute` above all) is the
+ * original extension's own reference, untouched. Preserving every non-render
+ * field keeps running the tool and exporting its transcript safe under this
  * patch. Wrapped copies are cached in a `WeakMap` keyed by the original
  * definition so repeated lookups for the same tool return the identical
- * object — some renderers/components compare definitions by reference —
- * and the original definition is never mutated.
+ * object — some renderers/components compare definitions by reference — and
+ * the original definition is never mutated.
  *
  * Which names get reskinned, and how, lives in `STATIC_RESKINS` (exact name
  * match) plus one dynamic case for the `mcp__` namespace-proxy prefix, since
  * pi-mcp-adapter registers one such tool per configured MCP server and the
  * set of server names isn't known ahead of time.
  *
- * Fragile by nature: depends on `getToolDefinition`'s name, its per-extension
- * `tools` map shape, and pi's root barrel continuing to export
+ * Fragile by nature: depends on both runner method names, their returned
+ * per-extension `tools` map shape, and pi's root barrel continuing to export
  * `ExtensionRunner`. An upstream change to any of those turns this into a
  * no-op — the original extension's own vanilla rendering stays in place —
  * rather than a crash.
@@ -318,11 +317,12 @@ function reskinToolDefinition(
 }
 
 /**
- * Patches `ExtensionRunner.prototype.getToolDefinition` so lookups of any
- * name in `STATIC_RESKINS`, or any `mcp__<server>` namespace proxy, return
- * jpi-styled copies. Idempotent: safe to call more than once. Degrades to a
- * no-op — those tools keep their original rendering — if `ExtensionRunner`'s
- * shape doesn't match what this expects.
+ * Patches both `ExtensionRunner` lookup methods so direct lookups and live
+ * `AgentSession` registry snapshots return jpi-styled copies for names in
+ * `STATIC_RESKINS` or any `mcp__<server>` namespace proxy. Idempotent: safe
+ * to call more than once. Degrades to a no-op — those tools keep their
+ * original rendering — if `ExtensionRunner`'s shape doesn't match what this
+ * expects.
  */
 export function patchMcpToolRendering(): void {
   patchToolDefinitionLookup(reskinToolDefinition, (error) => {
