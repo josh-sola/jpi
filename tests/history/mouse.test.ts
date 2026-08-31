@@ -11,9 +11,6 @@ import { renderLayoutFrame } from "@earendil-works/pi-tui/dist/layout.js";
 import {
   applySelectionHighlightToRow,
   columnToStringIndex,
-  computeLayoutWidth,
-  computeMaxVisibleLines,
-  computePaddingX,
   computeRowHighlightRange,
   deleteRangeFromLines,
   installMouseSupport,
@@ -28,6 +25,11 @@ import {
   type Selection,
   type VisualLine,
 } from "../../modules/history/mouse.ts";
+import {
+  computeLayoutWidth,
+  computeMaxVisibleLines,
+  computePaddingX,
+} from "../../src/pi/editor.ts";
 
 function sgr(button: number, col: number, row: number, release = false): string {
   return `\x1b[<${button};${col + 1};${row + 1}${release ? "m" : "M"}`;

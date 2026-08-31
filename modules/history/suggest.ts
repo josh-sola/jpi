@@ -2,6 +2,7 @@ import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 
 import { isRecord, truncateMiddle } from "../../src/core/index.ts";
+import type { TranscriptEntryLike } from "../../src/pi/index.ts";
 
 /** The real return type of ModelRegistry.find, derived rather than duplicated. */
 export type PiModel = NonNullable<ReturnType<ModelRegistry["find"]>>;
@@ -68,14 +69,6 @@ function extractMessageText(content: unknown): string {
     .filter(Boolean)
     .join("\n\n")
     .trim();
-}
-
-export interface TranscriptEntryLike {
-  type?: string;
-  message?: {
-    role?: string;
-    content?: unknown;
-  };
 }
 
 interface TranscriptItem {

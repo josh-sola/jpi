@@ -77,6 +77,9 @@ export function registerHistory(pi: ExtensionAPI, ctx: ModuleContext<typeof hist
 
     const dim = (text: string) => sessionCtx.ui.theme.fg("dim", text);
 
+    // pi-internal(editor-slot-last-wins): setEditorComponent has one slot;
+    // the last extension to call it during session_start wins. Module order
+    // in extensions/jpi/index.ts is load-bearing (history loads last).
     sessionCtx.ui.setEditorComponent((tui, theme, keybindings) => {
       const instance = new HistoryEditor(tui, theme, keybindings, { mouse: value.mouse });
       if (suggestState) instance.dim = dim;

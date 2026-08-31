@@ -7,12 +7,12 @@ import { stripTerminalSequences } from "@earendil-works/pi-tui";
 import {
   formatPromptRow,
   formatRelativeTime,
-  matchIndices,
   rankPrompts,
   renderPromptRow,
 } from "../../modules/history/picker.ts";
 import type { PromptEntry } from "../../modules/history/store.ts";
 import { BorderBox } from "../../src/core/index.ts";
+import { matchIndices } from "../../src/pi/editor.ts";
 
 function entry(text: string, timestamp: string, cwd = "/repo/project"): PromptEntry {
   return { text, timestamp, cwd };

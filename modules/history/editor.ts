@@ -38,6 +38,8 @@ export interface HistoryEditorOptions extends EditorOptions {
  * finishes.
  */
 export class HistoryEditor extends CustomEditor {
+  // pi-internal(private-editor-history): duplicates CustomEditor's private
+  // history/keybindings; drifts if pi's private fields change meaning.
   private readonly submissions: string[] = [];
   private seeded = false;
   private ghost: string | undefined;
@@ -46,6 +48,10 @@ export class HistoryEditor extends CustomEditor {
   private readonly appKeybindings: KeybindingsManager;
   private readonly mouse: MouseSupport | undefined;
 
+  // pi-internal(shortcut-conflict-dodge): ctrl+r is handled directly in
+  // handleInput instead of via pi.registerShortcut, which flags a startup
+  // conflict for any shortcut that shadows a built-in default (ctrl+r is
+  // app.session.rename's).
   /**
    * Fired on ctrl+r instead of going through pi.registerShortcut, which
    * flags a startup conflict for any shortcut that shadows a built-in

@@ -30,3 +30,12 @@ export interface ToolRenderContext<TState = any, TArgs = any> {
   expanded: boolean;
   isError: boolean;
 }
+
+/** Structural mirror of pi's own SessionEntry — only the shape suggest.ts's transcript rendering reads. */
+export interface TranscriptEntryLike {
+  type?: string;
+  message?: {
+    role?: string;
+    content?: unknown;
+  };
+}
