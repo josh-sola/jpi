@@ -10,7 +10,8 @@
 
 import { truncateToWidth } from "@earendil-works/pi-tui";
 
-import { errorMessage, splitDuration, type Notifier } from "../../../src/core/index.ts";
+import { errorMessage, splitDuration } from "../../../src/core/index.ts";
+import type { Notifier } from "../../../src/pi/index.ts";
 import type { TaskStore } from "../task-store.ts";
 import type { Task } from "../types.ts";
 

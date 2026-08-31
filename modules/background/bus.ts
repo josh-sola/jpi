@@ -4,8 +4,8 @@ import {
   jpiBackgroundRunningIds,
   TASKS_CHANNEL,
   TASKS_SCHEMA,
-  type EventBus,
 } from "../../src/core/index.ts";
+import type { EventBus } from "../../src/pi/index.ts";
 import { type MonitorManager, type MonitorSnapshot, resolveBackgroundItem } from "./monitor.ts";
 import type { BackgroundTaskRegistry, BgTaskSnapshot, TaskRunContext } from "./registry.ts";
 

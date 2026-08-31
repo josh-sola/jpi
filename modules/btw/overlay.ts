@@ -8,7 +8,8 @@ import {
   type TUI,
 } from "@earendil-works/pi-tui";
 
-import { BorderBox, resolveMarkdownTheme } from "../../src/core/index.ts";
+import { BorderBox } from "../../src/core/index.ts";
+import { resolveMarkdownTheme } from "../../src/pi/index.ts";
 
 /**
  * Overlay maxHeight, as a percentage of terminal rows. Exported so the

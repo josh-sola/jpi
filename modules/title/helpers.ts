@@ -1,6 +1,6 @@
 import { basename } from "node:path";
 
-import type { EventBus } from "../../src/core/index.ts";
+import type { EventBus } from "../../src/pi/index.ts";
 
 export const IDLE_INDICATOR = "⏹";
 export const ACTIVE_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"] as const;

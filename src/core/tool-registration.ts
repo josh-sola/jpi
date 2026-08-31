@@ -10,6 +10,7 @@ import type { ExtensionAPI, ToolDefinition } from "@earendil-works/pi-coding-age
 import { Container, Text } from "@earendil-works/pi-tui";
 import type { TSchema } from "typebox";
 
+import { cloneExtensionApi } from "../pi/extension-api.ts";
 import {
   formatReviewDuration,
   getReviewAnnotation,
@@ -58,8 +59,7 @@ export function withReviewAnnotation<
 
 /** Returns an `ExtensionAPI` handle identical to `pi` except for `registerTool`. */
 export function decorateToolRegistration(pi: ExtensionAPI): ExtensionAPI {
-  return {
-    ...pi,
+  return cloneExtensionApi(pi, {
     registerTool<TParams extends TSchema = TSchema, TDetails = unknown, TState = any>(
       def: ToolDefinition<TParams, TDetails, TState>,
     ): void {
@@ -75,5 +75,5 @@ export function decorateToolRegistration(pi: ExtensionAPI): ExtensionAPI {
         renderResult: withReviewAnnotation<TParams, TDetails, TState>(renderResult),
       });
     },
-  };
+  });
 }

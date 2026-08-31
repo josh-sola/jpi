@@ -5,7 +5,8 @@ import { join } from "node:path";
 
 import type { BuildSystemPromptOptions, Skill } from "@earendil-works/pi-coding-agent";
 
-import { errorMessage, seedIfMissing, type Notifier } from "../../src/core/index.ts";
+import { errorMessage, seedIfMissing } from "../../src/core/index.ts";
+import type { Notifier } from "../../src/pi/index.ts";
 import { getDefaultTemplatePath, getSystemPromptPath } from "./paths.ts";
 import { appendPiTail } from "./system-prompt-tail.ts";
 import { interpolate } from "./template.ts";

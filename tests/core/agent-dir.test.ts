@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "vite-plus/test";
 
-import { getAgentDirectory } from "../../src/core/agent-dir.ts";
+import { getAgentDirectory } from "../../src/pi/settings.ts";
 
 test("agent directory honors the Pi agent env var and falls back to the default", () => {
   assert.equal(getAgentDirectory({}, "/Users/tester"), "/Users/tester/.pi/agent");

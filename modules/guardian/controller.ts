@@ -19,9 +19,9 @@ import {
   seedIfMissing,
   truncateMiddle,
   type Config,
-  type NotifyLevel,
   type WithEnabled,
 } from "../../src/core/index.ts";
+import type { NotifyLevel } from "../../src/pi/index.ts";
 import {
   isScratchpadWrite,
   isToolAllowlisted,
