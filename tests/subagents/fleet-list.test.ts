@@ -1,5 +1,6 @@
 import { Editor, visibleWidth } from "@earendil-works/pi-tui";
 import { describe, expect, it, vi } from "vite-plus/test";
+import type { FleetUIContext } from "../../src/pi/types.ts";
 import type { AgentManager } from "../../modules/subagents/agent-manager.ts";
 import { registerAgents } from "../../modules/subagents/agent-types.ts";
 import type {
@@ -10,7 +11,6 @@ import type {
 import { type AgentActivity, getDisplayName } from "../../modules/subagents/ui/agent-widget.ts";
 import {
   FleetList,
-  type FleetUICtx,
   formatFleetElapsed,
   formatFleetTokens,
   orderAgentsAsTree,
@@ -79,7 +79,7 @@ function fakeManager(agents: AgentRecord[]): AgentManager {
 
 interface Harness {
   fleet: FleetList;
-  ui: FleetUICtx;
+  ui: FleetUIContext;
   manager: AgentManager;
   /** The overlay component (a real ConversationViewer) once one is opened. */
   overlayComponent: () => { handleInput(data: string): void } | undefined;
@@ -114,7 +114,7 @@ function harness(
   let overlayComponent: { handleInput(data: string): void } | undefined;
   const fakeTui = { requestRender: () => {}, terminal: { columns: 120, rows: 40 } };
 
-  const ui: FleetUICtx = {
+  const ui: FleetUIContext = {
     setWidget: (_key, content) => {
       widgetFactory = content as any;
     },
@@ -139,7 +139,7 @@ function harness(
         // and keep it so tests can drive the real ConversationViewer's input.
         overlayComponent = factory(fakeTui, theme, undefined, done);
       });
-    }) as FleetUICtx["custom"],
+    }) as FleetUIContext["custom"],
   };
 
   const manager = fakeManager(agents);
@@ -396,7 +396,7 @@ describe("FleetList navigation", () => {
         onTerminalInput: () => () => {},
         getEditorText: () => "",
         notify: () => {},
-        custom: (() => new Promise<undefined>(() => {})) as FleetUICtx["custom"],
+        custom: (() => new Promise<undefined>(() => {})) as FleetUIContext["custom"],
       });
       fleet.update(); // shows list, arms the timer
       fleet.setEnabled(false); // hides, clears the timer

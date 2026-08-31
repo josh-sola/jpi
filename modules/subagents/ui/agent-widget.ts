@@ -6,6 +6,7 @@
  */
 
 import { truncateToWidth } from "@earendil-works/pi-tui";
+import type { SessionLike, WidgetTheme, WidgetUIContext } from "../../../src/pi/index.ts";
 import { renderAgentName } from "../agent-color.ts";
 import { type AgentManager, isTopLevelAgent } from "../agent-manager.ts";
 import { getConfig } from "../agent-types.ts";
@@ -15,7 +16,6 @@ import {
   getLifetimeTotal,
   getSessionContextPercent,
   type LifetimeUsage,
-  type SessionLike,
 } from "../usage.ts";
 
 // ---- Constants ----
@@ -41,20 +41,6 @@ const TOOL_DISPLAY: Record<string, string> = {
 };
 
 // ---- Types ----
-
-export type Theme = {
-  fg(color: string, text: string): string;
-  bold(text: string): string;
-};
-
-export type UICtx = {
-  setStatus(key: string, text: string | undefined): void;
-  setWidget(
-    key: string,
-    content: undefined | ((tui: any, theme: Theme) => { render(): string[]; invalidate(): void }),
-    options?: { placement?: "aboveEditor" | "belowEditor" },
-  ): void;
-};
 
 /** Per-agent live activity state. */
 export interface AgentActivity {
@@ -106,7 +92,7 @@ export interface AgentDetails {
 // ---- Formatting helpers ----
 
 /** Apply foreground styling while restoring it after nested foreground/full ANSI resets. */
-export function fgPreservingNestedStyles(theme: Theme, color: string, text: string): string {
+export function fgPreservingNestedStyles(theme: WidgetTheme, color: string, text: string): string {
   const styledEmpty = theme.fg(color, "");
   const styleStart = styledEmpty.replace(/\u001b\[(?:0|39)m/g, "");
   return theme.fg(
@@ -160,7 +146,7 @@ export function formatCost(cost: number): string {
 export function formatSessionTokens(
   tokens: number,
   percent: number | null,
-  theme: Theme,
+  theme: WidgetTheme,
   compactions = 0,
 ): string {
   const tokenStr = formatTokens(tokens);
@@ -267,7 +253,7 @@ export function describeActivity(activeTools: Map<string, string>, responseText?
 // ---- Widget manager ----
 
 export class AgentWidget {
-  private uiCtx: UICtx | undefined;
+  private uiCtx: WidgetUIContext | undefined;
   private widgetFrame = 0;
   private widgetInterval: ReturnType<typeof setInterval> | undefined;
   /** Tracks how many turns each finished agent has survived. Key: agent ID, Value: turns since finished. */
@@ -331,9 +317,9 @@ export class AgentWidget {
   }
 
   /** Set the UI context (grabbed from first tool execution). */
-  setUICtx(ctx: UICtx) {
+  setUICtx(ctx: WidgetUIContext) {
     if (ctx !== this.uiCtx) {
-      // UICtx changed — the widget registered on the old context is gone.
+      // UI context changed — the widget registered on the old context is gone.
       // Force re-registration on next update().
       this.uiCtx = ctx;
       this.widgetRegistered = false;
@@ -400,7 +386,7 @@ export class AgentWidget {
       error?: string | undefined;
       lifetimeUsage?: LifetimeUsage;
     },
-    theme: Theme,
+    theme: WidgetTheme,
   ): string {
     const duration = formatMs((a.completedAt ?? Date.now()) - a.startedAt);
 
@@ -443,7 +429,7 @@ export class AgentWidget {
    * Render the widget content. Called from the registered widget's render() callback,
    * reading live state each time instead of capturing it in a closure.
    */
-  private renderWidget(tui: any, theme: Theme): string[] {
+  private renderWidget(tui: any, theme: WidgetTheme): string[] {
     const allAgents = this.widgetAgents();
     const running = allAgents.filter((a) => a.status === "running");
     const queued = allAgents.filter((a) => a.status === "queued");

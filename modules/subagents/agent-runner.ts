@@ -18,6 +18,14 @@ import {
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
 import {
+  getModelRuntime,
+  listExtensionTools,
+  messageUsage,
+  resolveDefaultSessionDir,
+  toolCallName,
+  wrapBeforeToolCall,
+} from "../../src/pi/index.ts";
+import {
   BUILTIN_TOOL_NAMES,
   getAgentConfig,
   getConfig,
@@ -234,6 +242,9 @@ export function parseExtSelectors(entries: string[]): {
  * Only meaningful when extensions are loaded — under `noExtensions`/`isolated` the
  * static `allowedToolNames` allowlist already gates the registry itself.
  */
+// pi-internal(turn-end-ordering): the turn_end-narrows-the-active-set bullet
+// above depends on pi emitting turn_end synchronously before prepareNextTurn
+// re-snapshots agent.state.tools.
 export function installExtensionToolScope(
   session: AgentSession,
   ctx: {
@@ -260,13 +271,13 @@ export function installExtensionToolScope(
   const inScope = (): Set<string> => {
     const keep = new Set(toolNames.filter((t) => !disallowedSet?.has(t)));
     const optInActive = extNames.size > 0;
-    for (const extension of loader.getExtensions().extensions) {
+    for (const extension of listExtensionTools(loader)) {
       const canons = extensionCanonicalNames(extension.path);
       if (optInActive && !canons.some((c) => extNames.has(c))) continue;
       // First alias that carries a narrowing set — a user won't narrow one
       // extension under two different names, so first-match is correct.
       const narrowed = canons.map((c) => narrowing.get(c)).find(Boolean);
-      for (const name of extension.tools.keys()) {
+      for (const name of extension.toolNames) {
         if (narrowed && !narrowed.has(name)) continue;
         if (disallowedSet?.has(name)) continue;
         keep.add(name);
@@ -303,16 +314,15 @@ export function installExtensionToolScope(
     if (event.type === "turn_end") renarrow();
   });
 
-  const priorBeforeToolCall = session.agent.beforeToolCall;
-  session.agent.beforeToolCall = async (context, signal) => {
+  wrapBeforeToolCall(session.agent, async (context) => {
     if (!inScope().has(context.toolCall.name)) {
       return {
         block: true,
         reason: `Tool "${context.toolCall.name}" is not available to this subagent.`,
       };
     }
-    return priorBeforeToolCall?.(context, signal);
-  };
+    return undefined;
+  });
 }
 
 /** Default max turns. undefined = unlimited (no turn limit). */
@@ -683,6 +693,8 @@ export async function runAgent(
   //   "*" keeps all default-discovered extensions. Excluded extensions never
   //   bind handlers or register tools (their factory still runs once).
   //
+  // pi-internal(prompt-append-order): depends on buildSystemPrompt()'s
+  // re-append landing AFTER systemPromptOverride — see below.
   // Suppress AGENTS.md/CLAUDE.md and APPEND_SYSTEM.md — upstream's
   // buildSystemPrompt() re-appends both AFTER systemPromptOverride, which
   // would defeat prompt_mode: replace and isolated: true. Parent context, if
@@ -795,7 +807,7 @@ export async function runAgent(
   }
   if (keepNames.size > 0 || extNames.size > 0) {
     const survivingNames = new Set(
-      loader.getExtensions().extensions.flatMap((e) => extensionCanonicalNames(e.path)),
+      listExtensionTools(loader).flatMap((e) => extensionCanonicalNames(e.path)),
     );
     for (const name of keepNames) {
       if (!survivingNames.has(name)) {
@@ -917,8 +929,7 @@ export async function runAgent(
 
   const settingsManager = SettingsManager.create(configCwd, agentDir);
   const configuredSessionDir = resolveConfiguredSessionDir(agentConfig?.sessionDir, effectiveCwd);
-  const defaultSessionDir =
-    process.env.PI_CODING_AGENT_SESSION_DIR ?? settingsManager.getSessionDir?.();
+  const defaultSessionDir = resolveDefaultSessionDir(settingsManager);
   // Frontmatter wins when it says anything; otherwise the project default,
   // which `rememberAgents` supplies for top-level agents only. Same precedence
   // as `outputTranscript`.
@@ -943,7 +954,7 @@ export async function runAgent(
   // Pi 0.80.8 replaced createAgentSession's modelRegistry option with
   // modelRuntime, but ExtensionContext still exposes only the registry facade.
   // Pass both so the full supported Pi range retains the parent's providers.
-  const parentModelRuntime = (ctx.modelRegistry as unknown as { runtime?: unknown }).runtime;
+  const parentModelRuntime = getModelRuntime(ctx);
   const sessionOpts: Parameters<typeof createAgentSession>[0] & {
     modelRegistry: ExtensionContext["modelRegistry"];
     modelRuntime?: unknown;
@@ -953,11 +964,7 @@ export async function runAgent(
     sessionManager,
     settingsManager,
     modelRegistry: ctx.modelRegistry,
-    // `as never` is what keeps this assignable across the supported Pi range:
-    // pre-0.80.8 the field exists only via the `modelRuntime?: unknown` shim
-    // above, while newer Pi types it as `ModelRuntime` — a shape an opaque
-    // `unknown` read off the private facade field can never satisfy.
-    ...(parentModelRuntime !== undefined && { modelRuntime: parentModelRuntime as never }),
+    ...(parentModelRuntime !== undefined && { modelRuntime: parentModelRuntime }),
     ...(model !== undefined && { model }),
     ...(sessionTools !== undefined && { tools: sessionTools }),
     customTools: nestedTools,
@@ -1046,7 +1053,7 @@ export async function runAgent(
       options.onToolActivity?.({ type: "end", toolName: event.toolName });
     }
     if (event.type === "message_end" && event.message.role === "assistant") {
-      const u = (event.message as any).usage;
+      const u = messageUsage(event.message);
       if (u)
         options.onAssistantUsage?.({
           input: u.input ?? 0,
@@ -1125,7 +1132,7 @@ export async function resumeAgent(
           if (event.type === "tool_execution_end")
             options.onToolActivity?.({ type: "end", toolName: event.toolName });
           if (event.type === "message_end" && event.message.role === "assistant") {
-            const u = (event.message as any).usage;
+            const u = messageUsage(event.message);
             if (u)
               options.onAssistantUsage?.({
                 input: u.input ?? 0,
@@ -1181,8 +1188,7 @@ export function getAgentConversation(session: AgentSession): string {
       const toolCalls: string[] = [];
       for (const c of msg.content) {
         if (c.type === "text" && c.text) textParts.push(c.text);
-        else if (c.type === "toolCall")
-          toolCalls.push(`  Tool: ${(c as any).name ?? (c as any).toolName ?? "unknown"}`);
+        else if (c.type === "toolCall") toolCalls.push(`  Tool: ${toolCallName(c)}`);
       }
       if (textParts.length > 0) parts.push(`[Assistant]: ${textParts.join("\n")}`);
       if (toolCalls.length > 0) parts.push(`[Tool Calls]:\n${toolCalls.join("\n")}`);

@@ -13,11 +13,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseFrontmatter } from "@earendil-works/pi-coding-agent";
 import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
+import { findAgentFile } from "../../src/pi/settings.ts";
 import {
   buildNewAgentFile,
   disableInContent,
   enableInContent,
-  findAgentFile,
   isDisabledContent,
   isEmptyStub,
   locateAgentFile,

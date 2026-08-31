@@ -70,6 +70,7 @@ import {
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import { errorMessage } from "../../src/core/index.ts";
+import { getModelRuntime, pushMessages, setSystemPrompt } from "../../src/pi/index.ts";
 import { runInChildSessionContext } from "./child-context.ts";
 import { agentMentionReminder } from "./mention.ts";
 import type { SubagentType, ThinkingLevel } from "./types.ts";
@@ -133,7 +134,7 @@ export async function runMentionClone(opts: MentionCloneOptions): Promise<Mentio
     // Pi 0.80.8 moved createAgentSession from modelRegistry to modelRuntime;
     // agent-runner.ts carries the same shim for the same reason — pass both so
     // the clone keeps the parent's providers across the supported range.
-    const parentModelRuntime = (ctx.modelRegistry as unknown as { runtime?: unknown }).runtime;
+    const parentModelRuntime = getModelRuntime(ctx);
     // The conversation as the main session resolves it: compaction applied,
     // branch summaries substituted.
     const conversation = buildSessionContext(
@@ -153,7 +154,9 @@ export async function runMentionClone(opts: MentionCloneOptions): Promise<Mentio
         model: ctx.model as Model<never> | undefined,
         ...(thinkingLevel && { thinkingLevel }),
         modelRegistry: ctx.modelRegistry,
-        ...(parentModelRuntime !== undefined && { modelRuntime: parentModelRuntime as never }),
+        ...(parentModelRuntime !== undefined && { modelRuntime: parentModelRuntime }),
+        // pi-internal(notools-empty-allowlist): see below — noTools: "all"
+        // resolves to an empty allowlist, not "spare custom tools".
         // An allowlist naming exactly the clone's own tool. NOT `noTools:
         // "all"`, whose doc comment ("start with no tools enabled") reads like
         // it spares custom tools and does not: it resolves to an EMPTY
@@ -173,11 +176,11 @@ export async function runMentionClone(opts: MentionCloneOptions): Promise<Mentio
     // real thing, so the copy reasons under the instructions the user's model
     // is actually working under.
     const systemPrompt = ctx.getSystemPrompt?.();
-    if (systemPrompt) session.agent.state.systemPrompt = systemPrompt;
+    if (systemPrompt) setSystemPrompt(session.agent, systemPrompt);
 
     // The conversation itself. Pushed rather than assigned so the array the
     // session was built around stays the one it goes on using.
-    session.agent.state.messages.push(...conversation.messages);
+    pushMessages(session.agent, conversation.messages);
 
     // User text first, reminder after — the order Claude Code's attachment
     // renderer produces, where the reminder trails the message it is about.

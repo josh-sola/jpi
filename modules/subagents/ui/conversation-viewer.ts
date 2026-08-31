@@ -12,7 +12,6 @@ import {
   BranchSummaryMessageComponent,
   CompactionSummaryMessageComponent,
   CustomMessageComponent,
-  getMarkdownTheme,
   ToolExecutionComponent,
   type TruncationResult,
   UserMessageComponent,
@@ -29,11 +28,16 @@ import {
   visibleWidth,
   wrapTextWithAnsi,
 } from "@earendil-works/pi-tui";
+import {
+  asBashExecution,
+  resolveWidgetMarkdownTheme,
+  toolCallName,
+  type WidgetTheme,
+} from "../../../src/pi/index.ts";
 import { renderAgentName } from "../agent-color.ts";
 import { extractText } from "../context.ts";
 import type { AgentRecord, ViewerMarkdownMode } from "../types.ts";
 import { getLifetimeCost, getLifetimeTotal, getSessionContextPercent } from "../usage.ts";
-import type { Theme } from "./agent-widget.ts";
 import {
   type AgentActivity,
   buildInvocationTags,
@@ -80,54 +84,6 @@ const MARKDOWN_MODE_LABELS: Record<ViewerMarkdownMode, string> = {
   assistant: "md",
   all: "md+",
 };
-
-/**
- * Pi's own Markdown theme when this process has one, else a theme built from the
- * viewer's `Theme`.
- *
- * Preferring pi's is what buys syntax-highlighted code fences (it carries a
- * `highlightCode`), and it keeps this surface consistent with the notification
- * renderer, which uses the same source. It has to be *probed* rather than
- * try/caught around the call: `getMarkdownTheme()` returns arrow functions that
- * read pi's global theme lazily, so an uninitialized theme throws inside
- * `render()` — long after this returns — and takes the overlay with it. That is
- * the case in tests and any embedded session that never called `initTheme()`.
- */
-function resolveMarkdownTheme(th: Theme): MarkdownTheme {
-  try {
-    const piTheme = getMarkdownTheme();
-    piTheme.heading("probe");
-    return piTheme;
-  } catch {
-    return fallbackMarkdownTheme(th);
-  }
-}
-
-/**
- * `Theme` carries only `fg` and `bold`, so the three remaining styles are
- * written as raw SGR. Rendering them as plain text instead would silently drop
- * `*emphasis*`'s markers with nothing in their place, turning a formatting
- * change into a content change.
- */
-function fallbackMarkdownTheme(th: Theme): MarkdownTheme {
-  const sgr = (on: number, off: number) => (text: string) => `\x1b[${on}m${text}\x1b[${off}m`;
-  return {
-    heading: (text) => th.bold(th.fg("accent", text)),
-    link: (text) => th.fg("accent", text),
-    linkUrl: (text) => th.fg("muted", text),
-    code: (text) => th.fg("muted", text),
-    codeBlock: (text) => th.fg("muted", text),
-    codeBlockBorder: (text) => th.fg("dim", text),
-    quote: (text) => th.fg("muted", text),
-    quoteBorder: (text) => th.fg("dim", text),
-    hr: (text) => th.fg("dim", text),
-    listBullet: (text) => th.fg("accent", text),
-    bold: (text) => th.bold(text),
-    italic: sgr(3, 23),
-    underline: sgr(4, 24),
-    strikethrough: sgr(9, 29),
-  };
-}
 
 /**
  * Cap `text` at `RESULT_MAX_CHARS`, reporting the elision separately rather than
@@ -214,7 +170,7 @@ export class ConversationViewer implements Component {
     private session: AgentSession,
     private record: AgentRecord,
     private activity: AgentActivity | undefined,
-    private theme: Theme,
+    private theme: WidgetTheme,
     private done: (result: undefined) => void,
     /** Abort the agent shown here. Omitted → no stop affordance (e.g. read-only history). */
     private onStop?: () => void,
@@ -240,7 +196,7 @@ export class ConversationViewer implements Component {
      */
     private onMarkdownMode?: (mode: ViewerMarkdownMode) => void,
   ) {
-    this.markdownTheme = resolveMarkdownTheme(theme);
+    this.markdownTheme = resolveWidgetMarkdownTheme(theme);
     this.keys = createViewerKeys(keybindings);
     this.unsubscribe = session.subscribe(() => {
       if (this.closed) return;
@@ -621,7 +577,7 @@ export class ConversationViewer implements Component {
       for (const c of msg.content) {
         if (c.type === "text" && c.text) textParts.push(c.text);
         else if (c.type === "toolCall") {
-          toolCalls.push((c as any).name ?? (c as any).toolName ?? "unknown");
+          toolCalls.push(toolCallName(c));
         }
       }
       if (needsSeparator) lines.push(th.fg("dim", "───"));
@@ -640,8 +596,9 @@ export class ConversationViewer implements Component {
       lines.push(th.fg("dim", "[Result]"));
       lines.push(...this.rawLines(text, width, true));
       if (elided) lines.push(truncateToWidth(th.fg("dim", truncationNote(elided)), width));
-    } else if ((msg as any).role === "bashExecution") {
-      const bash = msg as any;
+    } else {
+      const bash = asBashExecution(msg);
+      if (!bash) return needsSeparator;
       if (needsSeparator) lines.push(th.fg("dim", "───"));
       lines.push(truncateToWidth(th.fg("muted", `  $ ${bash.command}`), width));
       if (bash.output?.trim()) {
@@ -651,12 +608,12 @@ export class ConversationViewer implements Component {
         lines.push(...this.rawLines(text, width, true));
         if (elided) lines.push(truncateToWidth(th.fg("dim", truncationNote(elided)), width));
       }
-    } else {
-      return needsSeparator;
     }
     return true;
   }
 
+  // pi-internal(message-identity-stability): the block cache below keys on
+  // msg object identity — see the "Message objects are stable" paragraph.
   /**
    * Enriched transcript — reuses pi's own chat renderers (Markdown, diffs,
    * tool boxes) so an agent's transcript reads the same as pi's main chat.

@@ -18,6 +18,7 @@ import {
   Spacer,
   Text,
 } from "@earendil-works/pi-tui";
+import { personalAgentsDir, THINKING_LEVELS } from "../../src/pi/index.ts";
 import { isTopLevelAgent } from "./agent-manager.ts";
 import {
   buildNewAgentFile,
@@ -25,7 +26,6 @@ import {
   enableInContent,
   isEmptyStub,
   locateAgentFile,
-  personalAgentsDir,
   serializeAgentFile,
 } from "./agent-file-toggle.ts";
 import {
@@ -36,7 +36,7 @@ import {
   setGraceTurns,
   setRememberAgents,
 } from "./agent-runner.ts";
-import { getModelLabelFromConfig, THINKING_LEVELS } from "./agent-tool.ts";
+import { getModelLabelFromConfig } from "./agent-tool.ts";
 import {
   BUILTIN_TOOL_NAMES,
   getAgentConfig,

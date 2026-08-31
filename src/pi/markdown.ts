@@ -2,6 +2,7 @@ import { getMarkdownTheme, type Theme } from "@earendil-works/pi-coding-agent";
 import { Markdown, type MarkdownTheme } from "@earendil-works/pi-tui";
 
 import { errorMessage } from "./errors.ts";
+import type { WidgetTheme } from "./types.ts";
 
 /**
  * Pi's own Markdown theme when this process has one, else a theme built from
@@ -31,6 +32,52 @@ export function resolveMarkdownTheme(theme: Theme): MarkdownTheme {
  * formatting change into a content change.
  */
 function fallbackMarkdownTheme(theme: Theme): MarkdownTheme {
+  const sgr = (on: number, off: number) => (text: string) => `\x1b[${on}m${text}\x1b[${off}m`;
+  return {
+    heading: (text) => theme.bold(theme.fg("accent", text)),
+    link: (text) => theme.fg("accent", text),
+    linkUrl: (text) => theme.fg("muted", text),
+    code: (text) => theme.fg("muted", text),
+    codeBlock: (text) => theme.fg("muted", text),
+    codeBlockBorder: (text) => theme.fg("dim", text),
+    quote: (text) => theme.fg("muted", text),
+    quoteBorder: (text) => theme.fg("dim", text),
+    hr: (text) => theme.fg("dim", text),
+    listBullet: (text) => theme.fg("accent", text),
+    bold: (text) => theme.bold(text),
+    italic: sgr(3, 23),
+    underline: sgr(4, 24),
+    strikethrough: sgr(9, 29),
+  };
+}
+
+/**
+ * Same probe as `resolveMarkdownTheme` above, but for callers that only carry
+ * jpi's narrow `WidgetTheme` (`{ fg, bold }`) rather than pi's real `Theme` —
+ * subagents' `ConversationViewer` overlay is built from a `ctx.ui`-sourced
+ * widget theme, not pi's own. Kept as a separate function (rather than
+ * widening `resolveMarkdownTheme`'s parameter) because the two fallback
+ * themes genuinely differ: this one derives every SGR style from
+ * `WidgetTheme`'s two primitives, the other reads pi's own `Theme` methods
+ * directly.
+ */
+export function resolveWidgetMarkdownTheme(theme: WidgetTheme): MarkdownTheme {
+  try {
+    const piTheme = getMarkdownTheme();
+    piTheme.heading("probe");
+    return piTheme;
+  } catch {
+    return fallbackWidgetMarkdownTheme(theme);
+  }
+}
+
+/**
+ * `WidgetTheme` carries only `fg` and `bold`, so the three remaining styles
+ * are written as raw SGR. Rendering them as plain text instead would
+ * silently drop `*emphasis*`'s markers with nothing in their place, turning
+ * a formatting change into a content change.
+ */
+function fallbackWidgetMarkdownTheme(theme: WidgetTheme): MarkdownTheme {
   const sgr = (on: number, off: number) => (text: string) => `\x1b[${on}m${text}\x1b[${off}m`;
   return {
     heading: (text) => theme.bold(theme.fg("accent", text)),

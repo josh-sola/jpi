@@ -23,6 +23,7 @@ import {
   createResultLine,
   errorMessage,
 } from "../../src/core/index.ts";
+import { THINKING_LEVELS, type WidgetUIContext } from "../../src/pi/index.ts";
 import { renderAgentName } from "./agent-color.ts";
 import { isTopLevelAgent } from "./agent-manager.ts";
 import { getDefaultMaxTurns, normalizeMaxTurns, SUBAGENT_TOOL_NAMES } from "./agent-runner.ts";
@@ -66,19 +67,15 @@ import {
   formatTurns,
   getDisplayName,
   SPINNER,
-  type UICtx,
 } from "./ui/agent-widget.ts";
 import { getLifetimeTotal, type LifetimeUsage } from "./usage.ts";
 import { isWorktreeIsolationEnabled } from "./worktree.ts";
 
-/**
- * Advertised thinking levels, ordered to mirror pi-ai's EXTENDED_THINKING_LEVELS
- * (`off` + every `ThinkingLevel`). Single source for the Agent tool description,
- * the generated-agent template, and the `/agents` wizard so these lists can't
- * drift behind pi again (#147). Availability of any level still depends on the
- * host pi version and the selected model — pi clamps unsupported levels down.
- */
-export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
+// THINKING_LEVELS (src/pi) is the single source for the Agent tool
+// description, the generated-agent template, and the `/agents` wizard so
+// these lists can't drift behind pi again (#147). Availability of any level
+// still depends on the host pi version and the selected model — pi clamps
+// unsupported levels down.
 
 /** Tool execute return value for a text response. */
 export function textResult(msg: string, details?: AgentDetails) {
@@ -887,7 +884,7 @@ Terse command-style prompts produce shallow, generic work.
     // (a background spawn deliberately omits it — see startBackgroundResume).
     execute: async (toolCallId, params, _signal, _onUpdate, ctx) => {
       // Ensure we have UI context for widget rendering
-      rt.widget.setUICtx(ctx.ui as UICtx);
+      rt.widget.setUICtx(ctx.ui as WidgetUIContext);
 
       // Reload custom agents so new project/global .md files are picked up without restart
       rt.reloadCustomAgents();
