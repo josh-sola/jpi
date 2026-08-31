@@ -1,4 +1,5 @@
-import { resolve } from "node:path";
+import { readFileSync } from "node:fs";
+import { isAbsolute, resolve } from "node:path";
 
 import type { ToolCallEvent } from "@earendil-works/pi-coding-agent";
 
@@ -109,24 +110,10 @@ export function isMcpGatewayIntrospection(input: unknown): boolean {
   return input.tool === undefined && input.connect === undefined && input.action === undefined;
 }
 
-export function isToolAllowlisted(
-  config: ReviewConfig,
-  event: Pick<ToolCallEvent, "toolName" | "input">,
-): boolean {
-  if (config.allowTools.includes(event.toolName)) return true;
-  if (config.readonly && BUILT_IN_READONLY_TOOLS.has(event.toolName)) return true;
-  if (config.readonly && event.toolName === "mcp" && isMcpGatewayIntrospection(event.input))
-    return true;
-  if (config.allowMcp.some((server) => matchesMcpServer(event.toolName, server))) return true;
-  if (event.toolName !== "bash") return false;
-
-  const input: unknown = event.input;
-  const command = isRecord(input) && typeof input.command === "string" ? input.command : undefined;
-  if (!command) return false;
-
-  const split = splitCommand(command);
+function isCommandTextAllowlisted(config: ReviewConfig, text: string): boolean {
+  const split = splitCommand(text);
   if (split.kind === "opaque") {
-    return config.allowBash.some((pattern) => matchesWholeCommand(pattern.regex, command));
+    return config.allowBash.some((pattern) => matchesWholeCommand(pattern.regex, text));
   }
 
   // Most-restrictive-wins: every segment needs its own justification, so one
@@ -136,6 +123,57 @@ export function isToolAllowlisted(
       (config.readonly && isReadOnlyCommand(segment.argv)) ||
       config.allowBash.some((pattern) => matchesWholeCommand(pattern.regex, segment.text)),
   );
+}
+
+// pi-internal(tool-path-resolution): run's `file` resolves against the
+// session cwd, never run's own `path` param (which only sets the staged
+// copy's execution cwd) — the same resolution prepareRun uses, so the
+// allowlist judges the bytes that run.
+function readRunScriptText(input: Record<string, unknown>, cwd: string): string | undefined {
+  if (typeof input.script === "string") return input.script;
+  if (typeof input.file !== "string") return undefined;
+  try {
+    const target = isAbsolute(input.file) ? input.file : resolve(cwd, input.file);
+    return readFileSync(target, "utf8");
+  } catch {
+    // An unreadable file stays reviewed rather than throwing out of the gate.
+    return undefined;
+  }
+}
+
+function isRunAllowlisted(config: ReviewConfig, input: unknown, cwd: string): boolean {
+  if (!isRecord(input)) return false;
+  if (input.language !== "zsh") return false;
+  if (Array.isArray(input.dependencies) && input.dependencies.length > 0) return false;
+
+  const hasScript = typeof input.script === "string";
+  const hasFile = typeof input.file === "string";
+  if (hasScript === hasFile) return false; // both or neither: the tool itself rejects this shape
+
+  const text = readRunScriptText(input, cwd);
+  if (text === undefined) return false;
+
+  return isCommandTextAllowlisted(config, text);
+}
+
+export function isToolAllowlisted(
+  config: ReviewConfig,
+  event: Pick<ToolCallEvent, "toolName" | "input">,
+  cwd: string = process.cwd(),
+): boolean {
+  if (config.allowTools.includes(event.toolName)) return true;
+  if (config.readonly && BUILT_IN_READONLY_TOOLS.has(event.toolName)) return true;
+  if (config.readonly && event.toolName === "mcp" && isMcpGatewayIntrospection(event.input))
+    return true;
+  if (config.allowMcp.some((server) => matchesMcpServer(event.toolName, server))) return true;
+  if (event.toolName === "run") return isRunAllowlisted(config, event.input, cwd);
+  if (event.toolName !== "bash") return false;
+
+  const input: unknown = event.input;
+  const command = isRecord(input) && typeof input.command === "string" ? input.command : undefined;
+  if (!command) return false;
+
+  return isCommandTextAllowlisted(config, command);
 }
 
 // pi-internal(tool-path-resolution): write/edit tool inputs both carry

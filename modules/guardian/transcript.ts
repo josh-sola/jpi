@@ -29,12 +29,20 @@ function truncateTranscriptText(value: string): string {
 // Shared by interleaved tool-call transcript items and the controller's
 // session-grant records, so both name the same tool the same way.
 export function summarizeToolCall(name: string, args: unknown): string {
-  const command =
-    name === "bash" && isRecord(args) && typeof args.command === "string"
-      ? args.command
-      : undefined;
-  const raw = command ?? JSON.stringify(args) ?? "{}";
+  const raw = summarizeToolCallText(name, args) ?? JSON.stringify(args) ?? "{}";
   return truncateMiddle(raw, MAX_TRANSCRIPT_TOOLCALL_CHARS, TRUNCATION_MARKER);
+}
+
+function summarizeToolCallText(name: string, args: unknown): string | undefined {
+  if (name === "bash") {
+    return isRecord(args) && typeof args.command === "string" ? args.command : undefined;
+  }
+  if (name === "run") {
+    if (!isRecord(args)) return undefined;
+    if (typeof args.script === "string") return args.script;
+    if (typeof args.file === "string") return args.file;
+  }
+  return undefined;
 }
 
 function toJsonValue(value: unknown, depth = 0, seen = new WeakSet<object>()): unknown {
