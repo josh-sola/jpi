@@ -11,7 +11,7 @@ test("appendPiTail appends appendSystemPrompt text, then the current working dir
   );
   assert.equal(
     result,
-    "rendered body\n\nextra rules\nCurrent working directory: /Users/tester/project",
+    "rendered body\n\nextra rules\nCurrent working directory: /Users/tester/project\n",
   );
 });
 
