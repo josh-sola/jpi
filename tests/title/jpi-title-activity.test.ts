@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "vite-plus/test";
 
 import { createTitleExtension } from "../../modules/title/extension.ts";
-import { ACTIVE_FRAMES } from "../../modules/title/helpers.ts";
+import { ACTIVE_FRAMES, SPINNER_INTERVAL_MS } from "../../modules/title/helpers.ts";
 import { FakeEventBus, ManualScheduler, ok } from "./jpi-title-test-helpers.ts";
 
 function harness() {
@@ -24,14 +24,14 @@ function harness() {
   return { scheduler, events, titles, context, extension };
 }
 
-test("activity starts at the first frame and advances in the exact 80 ms order", async () => {
+test("activity starts at the first frame and advances in the exact interval order", async () => {
   const { scheduler, titles, context, extension } = harness();
   await extension.onSessionStart({}, context);
   scheduler.fire(scheduler.active("timeout", 0)[0]!);
   titles.length = 0;
 
   extension.onAgentStart({}, context);
-  const spinner = scheduler.active("interval", 80)[0];
+  const spinner = scheduler.active("interval", SPINNER_INTERVAL_MS)[0];
   assert.ok(spinner);
   assert.equal(titles[0], `${ACTIVE_FRAMES[0]} project`);
   for (let index = 1; index < ACTIVE_FRAMES.length; index += 1) scheduler.fire(spinner);
@@ -53,7 +53,7 @@ test("main, background agents, and multiple subagents use union semantics", asyn
   scheduler.fire(scheduler.active("timeout", 0)[0]!);
 
   extension.onAgentStart({}, context);
-  const spinner = scheduler.active("interval", 80)[0];
+  const spinner = scheduler.active("interval", SPINNER_INTERVAL_MS)[0];
   assert.ok(spinner);
   events.emit("subagents:started", { id: "one" });
   events.emit("subagents:started", { id: "two" });

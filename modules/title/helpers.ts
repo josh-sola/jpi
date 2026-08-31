@@ -3,8 +3,10 @@ import { basename } from "node:path";
 import type { EventBus } from "../../src/pi/index.ts";
 
 export const IDLE_INDICATOR = "⏹";
-export const ACTIVE_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"] as const;
-export const SPINNER_INTERVAL_MS = 80;
+export const ACTIVE_FRAMES = ["◐", "◓", "◑", "◒"] as const;
+// tmux throttles window-name updates to one per 500ms; 530ms keeps every
+// frame visible and avoids phase-locking with tmux's sampling tick.
+export const SPINNER_INTERVAL_MS = 530;
 
 export type { EventBus };
 
