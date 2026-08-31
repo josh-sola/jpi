@@ -69,18 +69,7 @@ describe("system-prompt: appendPiTail vs the real buildSystemPrompt (real pi-cod
     const jpiResult = appendPiTail(rendered, options, formatSkillsForPrompt);
     const realResult = buildSystemPrompt({ customPrompt: rendered, ...options });
 
-    // Byte-for-byte, EXCEPT the real customPrompt branch appends one extra
-    // trailing "\n" after "Current working directory: ..." that appendPiTail
-    // does not (confirmed against pi-coding-agent@0.84.4's
-    // dist/core/system-prompt.js line ~32 vs jpi's own
-    // tests/prompt/system-prompt-tail.test.ts, which pins the no-trailing-
-    // newline shape). Trimming only trailing whitespace keeps this canary
-    // sensitive to every other change — reordering, dropped sections,
-    // reworded skill/context blocks — while not flagging red on a one-byte
-    // gap that predates this canary. See this PR's report: this is a real,
-    // pre-existing divergence worth a follow-up, not something this test
-    // should paper over silently.
-    expect(jpiResult.trimEnd()).toBe(realResult.trimEnd());
+    expect(jpiResult).toBe(realResult);
   });
 
   it("still matches with no appendSystemPrompt/contextFiles/skills — just the tail", () => {
@@ -90,7 +79,7 @@ describe("system-prompt: appendPiTail vs the real buildSystemPrompt (real pi-cod
     const jpiResult = appendPiTail(rendered, options, formatSkillsForPrompt);
     const realResult = buildSystemPrompt({ customPrompt: rendered, ...options });
 
-    expect(jpiResult.trimEnd()).toBe(realResult.trimEnd());
+    expect(jpiResult).toBe(realResult);
   });
 
   it("still matches when skills are suppressed by an unavailable read tool", () => {
@@ -100,7 +89,7 @@ describe("system-prompt: appendPiTail vs the real buildSystemPrompt (real pi-cod
     const jpiResult = appendPiTail(rendered, options, formatSkillsForPrompt);
     const realResult = buildSystemPrompt({ customPrompt: rendered, ...options });
 
-    expect(jpiResult.trimEnd()).toBe(realResult.trimEnd());
+    expect(jpiResult).toBe(realResult);
     expect(jpiResult).not.toContain("<available_skills>");
   });
 });

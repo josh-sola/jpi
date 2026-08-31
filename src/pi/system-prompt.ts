@@ -108,7 +108,7 @@ export function appendPiTail(
   }
 
   const promptCwd = options.cwd.replace(/\\/g, "/");
-  prompt += `\nCurrent working directory: ${promptCwd}`;
+  prompt += `\nCurrent working directory: ${promptCwd}\n`;
 
   return prompt;
 }
