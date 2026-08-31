@@ -6,6 +6,10 @@ import { Container, Editor, ScrollView, VStack, visibleWidth } from "@earendil-w
 // pi-tui doesn't re-export its layout engine (unlike Container/VStack/ScrollView, which
 // are the real classes pi's fullscreen mode composes the editor with) — this regression
 // test needs the real box tree those classes produce, not a hand-built stand-in.
+// pi-internal(pi-tui-no-exports-map): works only while pi-tui declares no
+// `exports` map in its package.json — a deep import like this one would be
+// rejected outright the moment it gains one (see how tests/pi/system-prompt.test.ts
+// has to work around pi-coding-agent already having one).
 import { renderLayoutFrame } from "@earendil-works/pi-tui/dist/layout.js";
 
 import {
