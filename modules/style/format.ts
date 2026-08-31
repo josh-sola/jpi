@@ -48,17 +48,6 @@ export function countReadLines(text: string): number {
   return countLines(stripTrailingBracketNotice(text));
 }
 
-/** Added/removed line counts from an edit tool's unified-style diff string. */
-export function countDiffStats(diff: string): { additions: number; removals: number } {
-  let additions = 0;
-  let removals = 0;
-  for (const line of diff.split("\n")) {
-    if (line.startsWith("+") && !line.startsWith("+++")) additions++;
-    else if (line.startsWith("-") && !line.startsWith("---")) removals++;
-  }
-  return { additions, removals };
-}
-
 const NOTICE_LINE = /^\[.*\]$/;
 
 /**
