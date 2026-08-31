@@ -42,6 +42,15 @@ export {
   workspaceAgentsDir,
 } from "./settings.ts";
 export { findSkillInRoot, skillDiscoveryRoots } from "./skills.ts";
+export {
+  appendPiTail,
+  buildEnvironment,
+  buildGuidelines,
+  buildPiDocsBlock,
+  buildToolList,
+  type EnvironmentParams,
+  type PiDocsPaths,
+} from "./system-prompt.ts";
 export { THINKING_LEVELS } from "./types.ts";
 export type {
   BeforeAgentStartEvent,

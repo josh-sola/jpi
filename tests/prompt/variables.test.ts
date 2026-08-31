@@ -6,7 +6,7 @@ import {
   buildGuidelines,
   buildPiDocsBlock,
   buildToolList,
-} from "../../modules/prompt/variables.ts";
+} from "../../src/pi/system-prompt.ts";
 
 test("buildToolList renders one line per tool that has a snippet", () => {
   const result = buildToolList({

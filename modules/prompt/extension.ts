@@ -6,17 +6,17 @@ import { join } from "node:path";
 import type { BuildSystemPromptOptions, Skill } from "@earendil-works/pi-coding-agent";
 
 import { errorMessage, seedIfMissing } from "../../src/core/index.ts";
-import type { Notifier } from "../../src/pi/index.ts";
-import { getDefaultTemplatePath, getSystemPromptPath } from "./paths.ts";
-import { appendPiTail } from "./system-prompt-tail.ts";
-import { interpolate } from "./template.ts";
 import {
+  appendPiTail,
   buildEnvironment,
   buildGuidelines,
   buildPiDocsBlock,
   buildToolList,
+  type Notifier,
   type PiDocsPaths,
-} from "./variables.ts";
+} from "../../src/pi/index.ts";
+import { getDefaultTemplatePath, getSystemPromptPath } from "./paths.ts";
+import { interpolate } from "./template.ts";
 
 // Carries systemPromptOptions in addition to systemPrompt, unlike the other
 // modules' onBeforeAgentStart event — not the shared core BeforeAgentStartEvent shape.
@@ -52,6 +52,9 @@ export function createPromptExtension(deps: PromptExtensionDeps): PromptExtensio
   const now = deps.now ?? (() => new Date());
 
   return {
+    // pi-internal(system-prompt-replace): last extension to set the prompt
+    // wins; jpi-prompt must load before memory/scratchpad (see
+    // extensions/jpi/index.ts).
     async onBeforeAgentStart(event, ctx) {
       try {
         const defaultContent = await readFile(defaultTemplatePath, "utf8");
