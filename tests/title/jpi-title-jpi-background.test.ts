@@ -70,18 +70,18 @@ test("tasks:v1 is a replace-set: each payload wholly replaces the previous runni
   assert.equal(titles.length, 0);
 
   events.emit(TASKS_CHANNEL, tasksPayload(["t1"]));
-  assert.equal(titles.at(-1), "⠋ tree");
+  assert.equal(titles.at(-1), "◐ tree");
 
   // an empty payload clears activity even though the previous set was non-empty
   events.emit(TASKS_CHANNEL, tasksPayload([]));
   assert.equal(titles.at(-1), "⏹ tree");
 
   events.emit(TASKS_CHANNEL, tasksPayload(["t2", "t3"]));
-  assert.equal(titles.at(-1), "⠋ tree");
+  assert.equal(titles.at(-1), "◐ tree");
 
   // a malformed payload is ignored, leaving the current state untouched
   events.emit(TASKS_CHANNEL, { schema: "wrong" });
-  assert.equal(titles.at(-1), "⠋ tree");
+  assert.equal(titles.at(-1), "◐ tree");
 });
 
 test("jpi-background and the legacy provider union: either one running keeps the title active", async () => {
@@ -91,17 +91,17 @@ test("jpi-background and the legacy provider union: either one running keeps the
   assert.equal(titles.length, 0);
 
   events.emit(TASKS_CHANNEL, tasksPayload(["t1"]));
-  assert.equal(titles.at(-1), "⠋ tree");
+  assert.equal(titles.at(-1), "◐ tree");
 
   const poll = scheduler.active("interval", 1_000)[0];
   assert.ok(poll);
   scheduler.fire(poll);
   events.emit(RESPONSE_CHANNEL, statusResponse(requests(events).at(-1)!, ["running"]));
-  assert.equal(titles.at(-1), "⠋ tree");
+  assert.equal(titles.at(-1), "◐ tree");
 
   // jpi-background clears, but the legacy provider is still running
   events.emit(TASKS_CHANNEL, tasksPayload([]));
-  assert.equal(titles.at(-1), "⠋ tree");
+  assert.equal(titles.at(-1), "◐ tree");
 
   // both providers clear: idle again
   scheduler.fire(poll);

@@ -40,7 +40,7 @@ test("background status polling and terminal refresh use the documented protocol
     payload: {},
   });
   events.emit(RESPONSE_CHANNEL, statusResponse(requests(events)[0]!, ["running", "completed"]));
-  assert.equal(titles.at(-1), "⠋ tree");
+  assert.equal(titles.at(-1), "◐ tree");
 
   extension.onAgentStart({}, context);
   events.emit(TERMINAL_CHANNEL, { task: { id: "done" } });
