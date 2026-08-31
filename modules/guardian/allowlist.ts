@@ -125,9 +125,10 @@ function isCommandTextAllowlisted(config: ReviewConfig, text: string): boolean {
   );
 }
 
-// run's `file` resolves against the session cwd, never run's own `path`
-// param (which only sets the staged copy's execution cwd) — the same
-// resolution prepareRun uses, so the allowlist judges the bytes that run.
+// pi-internal(tool-path-resolution): run's `file` resolves against the
+// session cwd, never run's own `path` param (which only sets the staged
+// copy's execution cwd) — the same resolution prepareRun uses, so the
+// allowlist judges the bytes that run.
 function readRunScriptText(input: Record<string, unknown>, cwd: string): string | undefined {
   if (typeof input.script === "string") return input.script;
   if (typeof input.file !== "string") return undefined;
@@ -175,8 +176,9 @@ export function isToolAllowlisted(
   return isCommandTextAllowlisted(config, command);
 }
 
-// write/edit tool inputs both carry `path`, resolved against the handler's
-// cwd by pi's own tool implementation, so it is resolved the same way here.
+// pi-internal(tool-path-resolution): write/edit tool inputs both carry
+// `path`, resolved against the handler's cwd by pi's own tool implementation,
+// so it is resolved the same way here.
 function getPathToolTarget(event: Pick<ToolCallEvent, "toolName" | "input">): string | undefined {
   if (event.toolName !== "write" && event.toolName !== "edit") return undefined;
   const input: unknown = event.input;

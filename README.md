@@ -74,6 +74,7 @@ This repo is two things at once: the bootstrap (`setup.sh` plus
 extensions/jpi/    the one pi extension: loads every module in modules/
 modules/<name>/     one directory per module (guardian, status, memory, ...)
 src/core/           shared library code (config, store, agent-dir helpers)
+src/pi/             the one place jpi reaches past Pi's public extension API (see src/pi/README.md)
 tests/              tests, mirroring modules/ and src/core/
 ```
 

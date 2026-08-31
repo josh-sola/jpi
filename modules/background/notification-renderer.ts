@@ -1,3 +1,5 @@
+// pi-internal(collapsed-box-mirror): the fallback this renderer collapses is
+// pi's own padded-box rendering for a custom message type with no renderer.
 /**
  * Compact renderer for the "jpi-background-notification" custom message
  * type. monitor.ts sends one for every streamed event and one on a

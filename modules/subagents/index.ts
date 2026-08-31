@@ -26,6 +26,7 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import { errorMessage } from "../../src/core/index.ts";
 import type { ModuleContext } from "../../src/core/module.ts";
+import type { FleetUIContext, WidgetUIContext } from "../../src/pi/index.ts";
 import { AgentManager, isTopLevelAgent } from "./agent-manager.ts";
 import {
   getDefaultMaxTurns,
@@ -91,8 +92,8 @@ import type {
   WidgetMode,
 } from "./types.ts";
 import { createMentionProvider, mentionRoster, type TypeInfo } from "./ui/agent-mention.ts";
-import { type AgentActivity, AgentWidget, type UICtx } from "./ui/agent-widget.ts";
-import { FleetList, type FleetUICtx } from "./ui/fleet-list.ts";
+import { type AgentActivity, AgentWidget } from "./ui/agent-widget.ts";
+import { FleetList } from "./ui/fleet-list.ts";
 import { getLifetimeTotal, PendingUsagePool, toReportedUsage } from "./usage.ts";
 import {
   getWorktreeCleanupPeriodDays,
@@ -525,6 +526,8 @@ export default async function setupSubagents(
 
   // --- Cross-extension RPC via pi.events ---
   let currentCtx: ExtensionContext | undefined;
+  // pi-internal(factory-vs-filter-order): the session_start gating below
+  // depends on this ordering — see the comment.
   // RPC handlers + the `subagents:ready` broadcast are wired on `session_start`
   // (a bound lifecycle event), not at factory time. pi runs every extension
   // factory before the `extensions:` filter and only fires lifecycle events for
@@ -581,6 +584,8 @@ export default async function setupSubagents(
     fleet.setEnabled(b);
   }
 
+  // pi-internal(append-only-providers): the never-unregistered claim below
+  // depends on pi's wrapper list being append-only.
   // Claude Code-style `@handle message` prompt mentions. Read live by both the
   // `input` hook and the stacked autocomplete provider, so the toggle applies
   // immediately — the provider itself can never be unregistered (pi's wrapper
@@ -637,6 +642,8 @@ export default async function setupSubagents(
     toolDescriptionMode = mode;
   }
 
+  // pi-internal(tool-result-usage-folding): depends on pi folding
+  // AgentToolResult.usage into getSessionStats() — see below.
   /**
    * Wrap a tool so its results carry back whatever subagent spend the parent
    * session has not been told about yet (see `PendingUsagePool`).
@@ -854,7 +861,7 @@ export default async function setupSubagents(
     currentCtx = ctx;
     if (ctx.hasUI) {
       widget.setUICtx(ctx.ui);
-      fleet.setUICtx(ctx.ui as any);
+      fleet.setUICtx(ctx.ui as unknown as FleetUIContext);
       // Wired once per activation, like rpcHandle below: jpi-status (if present)
       // picks the rows up from here instead of the belowEditor widget.
       if (!fleetBridgeWired) {
@@ -868,6 +875,8 @@ export default async function setupSubagents(
     if (!rpcHandle) {
       rpcHandle = wireRpcHandlers(rt);
     }
+    // pi-internal(append-only-providers): the once-per-activation guard below
+    // depends on pi never pruning the wrapper list — see the comment.
     // Stack `@handle` suggestions on pi's built-in autocomplete. Registered at
     // most once per activation: pi appends wrappers to a list it never prunes,
     // so a second call would layer a duplicate provider on the first. TUI only
@@ -1193,8 +1202,8 @@ export default async function setupSubagents(
 
   // Grab UI context from first tool execution + clear lingering widget on new turn
   pi.on("tool_execution_start", async (_event, ctx) => {
-    widget.setUICtx(ctx.ui as UICtx);
-    fleet.setUICtx(ctx.ui as unknown as FleetUICtx);
+    widget.setUICtx(ctx.ui as WidgetUIContext);
+    fleet.setUICtx(ctx.ui as unknown as FleetUIContext);
     widget.onTurnStart();
   });
 

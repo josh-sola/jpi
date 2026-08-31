@@ -26,9 +26,8 @@
  *   → resolves to { "anthropic/claude-sonnet-4-6", "anthropic/claude-opus-4-6" }
  */
 
-import { existsSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
-import { getAgentDir } from "@earendil-works/pi-coding-agent";
+import { statSync } from "node:fs";
+import { readSettingsField, settingsFilePaths } from "../../src/pi/index.ts";
 import type { ModelEntry } from "./model-resolver.ts";
 
 /** Minimal registry shape — only the methods resolveEnabledModels actually calls. */
@@ -37,21 +36,8 @@ export interface ModelRegistryRef {
   getAvailable?(): unknown[];
 }
 
-/** Paths to pi's settings.json files: [project, global] (project takes precedence). */
-function settingsPaths(cwd: string): [project: string, global: string] {
-  return [join(cwd, ".pi", "settings.json"), join(getAgentDir(), "settings.json")];
-}
-
-/** Read `enabledModels` from a single settings.json file. Undefined when missing or absent. */
-function readField(path: string): string[] | undefined {
-  if (!existsSync(path)) return undefined;
-  try {
-    const raw = JSON.parse(readFileSync(path, "utf-8"));
-    if (Array.isArray(raw?.enabledModels)) return raw.enabledModels as string[];
-  } catch {
-    /* corrupt file — silent */
-  }
-  return undefined;
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value);
 }
 
 /**
@@ -61,8 +47,11 @@ function readField(path: string): string[] | undefined {
  * Returns undefined when neither file has the field.
  */
 export function readEnabledModels(cwd: string): string[] | undefined {
-  const [project, global] = settingsPaths(cwd);
-  return readField(project) ?? readField(global);
+  const [project, global] = settingsFilePaths(cwd);
+  return (
+    readSettingsField(project, "enabledModels", isStringArray) ??
+    readSettingsField(global, "enabledModels", isStringArray)
+  );
 }
 
 /**
@@ -102,7 +91,7 @@ export function resolveEnabledModels(
 ): Set<string> | undefined {
   // Fast path: check cache (stat both project and global settings.json files)
   const patternsKey = JSON.stringify(patterns);
-  const [project, global] = settingsPaths(cwd);
+  const [project, global] = settingsFilePaths(cwd);
   const fileHash = `${hashOf(project)};${hashOf(global)}`;
 
   if (fileHash === cachedHash && patternsKey === cachedPatternsKey) {

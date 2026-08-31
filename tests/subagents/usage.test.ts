@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vite-plus/test";
+import { getSessionTokens } from "../../src/pi/session-stats.ts";
 import {
   addUsage,
   getLifetimeCost,
   getLifetimeTotal,
   getSessionContextPercent,
-  getSessionTokens,
   type LifetimeUsage,
   PendingUsagePool,
 } from "../../modules/subagents/usage.ts";

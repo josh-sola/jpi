@@ -1,9 +1,5 @@
-import {
-  projectSlug,
-  Store,
-  type BeforeAgentStartEvent,
-  type Notifier,
-} from "../../src/core/index.ts";
+import { projectSlug, Store } from "../../src/core/index.ts";
+import type { BeforeAgentStartEvent, Notifier } from "../../src/pi/index.ts";
 
 import { capacityStatus, entryCount, INDEX_FILENAME, readMemoryIndex } from "./memory-index.ts";
 import { getMemoryDirectory } from "./paths.ts";

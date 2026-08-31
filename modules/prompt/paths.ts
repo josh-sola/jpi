@@ -1,7 +1,7 @@
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 
-import { getAgentDirectory } from "../../src/core/index.ts";
+import { getAgentDirectory } from "../../src/pi/index.ts";
 
 export const SYSTEM_PROMPT_FILENAME = "JPI-SYSTEM.md";
 

@@ -3,7 +3,8 @@ import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { isKeyRelease, matchesKey, type KeyId } from "@earendil-works/pi-tui";
 
-import { getAgentDirectory, Store, type Config, type WithEnabled } from "../../src/core/index.ts";
+import { Store, type Config, type WithEnabled } from "../../src/core/index.ts";
+import { getAgentDirectory } from "../../src/pi/index.ts";
 import { createBackgroundBus } from "./bus.ts";
 import { backgroundSchema } from "./config.ts";
 import { DetachRegistry } from "./detach.ts";

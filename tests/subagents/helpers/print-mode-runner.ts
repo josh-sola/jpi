@@ -395,7 +395,9 @@ export async function runPrintMode(options: RunPrintModeOptions): Promise<PrintM
   // their completion nudges land before the parent's final turn.
   const hold = options.hold ?? true;
   if (hold && manager) {
-    // dequeueFollowUpMessages is internal — reach through with a cast.
+    // pi-internal(dequeue-followups-internal): dequeueFollowUpMessages is an
+    // unexported method on the real Agent, reached through with a cast and
+    // reassigned like a monkeypatch — not a documented multi-hook API.
     const agent = (session as any).agent;
     if (agent?.dequeueFollowUpMessages) {
       const original = agent.dequeueFollowUpMessages.bind(agent);

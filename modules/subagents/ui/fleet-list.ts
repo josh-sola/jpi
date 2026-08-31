@@ -27,12 +27,12 @@ import {
   truncateToWidth,
   visibleWidth,
 } from "@earendil-works/pi-tui";
-import type { Notifier } from "../../../src/core/index.ts";
+import type { FleetUIContext, FocusAwareTui, WidgetTheme } from "../../../src/pi/index.ts";
 import { hasAgentBadge, renderAgentName } from "../agent-color.ts";
 import type { AgentManager } from "../agent-manager.ts";
 import type { AgentRecord, ViewerMarkdownMode } from "../types.ts";
 import { getLifetimeCost, getLifetimeTotal } from "../usage.ts";
-import { type AgentActivity, formatCost, type Theme } from "./agent-widget.ts";
+import { type AgentActivity, formatCost } from "./agent-widget.ts";
 import { ConversationViewer, VIEWPORT_HEIGHT_PCT } from "./conversation-viewer.ts";
 
 /** Widget key for the below-editor fleet list. */
@@ -50,40 +50,6 @@ export interface FleetConsumer {
   /** Optional for compatibility with a consumer updated independently. */
   getFocusedComponent?(): unknown;
 }
-
-/** Narrow view of Pi's TUI focus API, with the legacy/private fallback. */
-type FocusAwareTui = {
-  getFocusedComponent?(): unknown;
-  focusedComponent?: unknown;
-};
-
-/** Minimal UI surface the FleetView needs from `ctx.ui` (structural subset). */
-export type FleetUICtx = {
-  setWidget(
-    key: string,
-    content:
-      | undefined
-      | ((
-          tui: any,
-          theme: Theme,
-        ) => { render(width: number): string[]; invalidate(): void; dispose?(): void }),
-    options?: { placement?: "aboveEditor" | "belowEditor" },
-  ): void;
-  onTerminalInput(
-    handler: (data: string) => { consume?: boolean; data?: string } | undefined,
-  ): () => void;
-  getEditorText(): string;
-  notify: Notifier;
-  custom<T>(
-    factory: (
-      tui: any,
-      theme: Theme,
-      keybindings: any,
-      done: (result: T) => void,
-    ) => { render(width: number): string[]; invalidate(): void; dispose?(): void },
-    options?: { overlay?: boolean; overlayOptions?: unknown; onHandle?: (handle: unknown) => void },
-  ): Promise<T>;
-};
 
 type MainEntry = { kind: "main" };
 /** `depth` is the row's visual nesting level: 0 for top-level and orphaned agents, 1+ for a shown descendant. */
@@ -159,7 +125,7 @@ function rightAlign(left: string, right: string, width: number): string {
 }
 
 export class FleetList {
-  private ui: FleetUICtx | undefined;
+  private ui: FleetUIContext | undefined;
   private tui: any;
   private inputUnsub: (() => void) | undefined;
   private widgetRegistered = false;
@@ -209,7 +175,7 @@ export class FleetList {
   }
 
   /** Capture the UI context and (re)register the global input handler. */
-  setUICtx(ui: FleetUICtx): void {
+  setUICtx(ui: FleetUIContext): void {
     if (ui === this.ui) return;
     this.inputUnsub?.();
     this.ui = ui;
@@ -338,7 +304,7 @@ export class FleetList {
    * `renderBar` gives the `belowEditor` widget, including the activation hint
    * and selection markers. Empty when the fleet view is off or has no rows.
    */
-  renderForConsumer(width: number, theme: Theme): string[] {
+  renderForConsumer(width: number, theme: WidgetTheme): string[] {
     if (!this.enabled) return [];
     return this.renderBar(width, theme);
   }
@@ -398,6 +364,8 @@ export class FleetList {
     // test below, which would otherwise read the dialog holding the keyboard as
     // "the user left the list" and reset the selection out from under it.
     if (this.viewerClose) return undefined;
+    // pi-internal(input-dispatch-order): the focus check below depends on
+    // this ordering — see the comment there.
     // Global input listeners fire BEFORE the focused component, and dialogs
     // (ctx.ui.select/confirm/input, pi's own menus) swap the prompt editor out
     // while getEditorText() still reads the detached — empty — editor. Focus may
@@ -450,6 +418,8 @@ export class FleetList {
     return undefined;
   }
 
+  // pi-internal(pi-tui-single-copy): the instanceof check below depends on
+  // the loader aliasing pi-tui to one shared copy — see below.
   /**
    * True when pi's prompt editor owns the keyboard. pi's editor is an `Editor`
    * subclass (CustomEditor) while every dialog/selector is not, and the loader
@@ -551,7 +521,7 @@ export class FleetList {
 
   // ---- Rendering ----
 
-  private renderBar(width: number, theme: Theme): string[] {
+  private renderBar(width: number, theme: WidgetTheme): string[] {
     const rows = this.roster().slice(1) as AgentEntry[];
     if (rows.length === 0) return [];
     // Clamp locally so a render between a roster shrink and the next update()
@@ -583,7 +553,7 @@ export class FleetList {
     return lines;
   }
 
-  private bullet(rosterIndex: number, sel: number, theme: Theme): string {
+  private bullet(rosterIndex: number, sel: number, theme: WidgetTheme): string {
     return rosterIndex === sel ? theme.fg("accent", "●") : theme.fg("dim", "○");
   }
 
@@ -592,7 +562,7 @@ export class FleetList {
     sel: number,
     record: AgentRecord,
     width: number,
-    theme: Theme,
+    theme: WidgetTheme,
     depth = 0,
   ): string {
     // The selected row renders in the theme's primary text color so it reads as

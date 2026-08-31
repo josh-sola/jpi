@@ -89,6 +89,9 @@ export interface BuildBtwContextParams {
   readonly model: PiModel;
 }
 
+// pi-internal(cache-prefix-byte-identity): relies on convertToLlm +
+// sessionEntryToContextMessages composing byte-identically to pi's own turn
+// for prompt-cache hits.
 /**
  * Mirrors the main turn's own entry-to-wire conversion (`convertToLlm` +
  * `sessionEntryToContextMessages`, the same pair the agent loop uses) so the

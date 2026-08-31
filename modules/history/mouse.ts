@@ -1,6 +1,17 @@
 import type { Editor, TUI, TuiInputListenerResult } from "@earendil-works/pi-tui";
 import { sliceByColumn, visibleWidth } from "@earendil-works/pi-tui";
 
+import {
+  computeLayoutWidth,
+  computeMaxVisibleLines,
+  computePaddingX,
+  detectEditorAccess,
+  type EditorAccess,
+  type MinimalLayoutBox,
+  type MinimalLayoutFrame,
+  patchViewportInput,
+} from "../../src/pi/editor.ts";
+
 const FOCUS_IN = "\x1b[I";
 const FOCUS_OUT = "\x1b[O";
 const SGR_MOUSE_RE = /^\x1b\[<(\d+);(\d+);(\d+)([Mm])$/;
@@ -45,20 +56,6 @@ interface Rect {
   readonly y: number;
   readonly width: number;
   readonly height: number;
-}
-
-/** Local stand-in for pi-tui's unexported LayoutBox/LayoutFrame — only the shape this module reads. */
-interface MinimalLayoutBox {
-  readonly component: unknown;
-  readonly rect: Rect;
-  readonly clip: Rect;
-  readonly children: readonly MinimalLayoutBox[];
-  /** Rows trimmed off the top of `component`'s own rendered lines before they reach `rect`. */
-  readonly lineOffset?: number;
-}
-
-interface MinimalLayoutFrame {
-  readonly root: MinimalLayoutBox;
 }
 
 /** Duck-types pi-tui's Container — the shape used to walk into an unrecognized component's children. */
@@ -185,24 +182,6 @@ export function isLeftButtonRelevant(event: SgrMouseEvent): boolean {
 
 export function containsPoint(rect: Rect, x: number, y: number): boolean {
   return x >= rect.x && x < rect.x + rect.width && y >= rect.y && y < rect.y + rect.height;
-}
-
-/** Mirrors Editor#render's own padding clamp: `Math.min(paddingX, Math.floor((width - 1) / 2))`. */
-export function computePaddingX(rawPaddingX: number, width: number): number {
-  const maxPadding = Math.max(0, Math.floor((width - 1) / 2));
-  return Math.min(rawPaddingX, maxPadding);
-}
-
-/** Mirrors Editor#render's own layout-width formula, the width buildVisualLineMap must be called with. */
-export function computeLayoutWidth(width: number, rawPaddingX: number): number {
-  const paddingX = computePaddingX(rawPaddingX, width);
-  const contentWidth = Math.max(1, width - paddingX * 2);
-  return Math.max(1, contentWidth - (paddingX ? 0 : 1));
-}
-
-/** Mirrors Editor#render's own `maxVisibleLines` formula. */
-export function computeMaxVisibleLines(terminalRows: number): number {
-  return Math.max(5, Math.floor(terminalRows * 0.3));
 }
 
 /** Walks graphemes (via Intl.Segmenter) to convert a visible column inside `text` to a string index, snapping past the end. */
@@ -334,62 +313,6 @@ export function applySelectionHighlightToRow(row: string, range: RowHighlightRan
 }
 
 // ---------------------------------------------------------------------------
-// pi-tui Editor/TUI private-surface accessors (the one seam to fix on a pi upgrade)
-// ---------------------------------------------------------------------------
-
-interface EditorState {
-  lines: string[];
-  cursorLine: number;
-  cursorCol: number;
-}
-
-function isEditorState(value: unknown): value is EditorState {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    Array.isArray((value as EditorState).lines) &&
-    typeof (value as EditorState).cursorLine === "number" &&
-    typeof (value as EditorState).cursorCol === "number"
-  );
-}
-
-interface EditorPrivateSurface {
-  state: EditorState;
-  scrollOffset: number;
-  buildVisualLineMap(width: number): VisualLine[];
-  pushUndoSnapshot(): void;
-}
-
-interface EditorAccess {
-  /** Live, mutable reference — matches how Editor's own methods mutate `this.state` in place. */
-  getState(): EditorState;
-  getScrollOffset(): number;
-  buildVisualLineMap(width: number): VisualLine[];
-  pushUndoSnapshot(): void;
-}
-
-function detectEditorAccess(editor: Editor): EditorAccess | undefined {
-  const surface = editor as unknown as Partial<EditorPrivateSurface>;
-  if (!isEditorState(surface.state)) return undefined;
-  if (typeof surface.scrollOffset !== "number") return undefined;
-  if (typeof surface.buildVisualLineMap !== "function") return undefined;
-  if (typeof surface.pushUndoSnapshot !== "function") return undefined;
-
-  const typed = editor as unknown as EditorPrivateSurface;
-  return {
-    getState: () => typed.state,
-    getScrollOffset: () => typed.scrollOffset,
-    buildVisualLineMap: (width) => typed.buildVisualLineMap(width),
-    pushUndoSnapshot: () => typed.pushUndoSnapshot(),
-  };
-}
-
-interface TuiPrivateSurface {
-  handleViewportInput: (data: string) => TuiInputListenerResult;
-  currentLayout: MinimalLayoutFrame | undefined;
-}
-
-// ---------------------------------------------------------------------------
 // Install
 // ---------------------------------------------------------------------------
 
@@ -415,18 +338,12 @@ export function installMouseSupport(tui: TUI, editor: Editor): MouseSupport | un
   // narrowed it — see a plain EditorAccess instead of EditorAccess | undefined.
   const editorAccess: EditorAccess = detected;
 
-  const rawTui = tui as unknown as Partial<TuiPrivateSurface>;
-  const original = rawTui.handleViewportInput;
-  if (typeof original !== "function") return undefined;
   if (typeof tui.hasOverlay !== "function") return undefined;
-  if (!("currentLayout" in rawTui)) return undefined;
   if (typeof tui.terminal?.rows !== "number") return undefined;
-
-  const callOriginal = original.bind(tui);
-  const getCurrentLayout = () => (rawTui as TuiPrivateSurface).currentLayout;
 
   let selection: Selection | undefined;
   let dragging = false;
+  let getCurrentLayout: () => MinimalLayoutFrame | undefined = () => undefined;
 
   function findEditorBox(): { rect: Rect; clip: Rect } | undefined {
     const frame = getCurrentLayout();
@@ -494,33 +411,35 @@ export function installMouseSupport(tui: TUI, editor: Editor): MouseSupport | un
     return { consume: true };
   }
 
-  function wrapped(data: string): TuiInputListenerResult {
-    if (data === FOCUS_OUT) {
-      dragging = false;
-      return callOriginal(data);
-    }
-    if (data === FOCUS_IN) return callOriginal(data);
+  const patched = patchViewportInput(tui, (callOriginal) => {
+    return function wrapped(data: string): TuiInputListenerResult {
+      if (data === FOCUS_OUT) {
+        dragging = false;
+        return callOriginal(data);
+      }
+      if (data === FOCUS_IN) return callOriginal(data);
 
-    const event = parseSgrMouseEvent(data);
-    if (!event) return callOriginal(data);
+      const event = parseSgrMouseEvent(data);
+      if (!event) return callOriginal(data);
 
-    if (tui.hasOverlay()) {
-      dragging = false;
-      return callOriginal(data);
-    }
-    if (isWheelEvent(event) || isRightButton(event) || !isLeftButtonRelevant(event)) {
-      return callOriginal(data);
-    }
+      if (tui.hasOverlay()) {
+        dragging = false;
+        return callOriginal(data);
+      }
+      if (isWheelEvent(event) || isRightButton(event) || !isLeftButtonRelevant(event)) {
+        return callOriginal(data);
+      }
 
-    const handled = event.release
-      ? handleRelease()
-      : isMotionEvent(event)
-        ? handleDrag(event)
-        : handlePress(event);
-    return handled ?? callOriginal(data);
-  }
-
-  rawTui.handleViewportInput = wrapped;
+      const handled = event.release
+        ? handleRelease()
+        : isMotionEvent(event)
+          ? handleDrag(event)
+          : handlePress(event);
+      return handled ?? callOriginal(data);
+    };
+  });
+  if (!patched) return undefined;
+  getCurrentLayout = patched.getCurrentLayout;
 
   return {
     hasSelection: () => normalizeSelection(selection) !== undefined,

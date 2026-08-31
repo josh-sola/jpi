@@ -4,4 +4,7 @@
  * ≤0.75.x). Upstream deletes `/compat` with its coding-agent ModelManager
  * migration; the replacement then is `fauxProvider()` + `createModels()`.
  */
+// pi-internal(pi-ai-compat-removal): upstream plans to delete `/compat`
+// entirely with its coding-agent ModelManager migration (see header above) —
+// the replacement then is `fauxProvider()` + `createModels()`.
 export { getModel, registerFauxProvider, streamSimple } from "@earendil-works/pi-ai/compat";

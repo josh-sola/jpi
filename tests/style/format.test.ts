@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { test } from "vite-plus/test";
 
 import {
-  countDiffStats,
   countFindResults,
   countGrepMatches,
   countLsEntries,
@@ -13,6 +12,7 @@ import {
   summarizeBashOutput,
   truncateCommand,
 } from "../../modules/style/format.ts";
+import { countDiffStats } from "../../src/pi/messages.ts";
 
 // --- truncateCommand ---
 

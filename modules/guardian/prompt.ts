@@ -1,7 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { errorMessage, getAgentDirectory, seedIfMissing } from "../../src/core/index.ts";
+import { errorMessage, seedIfMissing } from "../../src/core/index.ts";
+import { getAgentDirectory } from "../../src/pi/index.ts";
 
 import { REVIEW_POLICY } from "./policy.ts";
 

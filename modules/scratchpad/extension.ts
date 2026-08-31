@@ -1,4 +1,5 @@
-import { scratchpadDir, scratchpadRoot, type BeforeAgentStartEvent } from "../../src/core/index.ts";
+import { scratchpadDir, scratchpadRoot } from "../../src/core/index.ts";
+import type { BeforeAgentStartEvent } from "../../src/pi/index.ts";
 
 import { buildScratchpadSection, ensureScratchpadDir, sweepStale } from "./scratchpad.ts";
 

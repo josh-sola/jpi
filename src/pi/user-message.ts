@@ -15,7 +15,7 @@
 
 import { UserMessageComponent } from "@earendil-works/pi-coding-agent";
 
-import { errorMessage } from "../../src/core/errors.ts";
+import { errorMessage } from "./errors.ts";
 
 const PATCHED = Symbol.for("jpi:style:user-message-padding-patched");
 

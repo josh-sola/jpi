@@ -9,7 +9,7 @@
  *   error   → { success: false, error: string }
  */
 
-import type { EventBus } from "../../src/core/index.ts";
+import type { EventBus } from "../../src/pi/index.ts";
 import { isTopLevelAgent } from "./agent-manager.ts";
 import { type ModelRegistry, resolveModel } from "./model-resolver.ts";
 import { checkModelScope } from "./model-scope.ts";

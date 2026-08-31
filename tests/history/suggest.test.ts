@@ -9,8 +9,8 @@ import {
   renderTranscript,
   sanitizeSuggestion,
   type PiModel,
-  type TranscriptEntryLike,
 } from "../../modules/history/suggest.ts";
+import type { TranscriptEntryLike } from "../../src/pi/index.ts";
 
 // generateSuggestion never inspects the model beyond passing it through, so
 // a bare stub cast is enough here.

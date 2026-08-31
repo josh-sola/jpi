@@ -4,7 +4,7 @@ import { test } from "vite-plus/test";
 import { initTheme, UserMessageComponent } from "@earendil-works/pi-coding-agent";
 import { stripTerminalSequences } from "@earendil-works/pi-tui";
 
-import { removeUserMessagePadding } from "../../modules/style/user-message-style.ts";
+import { removeUserMessagePadding } from "../../src/pi/user-message.ts";
 
 initTheme();
 

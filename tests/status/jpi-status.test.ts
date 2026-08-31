@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { test } from "vite-plus/test";
 
 import { Config } from "../../src/core/config.ts";
+import type { FooterContext, NotifyLevel } from "../../src/pi/index.ts";
 import {
   createDefaultStatusLineConfig,
   loadStatusLineConfig,
@@ -58,42 +59,12 @@ function statusConfig(env?: NodeJS.ProcessEnv): Config<typeof statusSchema> {
 const CSI_PATTERN = /\x1b\[[0-?]*[ -/]*[@-~]/g;
 const OSC_PATTERN = /\x1b\][\s\S]*?(?:\x07|\x1b\\)/g;
 
-// Mirrors extension.ts's un-exported FooterContext/FooterData/factory shapes so
-// the test doubles below get real parameter types instead of implicit any.
-type NotifyLevel = "info" | "warning" | "error";
 type Notification = { message: string; level?: NotifyLevel };
 
-type FooterData = {
-  getExtensionStatuses(): ReadonlyMap<string, string>;
-  onBranchChange(callback: () => void): () => void;
-};
-type FooterComponent = { render(width: number): string[]; invalidate(): void; dispose(): void };
-type FooterFactory = (
-  tui: { requestRender(): void },
-  theme: unknown,
-  footerData: FooterData,
-) => FooterComponent;
-type FooterContext = {
-  mode: string;
-  cwd: string;
-  model?: {
-    id?: string;
-    name?: string;
-    provider?: string;
-    reasoning?: boolean;
-    contextWindow?: number;
-    maxTokens?: number;
-  };
-  thinkingLevel?: string;
-  isIdle?(): boolean;
-  getContextUsage():
-    | { tokens?: number | null; contextWindow?: number | null; percent: number | null }
-    | undefined;
-  ui: {
-    notify(message: string, level?: NotifyLevel): void;
-    setFooter(factory: FooterFactory | undefined): void;
-  };
-};
+// Derived from FooterContext.ui.setFooter's own parameter type rather than
+// hand-mirrored, so the test doubles below get real parameter types instead
+// of implicit any.
+type FooterFactory = NonNullable<Parameters<FooterContext["ui"]["setFooter"]>[0]>;
 
 type ExecOptions = { cwd?: string; timeout?: number; signal?: AbortSignal };
 type ExecResult = Awaited<ReturnType<ExecCommand>>;

@@ -1,7 +1,7 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import { getAgentDirectory } from "./agent-dir.ts";
+import { getAgentDirectory } from "../pi/index.ts";
 
 /** The `Store("memories")` root: every project slug's memory directory lives under this. */
 export function memoriesRoot(

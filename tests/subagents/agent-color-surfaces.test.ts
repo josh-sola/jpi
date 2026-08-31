@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import type { FleetUIContext } from "../../src/pi/types.ts";
 import { registerAgents } from "../../modules/subagents/agent-types.ts";
 import { subagentsExtension } from "./helpers/boot-extension.ts";
 import type { AgentConfig, AgentRecord } from "../../modules/subagents/types.ts";
 import { type AgentActivity, AgentWidget } from "../../modules/subagents/ui/agent-widget.ts";
 import { ConversationViewer } from "../../modules/subagents/ui/conversation-viewer.ts";
-import { FleetList, type FleetUICtx } from "../../modules/subagents/ui/fleet-list.ts";
+import { FleetList } from "../../modules/subagents/ui/fleet-list.ts";
 
 const TYPE = "colored-reviewer";
 const DISPLAY_NAME = "Code Reviewer";
@@ -215,7 +216,7 @@ describe("custom agent color runtime surfaces", () => {
       onTerminalInput: vi.fn(() => vi.fn()),
       getEditorText: vi.fn(() => ""),
       notify: vi.fn(),
-      custom: (() => new Promise<undefined>(() => {})) as FleetUICtx["custom"],
+      custom: (() => new Promise<undefined>(() => {})) as FleetUIContext["custom"],
     });
 
     try {

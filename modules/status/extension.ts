@@ -2,7 +2,13 @@ import { homedir } from "node:os";
 
 import type { EventBus } from "@earendil-works/pi-coding-agent";
 
-import type { Notifier } from "../../src/core/index.ts";
+import type {
+  FocusAwareTui,
+  FooterContext,
+  MessageEventInput,
+  SessionInfoChangedInput,
+  ToolExecutionStartInput,
+} from "../../src/pi/index.ts";
 import {
   loadStatusLineConfig,
   toStatusLineConfig,
@@ -23,62 +29,9 @@ import {
   type FleetProviderPayload,
 } from "./fleet-bridge.ts";
 import { renderFooter, type WidthHelpers } from "./ui/render.ts";
-import {
-  FooterStats,
-  type BranchEntryLike,
-  type MessageEventInput,
-  type SessionInfoChangedInput,
-  type ToolExecutionStartInput,
-} from "./stats.ts";
+import { FooterStats } from "./stats.ts";
 
 const REFRESH_INTERVAL_MS = 10_000;
-
-type FooterData = {
-  getExtensionStatuses(): ReadonlyMap<string, string>;
-  onBranchChange(callback: () => void): () => void;
-};
-
-type FooterContext = {
-  mode: string;
-  cwd: string;
-  model?:
-    | {
-        id?: string;
-        name?: string;
-        provider?: string;
-        reasoning?: boolean;
-        contextWindow?: number;
-        maxTokens?: number;
-      }
-    | undefined;
-  thinkingLevel?: string | undefined;
-  isIdle?(): boolean;
-  getContextUsage():
-    | {
-        tokens?: number | null;
-        contextWindow?: number | null;
-        percent: number | null;
-      }
-    | undefined;
-  sessionManager?:
-    | {
-        getSessionName?(): string | undefined;
-        getBranch?(): BranchEntryLike[];
-      }
-    | undefined;
-  ui: {
-    notify: Notifier;
-    setFooter(
-      factory:
-        | ((
-            tui: { requestRender(): void },
-            theme: unknown,
-            footerData: FooterData,
-          ) => { render(width: number): string[]; invalidate(): void; dispose(): void })
-        | undefined,
-    ): void;
-  };
-};
 
 type Scheduler = IntervalScheduler;
 
@@ -242,8 +195,7 @@ export function createStatusExtension(
           fleetProvider = data;
           fleetDetach = data.attach({
             requestRender: renderFooterNow,
-            getFocusedComponent: () =>
-              (tui as unknown as { getFocusedComponent(): unknown }).getFocusedComponent(),
+            getFocusedComponent: () => (tui as FocusAwareTui).getFocusedComponent?.(),
           });
         });
         events.emit(FLEET_CONSUMER_READY_CHANNEL, { schema: "subagents.fleet.consumer-ready.v1" });

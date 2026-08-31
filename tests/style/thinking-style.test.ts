@@ -11,7 +11,7 @@ import { test } from "vite-plus/test";
 import type { MarkdownTheme } from "@earendil-works/pi-tui";
 import { Markdown } from "@earendil-works/pi-tui";
 
-import { disableThinkingItalics } from "../../modules/style/thinking-style.ts";
+import { disableThinkingItalics } from "../../src/pi/markdown.ts";
 
 const ITALIC_ON = "\x1b[3m";
 

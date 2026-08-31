@@ -13,7 +13,6 @@
 import { basename, extname, resolve } from "node:path";
 
 import type {
-  EditToolDetails,
   ExtensionAPI,
   Theme,
   ToolDefinition,
@@ -47,26 +46,8 @@ import {
   scratchpadRoot,
   truncateEnd,
 } from "../../src/core/index.ts";
-
-// Local mirror of pi's ToolRenderContext: pi-coding-agent 0.84.3's root barrel
-// does not re-export it. Delete once upstream exports it. Exported so other
-// style modules (mcp-style.ts) that need the same shape don't redeclare it.
-export interface ToolRenderContext<TState = any, TArgs = any> {
-  args: TArgs;
-  toolCallId: string;
-  invalidate: () => void;
-  lastComponent: Component | undefined;
-  state: TState;
-  cwd: string;
-  executionStarted: boolean;
-  argsComplete: boolean;
-  isPartial: boolean;
-  expanded: boolean;
-  isError: boolean;
-}
-
+import { countDiffStats, editResultDiff, type ToolRenderContext } from "../../src/pi/index.ts";
 import {
-  countDiffStats,
   countFindResults,
   countGrepMatches,
   countLsEntries,
@@ -258,6 +239,9 @@ export interface StyleToolsOptions {
   scratchpadTempRoot?: string;
 }
 
+// pi-internal(builtin-tool-shadowing): relies on extension registrations
+// shadowing pi's built-ins by name; load order in extensions/jpi/index.ts is
+// load-bearing.
 export function registerStyleTools(pi: ExtensionAPI, options: StyleToolsOptions = {}): void {
   const cwd = process.cwd();
   const memoriesRootDir = memoriesRoot(options.env, options.homeDirectory);
@@ -326,7 +310,7 @@ export function registerStyleTools(pi: ExtensionAPI, options: StyleToolsOptions 
       if (context.isError) return renderErrorResult(text, options.expanded, theme);
 
       const rawPath = asString((context.args as { path?: unknown }).path);
-      const diff = (result.details as EditToolDetails | undefined)?.diff;
+      const diff = editResultDiff(result.details);
 
       const container = new Container();
       if (!diff) {

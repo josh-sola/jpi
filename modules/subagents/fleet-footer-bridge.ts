@@ -18,13 +18,13 @@ import {
   FLEET_PROVIDER_CHANNEL,
   type FleetProviderPayload as CoreFleetProviderPayload,
 } from "../../src/core/index.ts";
+import type { WidgetTheme } from "../../src/pi/index.ts";
 import type { EventBus } from "./cross-extension-rpc.ts";
-import type { Theme } from "./ui/agent-widget.ts";
 import type { FleetList } from "./ui/fleet-list.ts";
 
 export { FLEET_CONSUMER_READY_CHANNEL, FLEET_PROVIDER_CHANNEL };
 
-export type FleetProviderPayload = CoreFleetProviderPayload<Theme>;
+export type FleetProviderPayload = CoreFleetProviderPayload<WidgetTheme>;
 
 /**
  * Emit the fleet render provider on `FLEET_PROVIDER_CHANNEL`, and re-emit it

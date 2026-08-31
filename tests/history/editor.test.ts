@@ -18,6 +18,10 @@ function newEditor(): HistoryEditor {
   return new HistoryEditor(tui, theme, keybindings);
 }
 
+// pi-internal(private-editor-history): reads pi's own CustomEditor.history
+// (private) and calls its private undo() — same topic as
+// modules/history/editor.ts's HistoryEditor.submissions, which keeps its own
+// duplicate list because this field isn't part of CustomEditor's public API.
 function historyOf(editor: HistoryEditor): string[] {
   return (editor as unknown as { history: string[] }).history;
 }
@@ -26,6 +30,7 @@ function ghostOf(editor: HistoryEditor): string | undefined {
   return (editor as unknown as { ghost: string | undefined }).ghost;
 }
 
+// pi-internal(private-editor-history): see historyOf above.
 function undo(editor: HistoryEditor): void {
   (editor as unknown as { undo: () => void }).undo();
 }

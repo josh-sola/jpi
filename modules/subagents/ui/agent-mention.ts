@@ -142,6 +142,8 @@ export function createMentionProvider(
       options,
     ): Promise<AutocompleteSuggestions | null> {
       const mine = isEnabled() ? mentionItems(roster(), lines[cursorLine] ?? "", cursorCol) : null;
+      // pi-internal(unhandled-provider-rejection): the try/catch below depends
+      // on pi awaiting getSuggestions with no catch of its own — see there.
       // Asked unconditionally: pi owns `@` and must keep answering for it even
       // when a handle matches too. That is the same work vanilla pi does on any
       // `@` keystroke — a capped `fd` search, or nothing at all when the host

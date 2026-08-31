@@ -10,7 +10,7 @@ import { mkdir, open, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { getAgentDirectory } from "./agent-dir.ts";
+import { getAgentDirectory } from "../pi/index.ts";
 import type { AnyJpiNodeSpec, InferNode } from "./builder.ts";
 import { errorMessage } from "./errors.ts";
 import {

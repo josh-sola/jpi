@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "vite-plus/test";
 
-import { appendPiTail } from "../../modules/prompt/system-prompt-tail.ts";
+import { appendPiTail } from "../../src/pi/system-prompt.ts";
 
 test("appendPiTail appends appendSystemPrompt text, then the current working directory line", () => {
   const result = appendPiTail(

@@ -45,7 +45,6 @@
  */
 
 import type { Theme, ToolDefinition } from "@earendil-works/pi-coding-agent";
-import { ExtensionRunner } from "@earendil-works/pi-coding-agent";
 import { type Component, Container } from "@earendil-works/pi-tui";
 
 import {
@@ -59,10 +58,10 @@ import {
   truncateEnd,
   withReviewAnnotation,
 } from "../../src/core/index.ts";
+import { patchToolDefinitionLookup, type ToolRenderContext } from "../../src/pi/index.ts";
 import { firstNonEmptyLine, summarizeBashOutput } from "./format.ts";
-import { renderCollapsibleResult, renderErrorResult, type ToolRenderContext } from "./index.ts";
+import { renderCollapsibleResult, renderErrorResult } from "./index.ts";
 
-const PATCHED = Symbol.for("jpi:style:mcp-tools-patched");
 const NAMESPACE_PROXY_PREFIX = "mcp__";
 
 /** Every reskinned tool's real `execute`/`parameters` carry far more than this file touches. */
@@ -300,6 +299,25 @@ function wrapDefinition(original: McpDefinition, name: string, reskin: Reskin): 
 }
 
 /**
+ * Lookups of any name in `STATIC_RESKINS`, or any `mcp__<server>` namespace
+ * proxy, return jpi-styled copies; every other name falls through to the
+ * original definition unchanged. The actual prototype patch mechanics
+ * (idempotence, saving the original, degrading to a no-op) live in
+ * `src/pi/extension-runner.ts`'s `patchToolDefinitionLookup` — this is just
+ * its transform.
+ */
+function reskinToolDefinition(
+  toolName: string,
+  original: (name: string) => unknown,
+): McpDefinition | undefined {
+  const definition = original(toolName) as McpDefinition | undefined;
+  if (!definition) return definition;
+  const reskin = reskinFor(toolName);
+  if (!reskin) return definition;
+  return wrapDefinition(definition, toolName, reskin);
+}
+
+/**
  * Patches `ExtensionRunner.prototype.getToolDefinition` so lookups of any
  * name in `STATIC_RESKINS`, or any `mcp__<server>` namespace proxy, return
  * jpi-styled copies. Idempotent: safe to call more than once. Degrades to a
@@ -307,32 +325,7 @@ function wrapDefinition(original: McpDefinition, name: string, reskin: Reskin): 
  * shape doesn't match what this expects.
  */
 export function patchMcpToolRendering(): void {
-  try {
-    const proto = ExtensionRunner.prototype as unknown as Record<PropertyKey, unknown> & {
-      [PATCHED]?: boolean;
-    };
-    if (proto[PATCHED]) return;
-
-    const original = proto.getToolDefinition;
-    if (typeof original !== "function") {
-      throw new Error("ExtensionRunner.prototype is missing getToolDefinition");
-    }
-
-    proto.getToolDefinition = function (
-      this: unknown,
-      toolName: string,
-    ): McpDefinition | undefined {
-      const definition = (
-        original as (this: unknown, toolName: string) => McpDefinition | undefined
-      ).call(this, toolName);
-      if (!definition) return definition;
-      const reskin = reskinFor(toolName);
-      if (!reskin) return definition;
-      return wrapDefinition(definition, toolName, reskin);
-    };
-
-    Object.defineProperty(proto, PATCHED, { value: true, configurable: true });
-  } catch (error) {
+  patchToolDefinitionLookup(reskinToolDefinition, (error) => {
     console.warn(`[jpi-style] could not restyle MCP tool rendering: ${errorMessage(error)}`);
-  }
+  });
 }

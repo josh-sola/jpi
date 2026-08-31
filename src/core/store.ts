@@ -4,7 +4,7 @@ import { mkdir, readdir, readFile, rename, unlink, writeFile } from "node:fs/pro
 import { homedir } from "node:os";
 
 import { errorMessage } from "./errors.ts";
-import { getAgentDirectory } from "./agent-dir.ts";
+import { getAgentDirectory } from "../pi/index.ts";
 
 export type StoreReadResult = { value: unknown } | { missing: true } | { problem: string };
 export type StoreTextReadResult = { value: string } | { missing: true } | { problem: string };

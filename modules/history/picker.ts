@@ -13,6 +13,7 @@ import {
 } from "@earendil-works/pi-tui";
 
 import { BorderBox } from "../../src/core/index.ts";
+import { matchIndices } from "../../src/pi/editor.ts";
 import type { PromptEntry } from "./store.ts";
 
 const MAX_VISIBLE = 12;
@@ -54,38 +55,6 @@ export function rankPrompts(entries: readonly PromptEntry[], query: string): Pro
   const trimmed = query.trim();
   if (!trimmed) return [...entries];
   return fuzzyFilter([...entries], trimmed, (entry) => entry.text);
-}
-
-/**
- * Greedy in-order case-insensitive character walk, mirroring pi-tui's
- * fuzzyMatch loop (minus its letter/digit-swap fallback). Tokens are
- * whitespace/slash separated, same as fuzzyFilter; a token that doesn't
- * fully match contributes no indices.
- */
-export function matchIndices(query: string, text: string): Set<number> {
-  const indices = new Set<number>();
-  const trimmed = query.trim();
-  if (!trimmed) return indices;
-
-  const textLower = text.toLowerCase();
-  const tokens = trimmed.split(/[\s/]+/).filter((token) => token.length > 0);
-
-  for (const token of tokens) {
-    const tokenLower = token.toLowerCase();
-    const tokenIndices: number[] = [];
-    let tokenIndex = 0;
-    for (let i = 0; i < textLower.length && tokenIndex < tokenLower.length; i++) {
-      if (textLower[i] === tokenLower[tokenIndex]) {
-        tokenIndices.push(i);
-        tokenIndex++;
-      }
-    }
-    if (tokenIndex === tokenLower.length) {
-      for (const index of tokenIndices) indices.add(index);
-    }
-  }
-
-  return indices;
 }
 
 export interface RowMeta {

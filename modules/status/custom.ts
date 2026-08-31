@@ -1,6 +1,7 @@
 import { dirname, resolve } from "node:path";
 
-import { errorMessage, type NotifyLevel } from "../../src/core/index.ts";
+import { errorMessage } from "../../src/core/index.ts";
+import type { NotifyLevel } from "../../src/pi/index.ts";
 import type { ExecCommand, RepositoryMetadata } from "./data.ts";
 import type { StatusLineFormat } from "./layout.ts";
 

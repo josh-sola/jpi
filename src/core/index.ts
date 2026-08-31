@@ -1,4 +1,3 @@
-export { getAgentDirectory } from "./agent-dir.ts";
 export { errorMessage } from "./errors.ts";
 export { isRecord } from "./guards.ts";
 export {
@@ -25,7 +24,6 @@ export { writeJsonAtomic } from "./durable-write.ts";
 export { type DurationParts, splitDuration, truncateEnd, truncateMiddle } from "./format.ts";
 export { memoriesRoot } from "./memories-dir.ts";
 export { injectEnabled, type JpiModule, type ModuleContext, type WithEnabled } from "./module.ts";
-export type { BeforeAgentStartEvent, EventBus, Notifier, NotifyLevel } from "./pi-types.ts";
 export { projectSlug } from "./project-slug.ts";
 export {
   asString,
@@ -39,7 +37,6 @@ export {
   isWithinRoot,
   plural,
   relativizePath,
-  resolveMarkdownTheme,
   ToolHeader,
   ToolResultLine,
   type BulletState,

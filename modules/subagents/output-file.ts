@@ -142,6 +142,8 @@ export function streamToOutputFile(
 
   const unsubscribe = session.subscribe((event: AgentSessionEvent) => {
     if (event.type === "turn_end") flush();
+    // pi-internal(compaction-trim-timing): the queueMicrotask deferral below
+    // depends on pi's overflow-retry trim order (#145) — see this comment.
     // Compaction replaces session.messages with a shorter, summarized array,
     // leaving writtenCount past the new end — without re-anchoring, the flush
     // loop would never match again and streaming would halt for good (#145).

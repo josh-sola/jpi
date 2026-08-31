@@ -26,32 +26,10 @@
  */
 
 import { existsSync } from "node:fs";
-import { join, sep } from "node:path";
-import { getAgentDir } from "@earendil-works/pi-coding-agent";
+import { sep } from "node:path";
+import { type AgentFileLocation, findAgentFile, workspaceAgentsDir } from "../../src/pi/index.ts";
 import { parseAgentFrontmatter } from "./custom-agents.ts";
 import type { AgentConfig } from "./types.ts";
-
-export type AgentFileLocation = "workspace" | "personal";
-
-export const workspaceAgentsDir = (cwd: string = process.cwd()) => join(cwd, ".agents", "agents");
-export const personalAgentsDir = () => join(getAgentDir(), "agents");
-
-/**
- * Find the file path of a custom agent by name, in discovery-precedence order
- * (workspace, then global). Mirrors the load-side precedence in
- * custom-agents.ts — if the two drift, `/agents` edits a file the loader
- * isn't reading.
- */
-export function findAgentFile(
-  name: string,
-  cwd: string = process.cwd(),
-): { path: string; location: AgentFileLocation } | undefined {
-  const workspacePath = join(workspaceAgentsDir(cwd), `${name}.md`);
-  if (existsSync(workspacePath)) return { path: workspacePath, location: "workspace" };
-  const personalPath = join(personalAgentsDir(), `${name}.md`);
-  if (existsSync(personalPath)) return { path: personalPath, location: "personal" };
-  return undefined;
-}
 
 /**
  * Find the file behind a *loaded* agent, preferring the path the loader
