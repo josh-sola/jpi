@@ -1476,6 +1476,96 @@ test("run review requests skip binary and oversize files", async (t) => {
   assert.doesNotMatch(hugeCalls[0].context.messages[0].content[0].text, /Script contents/);
 });
 
+test("isToolAllowlisted allows a zsh run's inline readonly script", () => {
+  const config = bashConfig();
+  assert.equal(
+    isToolAllowlisted(config, {
+      toolName: "run",
+      input: { language: "zsh", script: "git status" },
+    }),
+    true,
+  );
+});
+
+test("isToolAllowlisted allows a zsh run's inline script matching an allow.bash pattern", () => {
+  const config = bashConfig({
+    readonly: false,
+    allowBash: [{ source: "^git diff --check$", regex: /^git diff --check$/ }],
+  });
+  assert.equal(
+    isToolAllowlisted(config, {
+      toolName: "run",
+      input: { language: "zsh", script: "git diff --check" },
+    }),
+    true,
+  );
+});
+
+test("isToolAllowlisted reviews a zsh run when one line of a multi-line script is not readonly", () => {
+  const config = bashConfig();
+  assert.equal(
+    isToolAllowlisted(config, {
+      toolName: "run",
+      input: { language: "zsh", script: "git status\nrm -rf /" },
+    }),
+    false,
+  );
+});
+
+test("isToolAllowlisted reviews a typescript run even with a readonly-looking script", () => {
+  const config = bashConfig();
+  assert.equal(
+    isToolAllowlisted(config, {
+      toolName: "run",
+      input: { language: "typescript", script: "console.log('git status')" },
+    }),
+    false,
+  );
+});
+
+test("isToolAllowlisted reviews a zsh run that declares dependencies", () => {
+  const config = bashConfig();
+  assert.equal(
+    isToolAllowlisted(config, {
+      toolName: "run",
+      input: { language: "zsh", script: "git status", dependencies: ["foo"] },
+    }),
+    false,
+  );
+});
+
+test("isToolAllowlisted reviews a run call with neither script nor file", () => {
+  const config = bashConfig();
+  assert.equal(isToolAllowlisted(config, { toolName: "run", input: { language: "zsh" } }), false);
+});
+
+test("isToolAllowlisted allows a file-based zsh run whose file contains a readonly script", async (t) => {
+  const cwd = await withTempCwd(t);
+  await writeFile(join(cwd, "check.zsh"), "git status\n", "utf8");
+  const config = bashConfig();
+  assert.equal(
+    isToolAllowlisted(
+      config,
+      { toolName: "run", input: { language: "zsh", file: "check.zsh" } },
+      cwd,
+    ),
+    true,
+  );
+});
+
+test("isToolAllowlisted reviews a file-based zsh run whose file cannot be read", async (t) => {
+  const cwd = await withTempCwd(t);
+  const config = bashConfig();
+  assert.equal(
+    isToolAllowlisted(
+      config,
+      { toolName: "run", input: { language: "zsh", file: "missing.zsh" } },
+      cwd,
+    ),
+    false,
+  );
+});
+
 test("scratchpad-root writes and edits skip review while other calls stay reviewed", async (t) => {
   const { dir, env } = await withTempEnv(t);
   await writeGuardianConfig(dir, '  model "openai/reviewer"');
