@@ -806,7 +806,7 @@ test("metadata loading uses bounded git and wt commands and degrades optional fi
       ["git rev-parse --path-format=absolute --git-common-dir", "/repo/.git\n"],
       ["git branch --show-current", "josh/pi-status-line\n"],
       ["git remote get-url origin", "git@github.com:josh-sola/jrepo.git\n"],
-      ["wt name --path /trees/uuid", "Pi status line\n"],
+      ["wt tree name --path /trees/uuid", "Pi status line\n"],
       ["wt stack --json --all-branches", stackJson([])],
     ]);
     return outputs.has(key) ? ok(outputs.get(key)!) : { ...ok(), code: 1 };
@@ -817,6 +817,17 @@ test("metadata loading uses bounded git and wt commands and degrades optional fi
   assert.equal(metadata.worktree!.name, "Pi status line");
   assert.equal(metadata.branch, undefined);
   assert.ok(calls.every((call) => call.options?.timeout === 3_000));
+  assert.ok(
+    calls.some(
+      (call) =>
+        call.command === "wt" &&
+        call.args.length === 4 &&
+        call.args[0] === "tree" &&
+        call.args[1] === "name" &&
+        call.args[2] === "--path" &&
+        call.args[3] === "/trees/uuid",
+    ),
+  );
   assert.ok(calls.some((call) => call.command === "wt" && call.args[0] === "stack"));
 });
 

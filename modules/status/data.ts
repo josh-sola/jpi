@@ -295,7 +295,7 @@ export async function loadRepositoryMetadata(
   const linkedWorktree = gitDir !== commonGitDir;
   const [friendlyName, stackJson] = await Promise.all([
     linkedWorktree
-      ? run(exec, "wt", ["name", "--path", topLevel], topLevel, signal)
+      ? run(exec, "wt", ["tree", "name", "--path", topLevel], topLevel, signal)
       : Promise.resolve(undefined),
     run(exec, "wt", ["stack", "--json", "--all-branches"], topLevel, signal, STACK_OUTPUT_LIMIT),
   ]);
