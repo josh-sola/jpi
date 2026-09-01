@@ -18,13 +18,8 @@ import {
   computeRowHighlightRange,
   deleteRangeFromLines,
   installMouseSupport,
-  isLeftButtonRelevant,
-  isMotionEvent,
-  isRightButton,
-  isWheelEvent,
   mapScreenPointToPosition,
   normalizeSelection,
-  parseSgrMouseEvent,
   type Position,
   type Selection,
   type VisualLine,
@@ -34,6 +29,13 @@ import {
   computeMaxVisibleLines,
   computePaddingX,
 } from "../../src/pi/editor.ts";
+import {
+  isLeftButtonRelevant,
+  isMotionEvent,
+  isRightButton,
+  isWheelEvent,
+  parseSgrMouseEvent,
+} from "../../src/pi/mouse.ts";
 
 function sgr(button: number, col: number, row: number, release = false): string {
   return `\x1b[<${button};${col + 1};${row + 1}${release ? "m" : "M"}`;

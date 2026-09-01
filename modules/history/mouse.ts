@@ -11,21 +11,19 @@ import {
   type MinimalLayoutFrame,
   patchViewportInput,
 } from "../../src/pi/editor.ts";
+import {
+  isLeftButtonRelevant,
+  isMotionEvent,
+  isRightButton,
+  isWheelEvent,
+  parseSgrMouseEvent,
+  type SgrMouseEvent,
+} from "../../src/pi/mouse.ts";
 
 const FOCUS_IN = "\x1b[I";
 const FOCUS_OUT = "\x1b[O";
-const SGR_MOUSE_RE = /^\x1b\[<(\d+);(\d+);(\d+)([Mm])$/;
 
 const graphemeSegmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
-
-export interface SgrMouseEvent {
-  readonly button: number;
-  /** 0-based screen column. */
-  readonly x: number;
-  /** 0-based screen row. */
-  readonly y: number;
-  readonly release: boolean;
-}
 
 export interface Position {
   /** Index into the editor's logical lines. */
@@ -141,39 +139,6 @@ export interface RowHighlightRange {
   readonly startCol: number;
   /** Exclusive. */
   readonly endCol: number;
-}
-
-// ---------------------------------------------------------------------------
-// SGR mouse parsing and classification (pure)
-// ---------------------------------------------------------------------------
-
-export function parseSgrMouseEvent(data: string): SgrMouseEvent | undefined {
-  const match = SGR_MOUSE_RE.exec(data);
-  if (!match) return undefined;
-  return {
-    button: Number.parseInt(match[1]!, 10),
-    x: Number.parseInt(match[2]!, 10) - 1,
-    y: Number.parseInt(match[3]!, 10) - 1,
-    release: match[4] === "m",
-  };
-}
-
-export function isWheelEvent(event: SgrMouseEvent): boolean {
-  return (event.button & 64) !== 0;
-}
-
-export function isRightButton(event: SgrMouseEvent): boolean {
-  return (event.button & 3) === 2;
-}
-
-export function isMotionEvent(event: SgrMouseEvent): boolean {
-  return (event.button & 32) !== 0;
-}
-
-/** True for a left-button press/drag, or a release (some terminals report button 3 — "unspecified" — on release). */
-export function isLeftButtonRelevant(event: SgrMouseEvent): boolean {
-  const low = event.button & 3;
-  return low === 0 || (event.release && low === 3);
 }
 
 // ---------------------------------------------------------------------------

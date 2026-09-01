@@ -31,6 +31,15 @@ export {
   toolCallName,
 } from "./messages.ts";
 export { getModelRuntime } from "./model-registry.ts";
+export {
+  isLeftButtonRelevant,
+  isMotionEvent,
+  isRightButton,
+  isWheelEvent,
+  parseSgrMouseEvent,
+  type SgrMouseEvent,
+  verticalWheelDirection,
+} from "./mouse.ts";
 export { getSessionTokens, type SessionLike, type SessionStatsLike } from "./session-stats.ts";
 export {
   type AgentFileLocation,
