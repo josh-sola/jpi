@@ -35,7 +35,6 @@ packages=(
   "git:github.com/josh-sola/jpi"
   "npm:pi-mcp-adapter"
   "npm:@juicesharp/rpiv-ask-user-question"
-  "npm:pi-schedule-prompt"
   "npm:pi-rewind"
 )
 

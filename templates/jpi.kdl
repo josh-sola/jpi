@@ -52,7 +52,6 @@ guardian {
     tool "steer_subagent"
     tool "TaskCreate"
     tool "TaskUpdate"
-    tool "schedule_prompt"
     // regexes; a full command match skips review
     bash "^git.*$"
     bash "^gh.*$"
@@ -112,6 +111,13 @@ prompt {
   enabled #true
 }
 
+// schedule/list_schedules/stop_schedule: cron-scheduled prompts injected into this session's chat; /schedule
+schedule {
+  enabled #true
+  // most scheduled prompts a session may hold at once
+  max-schedules 10
+}
+
 // steers temp files into a per-session scratch dir and sweeps stale ones
 scratchpad {
   enabled #true
@@ -125,7 +131,7 @@ status {
   format {
     // status line rows, top to bottom
     row "@jpi/model" "@jpi/context" "@jpi/repository" "@jpi/branch"
-    row "@jpi-guardian/review-mode" "@jpi-background/tasks" "@jpi-background/monitors" "@jpi/slot"
+    row "@jpi-guardian/review-mode" "@jpi-background/tasks" "@jpi-background/monitors" "@jpi-schedule/prompts" "@jpi/slot"
   }
   // built-in statuses to hide
 }

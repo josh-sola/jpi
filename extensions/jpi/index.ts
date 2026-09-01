@@ -10,6 +10,7 @@ import guardianModule from "../../modules/guardian/module.ts";
 import historyModule from "../../modules/history/module.ts";
 import memoryModule from "../../modules/memory/module.ts";
 import promptModule from "../../modules/prompt/module.ts";
+import scheduleModule from "../../modules/schedule/module.ts";
 import scratchpadModule from "../../modules/scratchpad/module.ts";
 import statusModule from "../../modules/status/module.ts";
 import styleModule from "../../modules/style/module.ts";
@@ -35,6 +36,7 @@ const MODULES: readonly JpiModule[] = [
   tasksModule,
   scratchpadModule,
   btwModule,
+  scheduleModule,
   styleModule,
   historyModule,
 ];
