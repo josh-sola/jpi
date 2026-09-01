@@ -1,4 +1,5 @@
 export { setSystemPrompt, pushMessages, wrapBeforeToolCall } from "./agent.ts";
+export { patchAssistantMessage, type AssistantMessageThemeResolver } from "./assistant-message.ts";
 export {
   computeLayoutWidth,
   computeMaxVisibleLines,
