@@ -30,8 +30,11 @@ import {
 } from "@earendil-works/pi-tui";
 import {
   asBashExecution,
+  isWheelEvent,
+  parseSgrMouseEvent,
   resolveWidgetMarkdownTheme,
   toolCallName,
+  verticalWheelDirection,
   type WidgetTheme,
 } from "../../../src/pi/index.ts";
 import { renderAgentName } from "../agent-color.ts";
@@ -52,6 +55,8 @@ import { createViewerKeys, type ViewerKeybindings, type ViewerKeys } from "./vie
 /** Base lines consumed by chrome: top border + header + header sep + footer sep + footer + bottom border. */
 const CHROME_LINES_BASE = 6;
 const MIN_VIEWPORT = 3;
+/** Lines scrolled per wheel tick — a coarser step than the arrow-key line-scroll. */
+const WHEEL_SCROLL_LINES = 3;
 /**
  * Height ceiling shared by the overlay's `maxHeight` and the viewer's internal
  * viewport cap. 100 makes the overlay a full-screen swap rather than a
@@ -205,6 +210,18 @@ export class ConversationViewer implements Component {
   }
 
   handleInput(data: string): void {
+    // pi defers raw SGR mouse bytes to a focused overlay's handleInput rather than
+    // parsing them itself, so this has to happen first — before any key matching,
+    // or the composer/steer routing below, could mistake them for text input.
+    const mouseEvent = parseSgrMouseEvent(data);
+    if (mouseEvent) {
+      if (isWheelEvent(mouseEvent)) {
+        const direction = verticalWheelDirection(mouseEvent);
+        if (direction !== undefined) this.handleWheel(direction);
+      }
+      return;
+    }
+
     // While composing a steer message, the input owns all keys (Enter sends,
     // Esc cancels — both wired in openComposer()). Editing keys flow through.
     if (this.composer) {
@@ -449,6 +466,19 @@ export class ConversationViewer implements Component {
   }
 
   // ---- Private ----
+
+  /** Keep in sync with the scroll-key branches in handleInput. */
+  private handleWheel(direction: -1 | 1): void {
+    const contentLines = this.buildContentLines(this.lastInnerW);
+    this.pendingContentLines = { width: this.lastInnerW, lines: contentLines };
+    const maxScroll = Math.max(0, contentLines.length - this.viewportHeight());
+
+    this.scrollOffset = Math.max(
+      0,
+      Math.min(maxScroll, this.scrollOffset + direction * WHEEL_SCROLL_LINES),
+    );
+    this.autoScroll = this.scrollOffset >= maxScroll;
+  }
 
   private viewportHeight(): number {
     // Cap mirrors the overlay's maxHeight — otherwise the viewer would render

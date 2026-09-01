@@ -19,6 +19,15 @@ const SHIFT_DOWN = "\x1b[1;2B";
 const PAGE_UP = "\x1b[5~";
 const PAGE_DOWN = "\x1b[6~";
 
+function sgr(button: number, col: number, row: number): string {
+  return `\x1b[<${button};${col + 1};${row + 1}M`;
+}
+
+const WHEEL_UP = sgr(64, 0, 0);
+const WHEEL_DOWN = sgr(65, 0, 0);
+const WHEEL_HORIZONTAL = sgr(66, 0, 0);
+const LEFT_CLICK = sgr(0, 0, 0);
+
 function createEmacsKeybindings(): KeybindingsManager {
   return new KeybindingsManager(TUI_KEYBINDINGS, {
     "tui.select.up": ["up", "ctrl+p"],
@@ -70,6 +79,10 @@ function createViewer(keybindings?: ViewerKeybindings) {
 
 function scrollOffset(viewer: ConversationViewer): number {
   return (viewer as any).scrollOffset;
+}
+
+function autoScroll(viewer: ConversationViewer): boolean {
+  return (viewer as any).autoScroll;
 }
 
 describe("viewer-keys", () => {
@@ -153,5 +166,68 @@ describe("ConversationViewer custom keybindings", () => {
     expect(scrollOffset(viewer)).toBe(bottom);
     viewer.handleInput(UP);
     expect(scrollOffset(viewer)).toBe(bottom - 1);
+  });
+});
+
+describe("ConversationViewer mouse wheel", () => {
+  it("scrolls up 3 lines and disengages autoScroll", () => {
+    const viewer = createViewer();
+    const bottom = scrollOffset(viewer);
+    expect(autoScroll(viewer)).toBe(true);
+
+    viewer.handleInput(WHEEL_UP);
+
+    expect(scrollOffset(viewer)).toBe(bottom - 3);
+    expect(autoScroll(viewer)).toBe(false);
+  });
+
+  it("scrolls down 3 lines and re-engages autoScroll once back at the bottom", () => {
+    const viewer = createViewer();
+    const bottom = scrollOffset(viewer);
+    viewer.handleInput(WHEEL_UP);
+    expect(autoScroll(viewer)).toBe(false);
+
+    viewer.handleInput(WHEEL_DOWN);
+
+    expect(scrollOffset(viewer)).toBe(bottom);
+    expect(autoScroll(viewer)).toBe(true);
+  });
+
+  it("clamps wheel-up at the top", () => {
+    const viewer = createViewer();
+
+    for (let i = 0; i < 100; i++) viewer.handleInput(WHEEL_UP);
+
+    expect(scrollOffset(viewer)).toBe(0);
+  });
+
+  it("clamps wheel-down at the bottom", () => {
+    const viewer = createViewer();
+    const bottom = scrollOffset(viewer);
+
+    for (let i = 0; i < 100; i++) viewer.handleInput(WHEEL_DOWN);
+
+    expect(scrollOffset(viewer)).toBe(bottom);
+    expect(autoScroll(viewer)).toBe(true);
+  });
+
+  it("consumes a non-wheel SGR sequence without changing scrollOffset", () => {
+    const viewer = createViewer();
+    const bottom = scrollOffset(viewer);
+
+    viewer.handleInput(LEFT_CLICK);
+
+    expect(scrollOffset(viewer)).toBe(bottom);
+    expect(autoScroll(viewer)).toBe(true);
+  });
+
+  it("ignores a horizontal wheel tick", () => {
+    const viewer = createViewer();
+    const bottom = scrollOffset(viewer);
+
+    viewer.handleInput(WHEEL_HORIZONTAL);
+
+    expect(scrollOffset(viewer)).toBe(bottom);
+    expect(autoScroll(viewer)).toBe(true);
   });
 });
