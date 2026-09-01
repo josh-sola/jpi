@@ -2,7 +2,13 @@ import { join } from "node:path";
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
-import { Store, type Config, type WithEnabled } from "../../src/core/index.ts";
+import {
+  SCHEDULES_CHANNEL,
+  SCHEDULES_SCHEMA,
+  Store,
+  type Config,
+  type WithEnabled,
+} from "../../src/core/index.ts";
 import { getAgentDirectory } from "../../src/pi/index.ts";
 import type { scheduleSchema } from "./config.ts";
 import { SCHEDULE_NOTIFICATION_TYPE, renderScheduleNotification } from "./notification-renderer.ts";
@@ -50,6 +56,16 @@ export function registerSchedule(
 
   const chip = createStatusChip(registry);
   let component: ScheduleOverlay | undefined;
+
+  function emitSchedules(): void {
+    pi.events.emit(SCHEDULES_CHANNEL, {
+      schema: SCHEDULES_SCHEMA,
+      schedules: registry.list().map((schedule) => ({ id: schedule.id })),
+    });
+  }
+
+  // Subscribed once for the process lifetime, same as the status chip.
+  registry.onChange(emitSchedules);
 
   for (const tool of createScheduleTools({ registry })) pi.registerTool(tool);
   pi.registerMessageRenderer(SCHEDULE_NOTIFICATION_TYPE, renderScheduleNotification);
@@ -100,6 +116,11 @@ export function registerSchedule(
 
     const persisted = await loadScheduleFile(store, sessionId);
     registry.restore(persisted);
+
+    // restore()'s onChange fire can race a subscriber that hasn't wired up
+    // yet (jpi-title subscribes during its own session_start handler), so
+    // re-emit once more on the next turn to guarantee it sees the set.
+    setTimeout(emitSchedules, 0);
 
     chip.start(ctx);
 

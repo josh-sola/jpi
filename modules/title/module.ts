@@ -17,6 +17,8 @@ const titleModule: JpiModule = {
     pi.on("session_info_changed", extension.onSessionInfoChanged);
     pi.on("agent_start", extension.onAgentStart);
     pi.on("agent_settled", extension.onAgentSettled);
+    pi.on("ui_prompt_start", extension.onUiPromptStart);
+    pi.on("ui_prompt_end", extension.onUiPromptEnd);
     pi.on("session_shutdown", extension.onSessionShutdown);
   },
 };

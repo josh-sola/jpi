@@ -42,5 +42,5 @@ test("repeated session starts ignore stale worktree results and callbacks", asyn
   await oldStart;
   assert.equal(scheduler.active("timeout", 0).length, 0);
   assert.equal(titles.length, titleCount);
-  assert.equal(events.unsubscribed, 6);
+  assert.equal(events.unsubscribed, 7);
 });

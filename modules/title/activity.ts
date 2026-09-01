@@ -1,9 +1,20 @@
-import { ACTIVE_FRAMES, IDLE_INDICATOR, SPINNER_INTERVAL_MS, type Scheduler } from "./helpers.ts";
+import {
+  ACTIVE_FRAMES,
+  IDLE_INDICATOR,
+  INPUT_INDICATOR,
+  SPINNER_INTERVAL_MS,
+  WAITING_INDICATOR,
+  type Scheduler,
+} from "./helpers.ts";
+
+type State = "input" | "working" | "waiting" | "idle";
 
 export class ActivityTitle {
   private main = false;
   private backgroundProviders = new Set<string>();
   private subagents = new Set<string>();
+  private scheduleActive = false;
+  private prompts = 0;
   private frame = 0;
   private timer?: unknown;
   private disposed = false;
@@ -43,6 +54,25 @@ export class ActivityTitle {
     });
   }
 
+  setScheduleActive(active: boolean): void {
+    this.change(() => {
+      this.scheduleActive = active;
+    });
+  }
+
+  /** Prompts can nest, so track a count rather than a flag. */
+  startPrompt(): void {
+    this.change(() => {
+      this.prompts += 1;
+    });
+  }
+
+  endPrompt(): void {
+    this.change(() => {
+      if (this.prompts > 0) this.prompts -= 1;
+    });
+  }
+
   refresh(): void {
     if (!this.disposed) this.render();
   }
@@ -55,16 +85,20 @@ export class ActivityTitle {
     this.main = false;
     this.backgroundProviders.clear();
     this.subagents.clear();
+    this.scheduleActive = false;
+    this.prompts = 0;
     this.setTitle(`${IDLE_INDICATOR} ${this.getName()}`);
   }
 
   private change(update: () => void): void {
     if (this.disposed) return;
-    const wasActive = this.active();
+    const before = this.state();
     update();
-    const active = this.active();
-    if (!wasActive && active) this.start();
-    if (wasActive && !active) this.stop();
+    const after = this.state();
+    if (before === after) return;
+    if (after === "working") this.start();
+    else if (before === "working") this.stop();
+    else this.render();
   }
 
   private start(): void {
@@ -85,11 +119,23 @@ export class ActivityTitle {
   }
 
   private render(): void {
-    const indicator = this.active() ? ACTIVE_FRAMES[this.frame] : IDLE_INDICATOR;
-    this.setTitle(`${indicator} ${this.getName()}`);
+    this.setTitle(this.text());
   }
 
-  private active(): boolean {
-    return this.main || this.backgroundProviders.size > 0 || this.subagents.size > 0;
+  private text(): string {
+    const state = this.state();
+    if (state === "input") return `${INPUT_INDICATOR} ${this.getName()}`;
+    if (state === "working") return `${ACTIVE_FRAMES[this.frame]} ${this.getName()}`;
+    if (state === "waiting") return `${WAITING_INDICATOR} ${this.getName()}`;
+    return `${IDLE_INDICATOR} ${this.getName()}`;
+  }
+
+  private state(): State {
+    if (this.prompts > 0) return "input";
+    if (this.main) return "working";
+    if (this.backgroundProviders.size > 0 || this.subagents.size > 0 || this.scheduleActive) {
+      return "waiting";
+    }
+    return "idle";
   }
 }

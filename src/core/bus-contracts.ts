@@ -17,6 +17,23 @@ export function jpiBackgroundRunningIds(data: unknown): Set<string> | undefined 
   return ids;
 }
 
+// jpi-schedule's schedules-level channel. Level semantics, replace-set: each
+// payload is the full current set of armed schedules. jpi-title reads this
+// channel directly — the string value is an external contract.
+export const SCHEDULES_CHANNEL = "jpi-schedule:schedules:v1";
+export const SCHEDULES_SCHEMA = "jpi-schedule.schedules.v1";
+
+export function scheduleIds(data: unknown): Set<string> | undefined {
+  if (!isRecord(data) || data.schema !== SCHEDULES_SCHEMA || !Array.isArray(data.schedules)) {
+    return undefined;
+  }
+  const ids = new Set<string>();
+  for (const schedule of data.schedules) {
+    if (isRecord(schedule) && typeof schedule.id === "string" && schedule.id) ids.add(schedule.id);
+  }
+  return ids;
+}
+
 // jpi-subagents' fleet-render handshake, received over `pi.events`. Neither
 // side importing the other's module is the point — this pair of constants and
 // the payload shape are the whole contract between them.

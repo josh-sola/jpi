@@ -16,6 +16,8 @@ export type TitleExtension = {
   onSessionInfoChanged(event: unknown, context: TitleContext): void;
   onAgentStart(event: unknown, context: TitleContext): void;
   onAgentSettled(event: unknown, context: TitleContext): void;
+  onUiPromptStart(event: unknown, context: TitleContext): void;
+  onUiPromptEnd(event: unknown, context: TitleContext): void;
   onSessionShutdown(event: unknown, context: TitleContext): void;
 };
 
@@ -64,6 +66,14 @@ export function createTitleExtension(dependencies: TitleDependencies): TitleExte
 
     onAgentSettled() {
       activeController?.setMainActive(false);
+    },
+
+    onUiPromptStart() {
+      activeController?.startUiPrompt();
+    },
+
+    onUiPromptEnd() {
+      activeController?.endUiPrompt();
     },
 
     onSessionShutdown() {

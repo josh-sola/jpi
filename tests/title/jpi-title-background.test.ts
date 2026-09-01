@@ -40,7 +40,7 @@ test("background status polling and terminal refresh use the documented protocol
     payload: {},
   });
   events.emit(RESPONSE_CHANNEL, statusResponse(requests(events)[0]!, ["running", "completed"]));
-  assert.equal(titles.at(-1), "◐ tree");
+  assert.equal(titles.at(-1), "⧗ tree");
 
   extension.onAgentStart({}, context);
   events.emit(TERMINAL_CHANNEL, { task: { id: "done" } });
@@ -88,7 +88,7 @@ test("shutdown clears session listeners and every timer while ignoring stale loo
   extension.onSessionShutdown({}, context);
   assert.equal(titles.at(-1), "⏹ project");
   assert.equal(lookupSignal?.aborted, true);
-  assert.equal(events.unsubscribed, 6);
+  assert.equal(events.unsubscribed, 7);
   assert.ok(scheduler.timers.every((timer) => timer.cleared));
 
   const titleCount = titles.length;

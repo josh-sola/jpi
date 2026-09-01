@@ -73,6 +73,64 @@ test("startup defers the idle title until after worktree lookup and rename is sy
   assert.equal(ctx.titles.at(-1), "⏹ Renamed Session");
 });
 
+test("startup re-asserts the title at 600ms and 1200ms to survive tmux's rename throttle", async () => {
+  const scheduler = new ManualScheduler();
+  const events = new FakeEventBus();
+  const ctx = context();
+  const extension = createTitleExtension({
+    exec: async () => ok("tree"),
+    events,
+    getSessionName: () => undefined,
+    scheduler,
+    requestId: () => "request",
+  });
+
+  await extension.onSessionStart({}, ctx.value);
+  scheduler.fire(scheduler.active("timeout", 0)[0]!);
+  assert.equal(ctx.titles.at(-1), "⏹ tree");
+
+  const reassert600 = scheduler.active("timeout", 600);
+  const reassert1200 = scheduler.active("timeout", 1200);
+  assert.equal(reassert600.length, 1);
+  assert.equal(reassert1200.length, 1);
+
+  const before = ctx.titles.length;
+  scheduler.fire(reassert600[0]!);
+  assert.equal(ctx.titles.length, before + 1);
+  assert.equal(ctx.titles.at(-1), "⏹ tree");
+
+  scheduler.fire(reassert1200[0]!);
+  assert.equal(ctx.titles.length, before + 2);
+  assert.equal(ctx.titles.at(-1), "⏹ tree");
+});
+
+test("shutdown before the reasserts fire clears them", async () => {
+  const scheduler = new ManualScheduler();
+  const events = new FakeEventBus();
+  const ctx = context();
+  const extension = createTitleExtension({
+    exec: async () => ok("tree"),
+    events,
+    getSessionName: () => undefined,
+    scheduler,
+    requestId: () => "request",
+  });
+
+  await extension.onSessionStart({}, ctx.value);
+  scheduler.fire(scheduler.active("timeout", 0)[0]!);
+  const reassert600 = scheduler.active("timeout", 600)[0]!;
+  const reassert1200 = scheduler.active("timeout", 1200)[0]!;
+
+  extension.onSessionShutdown({}, ctx.value);
+  assert.equal(reassert600.cleared, true);
+  assert.equal(reassert1200.cleared, true);
+
+  const titleCount = ctx.titles.length;
+  scheduler.fire(reassert600);
+  scheduler.fire(reassert1200);
+  assert.equal(ctx.titles.length, titleCount);
+});
+
 test("non-TUI sessions install no title behavior", async () => {
   const scheduler = new ManualScheduler();
   const events = new FakeEventBus();

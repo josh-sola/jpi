@@ -8,9 +8,15 @@ import {
   type Scheduler,
 } from "./helpers.ts";
 import { JpiBackgroundActivityMonitor } from "./jpi-background.ts";
+import { ScheduleActivityMonitor } from "./schedule.ts";
 
 const LEGACY_BACKGROUND_PROVIDER = "pi-background-tasks";
 const JPI_BACKGROUND_PROVIDER = "jpi-background";
+
+// tmux drops one of two renames landing in the same ~500ms throttle window
+// (see helpers.ts), so re-assert a couple more times to win the race against
+// core's post-session_start title write.
+const STARTUP_REASSERT_DELAYS_MS = [600, 1200];
 
 export type TitleContext = {
   mode: string;
@@ -36,12 +42,13 @@ function eventId(data: unknown): string | undefined {
 export class TitleController {
   private worktreeName?: string | undefined;
   private unsubscribers: Array<() => void> = [];
-  private startupTimer?: unknown;
+  private startupTimers: unknown[] = [];
   private worktreeLookup = new AbortController();
   private disposed = false;
   private activity: ActivityTitle;
   private background: BackgroundActivityMonitor;
   private jpiBackground: JpiBackgroundActivityMonitor;
+  private schedule: ScheduleActivityMonitor;
   private dependencies: Dependencies;
   private context: TitleContext;
 
@@ -63,6 +70,9 @@ export class TitleController {
     this.jpiBackground = new JpiBackgroundActivityMonitor(dependencies.events, (active) =>
       this.activity.setBackgroundProvider(JPI_BACKGROUND_PROVIDER, active),
     );
+    this.schedule = new ScheduleActivityMonitor(dependencies.events, (active) =>
+      this.activity.setScheduleActive(active),
+    );
   }
 
   async start(): Promise<void> {
@@ -82,6 +92,7 @@ export class TitleController {
     ];
     this.background.start();
     this.jpiBackground.start();
+    this.schedule.start();
     const name = await loadWorktreeName(
       this.dependencies.exec,
       this.context.cwd,
@@ -91,14 +102,20 @@ export class TitleController {
     this.worktreeName = name;
 
     // Core restores its title after awaited session_start handlers, so render next turn.
-    this.startupTimer = this.dependencies.scheduler.setTimeout(() => {
-      this.startupTimer = undefined;
-      if (!this.disposed) this.activity.refresh();
-    }, 0);
+    this.scheduleReassert(0);
+    for (const delay of STARTUP_REASSERT_DELAYS_MS) this.scheduleReassert(delay);
   }
 
   setMainActive(active: boolean): void {
     this.activity.setMain(active);
+  }
+
+  startUiPrompt(): void {
+    this.activity.startPrompt();
+  }
+
+  endUiPrompt(): void {
+    this.activity.endPrompt();
   }
 
   refreshName(): void {
@@ -112,9 +129,17 @@ export class TitleController {
     for (const unsubscribe of this.unsubscribers) unsubscribe();
     this.background.dispose();
     this.jpiBackground.dispose();
-    if (this.startupTimer !== undefined) {
-      this.dependencies.scheduler.clearTimeout(this.startupTimer);
-    }
+    this.schedule.dispose();
+    for (const timer of this.startupTimers) this.dependencies.scheduler.clearTimeout(timer);
+    this.startupTimers = [];
     this.activity.shutdown();
+  }
+
+  private scheduleReassert(delay: number): void {
+    const timer = this.dependencies.scheduler.setTimeout(() => {
+      this.startupTimers = this.startupTimers.filter((entry) => entry !== timer);
+      if (!this.disposed) this.activity.refresh();
+    }, delay);
+    this.startupTimers.push(timer);
   }
 }

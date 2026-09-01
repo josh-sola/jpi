@@ -16,6 +16,9 @@ export {
   type FleetProviderPayload,
   isFleetProviderPayload,
   jpiBackgroundRunningIds,
+  scheduleIds,
+  SCHEDULES_CHANNEL,
+  SCHEDULES_SCHEMA,
   TASKS_CHANNEL,
   TASKS_SCHEMA,
 } from "./bus-contracts.ts";
