@@ -17,6 +17,7 @@ import styleModule from "../../modules/style/module.ts";
 import subagentsModule from "../../modules/subagents/module.ts";
 import tasksModule from "../../modules/tasks/module.ts";
 import titleModule from "../../modules/title/module.ts";
+import exaWebModule from "../../modules/exa-web/module.ts";
 import webModule from "../../modules/web/module.ts";
 
 // Order encodes real constraints, not preference: prompt replaces the system
@@ -30,6 +31,7 @@ const MODULES: readonly JpiModule[] = [
   statusModule,
   memoryModule,
   webModule,
+  exaWebModule,
   titleModule,
   backgroundModule,
   subagentsModule,
@@ -53,13 +55,42 @@ export async function loadModules(
   const issues: string[] = [];
   const failures: string[] = [];
   const decoratedPi = decorateToolRegistration(pi);
+  const loaded: Array<{
+    mod: JpiModule;
+    config: Config<any>;
+    value: any;
+    loadIssues: readonly string[];
+  }> = [];
 
   for (const mod of modules) {
-    const config = new Config(mod.section, injectEnabled(mod.name, mod.schema));
+    const config = new Config(
+      mod.section,
+      injectEnabled(mod.name, mod.schema, mod.enabledByDefault ?? true),
+    );
     const { value, issues: loadIssues } = await config.load();
     for (const issue of loadIssues) issues.push(`${mod.name}: ${issue}`);
+    loaded.push({ mod, config, value, loadIssues });
+  }
 
-    if (!value.enabled) continue;
+  const enabledGroups = new Map<string, typeof loaded>();
+  for (const item of loaded) {
+    if (!item.value.enabled || !item.mod.exclusiveGroup) continue;
+    const group = enabledGroups.get(item.mod.exclusiveGroup) ?? [];
+    group.push(item);
+    enabledGroups.set(item.mod.exclusiveGroup, group);
+  }
+
+  const conflictingModules = new Set<JpiModule>();
+  for (const [group, members] of enabledGroups) {
+    if (members.length < 2) continue;
+    for (const member of members) conflictingModules.add(member.mod);
+    failures.push(
+      `${group}: multiple enabled modules are mutually exclusive (${members.map((member) => member.mod.name).join(", ")}).`,
+    );
+  }
+
+  for (const { mod, config, value, loadIssues } of loaded) {
+    if (!value.enabled || conflictingModules.has(mod)) continue;
 
     try {
       await mod.setup(decoratedPi, { config, value, issues: loadIssues });

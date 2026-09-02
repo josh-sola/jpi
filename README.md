@@ -28,13 +28,13 @@ https://raw.githubusercontent.com/josh-sola/jpi/main/ONBOARDING.md
 
 ## What gets installed
 
-| Package                              | What it is                                                                                                                                                                                                                                                                                                    |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pi-mcp-adapter`                     | Bridges MCP servers into Pi's tool set.                                                                                                                                                                                                                                                                       |
-| `@juicesharp/rpiv-ask-user-question` | Adds an `ask_user_question` tool for mid-task clarification.                                                                                                                                                                                                                                                  |
-| `pi-schedule-prompt`                 | Schedules a prompt to run later.                                                                                                                                                                                                                                                                              |
-| `pi-rewind`                          | Rewinds a session to an earlier point.                                                                                                                                                                                                                                                                        |
-| `jpi`                                | One package holding all of Josh's modules: the system prompt, guardian, status, memory, web, title, background, subagents, tasks, scratchpad, style, and history. Each module has its own stanza in `jpi.kdl`, and setting that stanza's `enabled` field to `#false` turns the module off (restart required). |
+| Package                              | What it is                                                                                                                                                                                                                                                                                                             |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pi-mcp-adapter`                     | Bridges MCP servers into Pi's tool set.                                                                                                                                                                                                                                                                                |
+| `@juicesharp/rpiv-ask-user-question` | Adds an `ask_user_question` tool for mid-task clarification.                                                                                                                                                                                                                                                           |
+| `pi-schedule-prompt`                 | Schedules a prompt to run later.                                                                                                                                                                                                                                                                                       |
+| `pi-rewind`                          | Rewinds a session to an earlier point.                                                                                                                                                                                                                                                                                 |
+| `jpi`                                | One package holding all of Josh's modules: the system prompt, guardian, status, memory, web, exa-web, title, background, subagents, tasks, scratchpad, style, and history. Each module has its own stanza in `jpi.kdl`, and setting that stanza's `enabled` field to `#false` turns the module off (restart required). |
 
 ## What gets configured
 
@@ -82,7 +82,9 @@ Each module's settings live in its own stanza in `jpi.kdl`; setting that
 stanza's `enabled` field to `#false` stops the module from loading at all
 (you need to restart `pi` for the change to take effect — this is different
 from a runtime toggle like `/guardian off`, which only pauses guardian for
-the current session).
+the current session). `web` (Ketch) and `exa-web` (direct Exa REST) are
+mutually exclusive: keep one enabled. `exa-web` is disabled by default and
+uses `api-key` when set, otherwise `EXA_API_KEY`.
 
 Dev commands, run from the repo root:
 

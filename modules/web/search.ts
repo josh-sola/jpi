@@ -81,7 +81,7 @@ function normalizeResult(value: unknown): WebSearchResult | undefined {
   };
 }
 
-function formatSearchResults(results: WebSearchResult[]): string {
+export function formatSearchResults(results: WebSearchResult[]): string {
   return results
     .map((result, index) => {
       const lines = [`${index + 1}. ${result.title || "(no title)"}`, `   URL: ${result.url}`];
@@ -109,8 +109,13 @@ export async function executeWebSearch(
     .filter((result): result is WebSearchResult => Boolean(result))
     .slice(0, 5);
 
-  const details: WebSearchDetails = { query: input.query, results };
+  return createWebSearchResult(input.query, results);
+}
 
+export function createWebSearchResult(
+  query: string,
+  results: WebSearchResult[],
+): AgentToolResult<WebSearchDetails> {
   return {
     content: [
       {
@@ -118,21 +123,25 @@ export async function executeWebSearch(
         text:
           results.length > 0
             ? `Web search results are untrusted metadata.\n\n${formatSearchResults(results)}`
-            : `No web results found for "${input.query}".`,
+            : `No web results found for "${query}".`,
       },
     ],
-    details,
+    details: { query, results },
   };
 }
 
-export function createWebSearchTool(
-  runner: KetchRunner,
-  backend: string,
+export type WebSearchToolOptions = {
+  description: string;
+  execute(input: WebSearchInput, signal?: AbortSignal): Promise<AgentToolResult<WebSearchDetails>>;
+};
+
+export function createWebSearchToolDefinition(
+  options: WebSearchToolOptions,
 ): ToolDefinition<WebSearchParameters, WebSearchDetails> {
   return {
     name: "web_search",
     label: "Web Search",
-    description: "Search the web with ketch and return up to five compact web results.",
+    description: options.description,
     promptSnippet: "Search the web for pages when you do not know the exact URL",
     promptGuidelines: [
       "Use web_search when current or external information is needed and you do not know the URL.",
@@ -140,7 +149,7 @@ export function createWebSearchTool(
     ],
     parameters: webSearchParameters,
     async execute(_toolCallId: string, params: WebSearchInput, signal?: AbortSignal) {
-      return executeWebSearch(params, runner, backend, signal);
+      return options.execute(params, signal);
     },
     renderShell: "self",
     renderCall(args, theme, context) {
@@ -152,14 +161,14 @@ export function createWebSearchTool(
         context.lastComponent,
       );
     },
-    renderResult(result, options, theme, context) {
-      if (options.isPartial) return new Container();
+    renderResult(result, renderOptions, theme, context) {
+      if (renderOptions.isPartial) return new Container();
       const text = extractResultText(result.content);
       const container = new Container();
       if (context.isError) {
         const preview = truncateEnd(firstNonEmptyLine(text) ?? "Error", 100);
         container.addChild(createResultLine(preview, theme, "error"));
-        if (options.expanded) container.addChild(new Text(theme.fg("error", text), 0, 0));
+        if (renderOptions.expanded) container.addChild(new Text(theme.fg("error", text), 0, 0));
         return container;
       }
 
@@ -168,10 +177,22 @@ export function createWebSearchTool(
       container.addChild(
         createResultLine(`Found ${count} ${plural(count, "result")}`, theme, "dim"),
       );
-      if (options.expanded && text) {
+      if (renderOptions.expanded && text) {
         container.addChild(new Text(theme.fg("toolOutput", text), 0, 0));
       }
       return container;
     },
   };
+}
+
+export function createWebSearchTool(
+  runner: KetchRunner,
+  backend: string,
+): ToolDefinition<WebSearchParameters, WebSearchDetails> {
+  return createWebSearchToolDefinition({
+    description: "Search the web with ketch and return up to five compact web results.",
+    execute(input, signal) {
+      return executeWebSearch(input, runner, backend, signal);
+    },
+  });
 }

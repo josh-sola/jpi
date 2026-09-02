@@ -202,8 +202,15 @@ title {
   enabled #true
 }
 
-// web_search and web_fetch, backed by the ketch CLI
+// web_search and web_fetch, backed by the ketch CLI. Enable only one web provider.
 web {
   enabled #true
   backend "ddg"
+}
+
+// web_search and web_fetch, backed directly by Exa. Enable only one web provider.
+exa-web {
+  enabled #false
+  // Exa API key; empty uses EXA_API_KEY
+  api-key ""
 }

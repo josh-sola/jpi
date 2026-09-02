@@ -535,7 +535,7 @@ if (isMain) {
   runCli().catch((error) => {
     process.stderr.write(
       `Warning: could not install ketch: ${error.message}\n` +
-        "web_search and web_fetch will not work until ketch is installed. " +
+        "The Ketch-backed web module will not work until ketch is installed. " +
         "Re-run `node scripts/install-ketch.mjs`, or install ketch on PATH, to recover.\n",
     );
   });

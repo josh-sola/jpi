@@ -130,6 +130,112 @@ test("issues from Config.load are collected prefixed with the module name", asyn
   assert.match(issues[0]!, /^widget: widget\.color: /);
 });
 
+test("a module can default to disabled when its stanza is missing", async (t) => {
+  const directory = await withTempAgentDir(t);
+  let called = false;
+  const mod: JpiModule = {
+    name: "widget",
+    section: "widget",
+    enabledByDefault: false,
+    setup: () => {
+      called = true;
+    },
+  };
+
+  await loadModules(fakePi, [mod]);
+
+  assert.equal(called, false);
+  const text = await readFile(join(directory, "jpi.kdl"), "utf8");
+  assert.match(text, /enabled #false/);
+});
+
+test("an exclusive group runs its sole enabled member", async (t) => {
+  const directory = await withTempAgentDir(t);
+  await writeFile(
+    join(directory, "jpi.kdl"),
+    "first {\n  enabled #false\n}\nsecond {\n  enabled #true\n}\n",
+    "utf8",
+  );
+  const calls: string[] = [];
+  const modules: JpiModule[] = [
+    {
+      name: "first",
+      section: "first",
+      exclusiveGroup: "provider",
+      setup: () => {
+        calls.push("first");
+      },
+    },
+    {
+      name: "second",
+      section: "second",
+      exclusiveGroup: "provider",
+      setup: () => {
+        calls.push("second");
+      },
+    },
+  ];
+
+  const result = await loadModules(fakePi, modules);
+
+  assert.deepEqual(calls, ["second"]);
+  assert.deepEqual(result.failures, []);
+});
+
+test("conflicting exclusive modules skip both setups but keep unrelated modules running", async (t) => {
+  await withTempAgentDir(t);
+  const calls: string[] = [];
+  const modules: JpiModule[] = [
+    {
+      name: "first",
+      section: "first",
+      exclusiveGroup: "provider",
+      setup: () => {
+        calls.push("first");
+      },
+    },
+    {
+      name: "second",
+      section: "second",
+      exclusiveGroup: "provider",
+      setup: () => {
+        calls.push("second");
+      },
+    },
+    {
+      name: "unrelated",
+      section: "unrelated",
+      setup: () => {
+        calls.push("unrelated");
+      },
+    },
+  ];
+
+  const result = await loadModules(fakePi, modules);
+
+  assert.deepEqual(calls, ["unrelated"]);
+  assert.deepEqual(result.failures, [
+    "provider: multiple enabled modules are mutually exclusive (first, second).",
+  ]);
+});
+
+test("exclusive-group conflicts are reported in module order", async (t) => {
+  await withTempAgentDir(t);
+  const modules: JpiModule[] = [
+    { name: "beta-a", section: "beta-a", exclusiveGroup: "beta", setup: () => {} },
+    { name: "alpha-a", section: "alpha-a", exclusiveGroup: "alpha", setup: () => {} },
+    { name: "beta-b", section: "beta-b", exclusiveGroup: "beta", setup: () => {} },
+    { name: "alpha-b", section: "alpha-b", exclusiveGroup: "alpha", setup: () => {} },
+  ];
+
+  const result = await loadModules(fakePi, modules);
+
+  assert.deepEqual(result.failures, [
+    "beta: multiple enabled modules are mutually exclusive (beta-a, beta-b).",
+    "alpha: multiple enabled modules are mutually exclusive (alpha-a, alpha-b).",
+  ]);
+});
+
 test("injectEnabled throws when a module schema declares its own enabled field", () => {
   const schema = j.node({
     fields: { enabled: j.boolean().describe("nope").default(true) },

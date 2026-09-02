@@ -27,6 +27,10 @@ export interface JpiModule<S extends AnyJpiNodeSpec = AnyJpiNodeSpec> {
   readonly section: string;
   /** Omit for a module with no config beyond `enabled`. */
   readonly schema?: S;
+  /** When multiple enabled modules share this group, the loader skips every member. */
+  readonly exclusiveGroup?: string;
+  /** The injected `enabled` value for generated stanzas and invalid-config fallbacks. */
+  readonly enabledByDefault?: boolean;
   setup(pi: ExtensionAPI, ctx: ModuleContext<S>): void | Promise<void>;
 }
 
@@ -39,6 +43,7 @@ export interface JpiModule<S extends AnyJpiNodeSpec = AnyJpiNodeSpec> {
 export function injectEnabled<S extends AnyJpiNodeSpec = EmptyJpiNodeSpec>(
   name: string,
   schema?: S,
+  enabledByDefault = true,
 ): WithEnabled<S> {
   const base = (schema ?? j.node()) as AnyJpiNodeSpec;
   if ("enabled" in base.fields || "enabled" in base.attrs) {
@@ -53,7 +58,7 @@ export function injectEnabled<S extends AnyJpiNodeSpec = EmptyJpiNodeSpec>(
       enabled: j
         .boolean()
         .describe(`set to #false to disable the ${name} module entirely`)
-        .default(true),
+        .default(enabledByDefault),
       ...base.fields,
     },
   }) as WithEnabled<S>;

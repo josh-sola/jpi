@@ -23,18 +23,20 @@ scripts/install-ketch.mjs, ketch-release.json
                         pinned ketch installer and release metadata
 ```
 
-The 14 modules, in load order, are prompt, guardian, status, memory, web,
-title, background, subagents, tasks, scratchpad, btw, schedule, style, and
-history.
+The 15 modules, in load order, are prompt, guardian, status, memory, web,
+exa-web, title, background, subagents, tasks, scratchpad, btw, schedule,
+style, and history.
 
 ## Module rules
 
 - Every module declares a stanza in `<agentDir>/jpi.kdl`; its `section` is
-  normally its module name. The loader injects an `enabled` field, rendered
-  first with a default of `#true`, so module schemas must not declare their
-  own. `enabled #false` prevents the module from loading and requires a
-  restart to re-enable it. A missing stanza is seeded with defaults on first
-  run.
+  normally its module name. The loader injects an `enabled` field rendered
+  first, so module schemas must not declare their own. Modules default to
+  `#true` unless they opt out; `exa-web` defaults to `#false`. A missing stanza
+  is seeded with defaults on first run. Changing `enabled` requires a restart.
+- Modules in the same exclusive group cannot load together. The loader skips
+  every enabled member of a conflicting group and reports a startup error.
+  `web` and `exa-web` are mutually exclusive web providers.
 - Module order in `extensions/jpi/index.ts` is load-bearing. Prompt must run
   before memory and scratchpad append to the system prompt. Style runs near
   the end because it re-registers built-in tools. History runs last because

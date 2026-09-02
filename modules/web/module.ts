@@ -18,6 +18,7 @@ const webModule: JpiModule<typeof webSchema> = {
   name: "web",
   section: "web",
   schema: webSchema,
+  exclusiveGroup: "web-provider",
   setup(pi, ctx) {
     registerWebTools(pi, { backend: ctx.value.backend });
   },
