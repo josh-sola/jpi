@@ -207,6 +207,10 @@ title {
   enabled #true
 }
 
+orca-status {
+  enabled #true
+}
+
 // web_search and web_fetch, backed by the ketch CLI. Enable only one web provider.
 web {
   enabled #true
