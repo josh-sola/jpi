@@ -83,7 +83,7 @@ export function appendPiTail(
     BuildSystemPromptOptions,
     "appendSystemPrompt" | "contextFiles" | "skills" | "selectedTools" | "cwd"
   >,
-  formatSkillsForPrompt: (skills: Skill[]) => string,
+  formatSkillsForPrompt: (skills: Skill[], fileReadTool?: "read" | "bash") => string,
 ): string {
   let prompt = renderedPrompt;
 
@@ -102,9 +102,10 @@ export function appendPiTail(
   }
 
   const skills = options.skills ?? [];
-  const hasRead = !options.selectedTools || options.selectedTools.includes("read");
-  if (hasRead && skills.length > 0) {
-    prompt += formatSkillsForPrompt(skills);
+  const tools = options.selectedTools ?? DEFAULT_TOOLS;
+  const skillFileReadTool = (["read", "bash"] as const).find((tool) => tools.includes(tool));
+  if (skillFileReadTool && skills.length > 0) {
+    prompt += formatSkillsForPrompt(skills, skillFileReadTool);
   }
 
   const promptCwd = options.cwd.replace(/\\/g, "/");

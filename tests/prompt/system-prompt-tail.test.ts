@@ -32,20 +32,27 @@ test("appendPiTail renders the <project_context> block for loaded context files"
   assert.match(result, /<\/project_context>/);
 });
 
-test("appendPiTail includes skills only when the read tool is available", () => {
+test("appendPiTail includes skills with the preferred available file loader", () => {
+  const loaders: Array<"read" | "bash" | undefined> = [];
+  const formatSkills = (_skills: unknown[], fileReadTool?: "read" | "bash") => {
+    loaders.push(fileReadTool);
+    return `\n\nSKILLS BLOCK (${fileReadTool})`;
+  };
+
   const withRead = appendPiTail(
     "body",
-    { cwd: "/repo", skills: [{ name: "demo" } as never], selectedTools: ["read"] },
-    () => "\n\nSKILLS BLOCK",
+    { cwd: "/repo", skills: [{ name: "demo" } as never], selectedTools: ["bash", "read"] },
+    formatSkills,
   );
-  assert.match(withRead, /SKILLS BLOCK/);
+  assert.match(withRead, /SKILLS BLOCK \(read\)/);
 
-  const withoutRead = appendPiTail(
+  const withBash = appendPiTail(
     "body",
     { cwd: "/repo", skills: [{ name: "demo" } as never], selectedTools: ["bash"] },
-    () => "\n\nSKILLS BLOCK",
+    formatSkills,
   );
-  assert.doesNotMatch(withoutRead, /SKILLS BLOCK/);
+  assert.match(withBash, /SKILLS BLOCK \(bash\)/);
+  assert.deepEqual(loaders, ["read", "bash"]);
 });
 
 test("appendPiTail normalizes a Windows-style cwd to forward slashes, matching stock pi", () => {

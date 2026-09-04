@@ -40,7 +40,7 @@ describe("assistant-message: AssistantMessageComponent.prototype.updateContent (
     ).toBe("function");
   });
 
-  it("wraps the real italic thinking Markdown child in contentContainer", () => {
+  it("replaces the Markdown in Pi 0.85's thinking MouseRegion", () => {
     patchAssistantMessage();
     const component = new AssistantMessageComponent(
       undefined,
@@ -58,13 +58,20 @@ describe("assistant-message: AssistantMessageComponent.prototype.updateContent (
     ).contentContainer;
     expect(contentContainer?.children).toBeDefined();
 
-    const wrapper = contentContainer?.children?.find((child) => {
-      const children = (child as { children?: unknown[] }).children;
-      return Array.isArray(children) && children.length === 1;
-    }) as { children: unknown[] } | undefined;
-    expect(wrapper).toBeDefined();
+    const mouseRegion = contentContainer?.children?.find((child) => {
+      const region = child as { child?: unknown };
+      return region.child !== undefined;
+    }) as { constructor: { name: string }; child: unknown } | undefined;
+    expect(mouseRegion).toBeDefined();
+    expect(mouseRegion?.constructor.name).toBe("MouseRegion");
 
-    const markdown = wrapper?.children[0] as {
+    const thinkingBlock = mouseRegion?.child as {
+      children?: unknown[];
+      constructor: { name: string };
+    };
+    expect(thinkingBlock.constructor.name).toBe("ThinkingBlockComponent");
+
+    const markdown = thinkingBlock.children?.[0] as {
       constructor: { name: string };
       defaultTextStyle?: { italic?: boolean };
     };

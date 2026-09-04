@@ -22,6 +22,10 @@ interface ContentContainerLike {
   children?: unknown[];
 }
 
+interface MouseRegionLike {
+  child: unknown;
+}
+
 interface AssistantMessageComponentLike {
   contentContainer?: ContentContainerLike;
   isStreaming?: boolean;
@@ -94,6 +98,10 @@ function isThinkingMarkdown(child: unknown): child is MarkdownLike {
   );
 }
 
+function isMouseRegion(child: unknown): child is MouseRegionLike {
+  return !!child && typeof child === "object" && "child" in child;
+}
+
 class ThinkingBlockComponent extends Container {
   constructor(
     private readonly markdown: MarkdownLike,
@@ -144,6 +152,8 @@ function replaceThinkingMarkdowns(
     const child = children[index];
     if (isThinkingMarkdown(child)) {
       children[index] = new ThinkingBlockComponent(child, timing);
+    } else if (isMouseRegion(child) && isThinkingMarkdown(child.child)) {
+      child.child = new ThinkingBlockComponent(child.child, timing);
     }
   }
 }

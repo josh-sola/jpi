@@ -41,7 +41,7 @@ export type PromptExtension = {
 export type PromptExtensionDeps = {
   env?: NodeJS.ProcessEnv;
   homeDirectory?: string;
-  formatSkillsForPrompt: (skills: Skill[]) => string;
+  formatSkillsForPrompt: (skills: Skill[], fileReadTool?: "read" | "bash") => string;
   getPiDocsPaths: () => PiDocsPaths;
   now?: () => Date;
 };

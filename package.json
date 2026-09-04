@@ -19,6 +19,7 @@
     "zod": "^4"
   },
   "devDependencies": {
+    "@earendil-works/pi-server": "0.85.0",
     "vite-plus": "0.3.0"
   },
   "peerDependencies": {
