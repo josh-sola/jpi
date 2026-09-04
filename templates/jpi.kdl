@@ -188,6 +188,11 @@ subagents {
   viewer-markdown assistant
 }
 
+// parallel read-only code review; /review [target]
+review {
+  enabled #true
+}
+
 // TaskCreate/TaskList/TaskGet/TaskUpdate, the task widget, /tasks
 tasks {
   enabled #true

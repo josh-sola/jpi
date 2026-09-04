@@ -23,9 +23,9 @@ scripts/install-ketch.mjs, ketch-release.json
                         pinned ketch installer and release metadata
 ```
 
-The 15 modules, in load order, are prompt, guardian, status, memory, web,
-exa-web, title, background, subagents, tasks, scratchpad, btw, schedule,
-style, and history.
+The 16 modules, in load order, are prompt, guardian, status, memory, web,
+exa-web, title, background, subagents, review, tasks, scratchpad, btw,
+schedule, style, and history.
 
 ## Module rules
 

@@ -15,6 +15,7 @@ import scratchpadModule from "../../modules/scratchpad/module.ts";
 import statusModule from "../../modules/status/module.ts";
 import styleModule from "../../modules/style/module.ts";
 import subagentsModule from "../../modules/subagents/module.ts";
+import reviewModule from "../../modules/review/module.ts";
 import tasksModule from "../../modules/tasks/module.ts";
 import titleModule from "../../modules/title/module.ts";
 import exaWebModule from "../../modules/exa-web/module.ts";
@@ -35,6 +36,7 @@ const MODULES: readonly JpiModule[] = [
   titleModule,
   backgroundModule,
   subagentsModule,
+  reviewModule,
   tasksModule,
   scratchpadModule,
   btwModule,
