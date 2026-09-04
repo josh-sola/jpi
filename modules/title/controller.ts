@@ -1,4 +1,4 @@
-import { ActivityTitle } from "./activity.ts";
+import { ActivityTitle, type TitleMode } from "./activity.ts";
 import { BackgroundActivityMonitor } from "./background.ts";
 import {
   loadWorktreeName,
@@ -31,6 +31,7 @@ type Dependencies = {
   scheduler: Scheduler;
   createRequestId(): string;
   generation: number;
+  mode: TitleMode;
 };
 
 function eventId(data: unknown): string | undefined {
@@ -59,6 +60,7 @@ export class TitleController {
       dependencies.scheduler,
       () => sessionIndicator(dependencies.getSessionName(), this.worktreeName, context.cwd),
       (title) => context.ui.setTitle(title),
+      dependencies.mode,
     );
     this.background = new BackgroundActivityMonitor(
       dependencies.events,

@@ -5,7 +5,7 @@ import { createTitleExtension } from "../../modules/title/extension.ts";
 import { ACTIVE_FRAMES, SPINNER_INTERVAL_MS } from "../../modules/title/helpers.ts";
 import { FakeEventBus, ManualScheduler, ok } from "./jpi-title-test-helpers.ts";
 
-function harness() {
+function harness(titleMode: "static" | "dynamic" = "dynamic") {
   const scheduler = new ManualScheduler();
   const events = new FakeEventBus();
   const titles: string[] = [];
@@ -18,6 +18,7 @@ function harness() {
     exec: async () => ({ ...ok(), code: 1 }),
     events,
     getSessionName: () => undefined,
+    getTitleMode: () => titleMode,
     scheduler,
     requestId: () => "id",
   });
@@ -45,6 +46,25 @@ test("activity starts at the first frame and advances in the exact interval orde
   extension.onAgentSettled({}, context);
   assert.equal(titles.at(-1), "⏹ project");
   assert.equal(spinner.cleared, true);
+});
+
+test("static activity renders the fixed first frame without allocating a spinner and returns through waiting to idle", async () => {
+  const { scheduler, events, titles, context, extension } = harness("static");
+  await extension.onSessionStart({}, context);
+  scheduler.fire(scheduler.active("timeout", 0)[0]!);
+  titles.length = 0;
+
+  extension.onAgentStart({}, context);
+  assert.deepEqual(titles, [`${ACTIVE_FRAMES[0]} project`]);
+  assert.equal(scheduler.active("interval", SPINNER_INTERVAL_MS).length, 0);
+
+  events.emit("subagents:started", { id: "one" });
+  extension.onAgentSettled({}, context);
+  assert.equal(titles.at(-1), "⧗ project");
+  assert.equal(scheduler.active("interval", SPINNER_INTERVAL_MS).length, 0);
+
+  events.emit("subagents:completed", { id: "one" });
+  assert.equal(titles.at(-1), "⏹ project");
 });
 
 test("subagents and background feed waiting while main is idle; the spinner only runs while working", async () => {

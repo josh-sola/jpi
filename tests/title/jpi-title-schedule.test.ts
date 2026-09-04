@@ -24,6 +24,7 @@ function harness() {
     exec: async () => ok("tree"),
     events,
     getSessionName: () => undefined,
+    getTitleMode: () => "dynamic",
     scheduler,
     requestId: () => "unique",
   });

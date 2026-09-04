@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import { type TitleMode } from "./activity.ts";
 import { TitleController, type TitleContext } from "./controller.ts";
 import type { EventBus, ExecCommand, Scheduler } from "./helpers.ts";
 
@@ -7,6 +8,7 @@ export type TitleDependencies = {
   exec: ExecCommand;
   events: EventBus;
   getSessionName(): string | undefined;
+  getTitleMode(): TitleMode;
   scheduler?: Scheduler;
   requestId?: () => string;
 };
@@ -49,6 +51,7 @@ export function createTitleExtension(dependencies: TitleDependencies): TitleExte
           scheduler,
           createRequestId,
           generation,
+          mode: dependencies.getTitleMode(),
         },
         context,
       );

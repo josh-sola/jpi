@@ -20,6 +20,7 @@ test("repeated session starts ignore stale worktree results and callbacks", asyn
     },
     events,
     getSessionName: () => undefined,
+    getTitleMode: () => "dynamic",
     scheduler,
     requestId: () => "reload",
   });

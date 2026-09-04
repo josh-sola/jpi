@@ -8,6 +8,7 @@ import {
 } from "./helpers.ts";
 
 type State = "input" | "working" | "waiting" | "idle";
+export type TitleMode = "static" | "dynamic";
 
 export class ActivityTitle {
   private main = false;
@@ -21,11 +22,18 @@ export class ActivityTitle {
   private scheduler: Scheduler;
   private getName: () => string;
   private setTitle: (title: string) => void;
+  private mode: TitleMode;
 
-  constructor(scheduler: Scheduler, getName: () => string, setTitle: (title: string) => void) {
+  constructor(
+    scheduler: Scheduler,
+    getName: () => string,
+    setTitle: (title: string) => void,
+    mode: TitleMode,
+  ) {
     this.scheduler = scheduler;
     this.getName = getName;
     this.setTitle = setTitle;
+    this.mode = mode;
   }
 
   setMain(active: boolean): void {
@@ -104,6 +112,7 @@ export class ActivityTitle {
   private start(): void {
     this.frame = 0;
     this.render();
+    if (this.mode === "static") return;
     this.timer = this.scheduler.setInterval(() => {
       if (this.disposed) return;
       this.frame = (this.frame + 1) % ACTIVE_FRAMES.length;

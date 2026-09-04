@@ -27,6 +27,7 @@ test("background status polling and terminal refresh use the documented protocol
     exec: async () => ok("tree"),
     events,
     getSessionName: () => undefined,
+    getTitleMode: () => "dynamic",
     scheduler,
     requestId: () => "unique",
   });
@@ -79,6 +80,7 @@ test("shutdown clears session listeners and every timer while ignoring stale loo
     },
     events,
     getSessionName: () => undefined,
+    getTitleMode: () => "dynamic",
     scheduler,
     requestId: () => "pending",
   });

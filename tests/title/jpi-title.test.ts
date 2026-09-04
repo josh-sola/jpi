@@ -57,6 +57,7 @@ test("startup defers the idle title until after worktree lookup and rename is sy
     exec: async () => ok("Friendly tree\n"),
     events,
     getSessionName: () => sessionName,
+    getTitleMode: () => "dynamic",
     scheduler,
     requestId: () => "request",
   });
@@ -81,6 +82,7 @@ test("startup re-asserts the title at 600ms and 1200ms to survive tmux's rename 
     exec: async () => ok("tree"),
     events,
     getSessionName: () => undefined,
+    getTitleMode: () => "dynamic",
     scheduler,
     requestId: () => "request",
   });
@@ -112,6 +114,7 @@ test("shutdown before the reasserts fire clears them", async () => {
     exec: async () => ok("tree"),
     events,
     getSessionName: () => undefined,
+    getTitleMode: () => "dynamic",
     scheduler,
     requestId: () => "request",
   });
@@ -143,6 +146,7 @@ test("non-TUI sessions install no title behavior", async () => {
     },
     events,
     getSessionName: () => undefined,
+    getTitleMode: () => "dynamic",
     scheduler,
   });
 
