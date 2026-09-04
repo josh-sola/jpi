@@ -18,6 +18,7 @@ import subagentsModule from "../../modules/subagents/module.ts";
 import reviewModule from "../../modules/review/module.ts";
 import tasksModule from "../../modules/tasks/module.ts";
 import titleModule from "../../modules/title/module.ts";
+import orcaStatusModule from "../../modules/orca-status/module.ts";
 import exaWebModule from "../../modules/exa-web/module.ts";
 import webModule from "../../modules/web/module.ts";
 
@@ -34,6 +35,7 @@ const MODULES: readonly JpiModule[] = [
   webModule,
   exaWebModule,
   titleModule,
+  orcaStatusModule,
   backgroundModule,
   subagentsModule,
   reviewModule,
