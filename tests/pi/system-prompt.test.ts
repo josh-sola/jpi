@@ -82,7 +82,7 @@ describe("system-prompt: appendPiTail vs the real buildSystemPrompt (real pi-cod
     expect(jpiResult).toBe(realResult);
   });
 
-  it("still matches when skills are suppressed by an unavailable read tool", () => {
+  it("still matches when bash is the only skill file loader", () => {
     const rendered = "BODY";
     const options = { ...fixtureOptions(), selectedTools: ["bash"] };
 
@@ -90,7 +90,9 @@ describe("system-prompt: appendPiTail vs the real buildSystemPrompt (real pi-cod
     const realResult = buildSystemPrompt({ customPrompt: rendered, ...options });
 
     expect(jpiResult).toBe(realResult);
-    expect(jpiResult).not.toContain("<available_skills>");
+    expect(jpiResult).toContain(
+      "Use bash to load a skill's file when the task matches its description.",
+    );
   });
 });
 
