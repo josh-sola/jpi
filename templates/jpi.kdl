@@ -211,6 +211,18 @@ orca-status {
   enabled #true
 }
 
+// herdr agent state and sidebar label, sent to a herdr pane over its socket
+herdr-status {
+  enabled #true
+  // sidebar label per model, keyed provider/id; other models show the lowercased model name
+  label "openai-codex/gpt-5.6-sol" "codex sol"
+  label "openai-codex/gpt-5.6-luna" "codex luna"
+  label "openai-codex/gpt-5.6-terra" "codex terra"
+  label "openai-codex/gpt-6-astra" "codex astra"
+  label "openrouter/~moonshotai/kimi-latest" "kimi k3"
+  label "openrouter/~x-ai/grok-latest" "grok"
+}
+
 // web_search and web_fetch, backed by the ketch CLI. Enable only one web provider.
 web {
   enabled #true
