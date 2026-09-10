@@ -1,3 +1,11 @@
+export {
+  createActivityTracker,
+  type ActivitySnapshot,
+  type ActivitySubagent,
+  type ActivityTracker,
+  type ActivityTrackerDependencies,
+  type Scheduler,
+} from "./activity-tracker.ts";
 export { errorMessage } from "./errors.ts";
 export { isRecord } from "./guards.ts";
 export {
